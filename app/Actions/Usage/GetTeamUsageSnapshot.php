@@ -7,6 +7,7 @@ use App\Models\TeamQuotaPolicy;
 use App\Models\UsageLedger;
 use Carbon\CarbonInterface;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
 
 class GetTeamUsageSnapshot
 {
@@ -123,10 +124,11 @@ class GetTeamUsageSnapshot
         $start = $at->copy()->subDays(13)->startOfDay();
 
         /** @var Collection<string, int> $rows */
-        $rows = UsageLedger::query()
+        $rows = DB::table('usage_ledgers')
             ->where('team_id', $team->id)
             ->where('bucket_type', 'day')
             ->whereDate('bucket_date', '>=', $start->toDateString())
+            ->selectRaw('DATE(bucket_date) as bucket_date, SUM(request_count) as request_count')
             ->groupBy('bucket_date')
             ->orderBy('bucket_date')
             ->pluck('request_count', 'bucket_date');
@@ -134,10 +136,12 @@ class GetTeamUsageSnapshot
         $labels = [];
         $values = [];
 
-        for ($date = $start->copy(); $date->lte($at); $date->addDay()) {
+        $date = $start->copy();
+        while ($date->lte($at)) {
             $bucketDate = $date->toDateString();
             $labels[] = $date->format('m-d');
             $values[] = (int) ($rows[$bucketDate] ?? 0);
+            $date = $date->addDay();
         }
 
         return ['labels' => $labels, 'values' => $values];
