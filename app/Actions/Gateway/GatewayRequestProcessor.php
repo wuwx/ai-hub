@@ -2,6 +2,8 @@
 
 namespace App\Actions\Gateway;
 
+use App\Actions\Billing\DebitTeamWallet;
+use App\Actions\Billing\ResolveModelPricing;
 use App\Actions\Usage\EnforceTeamTokenQuota;
 use App\Actions\Usage\RecordApiRequestUsage;
 use App\Exceptions\QuotaExceededException;
@@ -14,6 +16,7 @@ use Illuminate\Http\Client\Response as HttpResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 use Symfony\Component\HttpFoundation\Response;
 
@@ -24,6 +27,8 @@ class GatewayRequestProcessor
         private readonly ResolveProviderSecret $resolveProviderSecret,
         private readonly EnforceTeamTokenQuota $enforceTeamTokenQuota,
         private readonly RecordApiRequestUsage $recordApiRequestUsage,
+        private readonly DebitTeamWallet $debitTeamWallet,
+        private readonly ResolveModelPricing $resolveModelPricing,
     ) {
         //
     }
@@ -65,6 +70,16 @@ class GatewayRequestProcessor
             return $this->jsonWithTrace(
                 $this->protocolTransformer->errorPayload($incomingProtocol, 'Model is unavailable for this team.', 'model_unavailable'),
                 422,
+                $traceId,
+            );
+        }
+
+        // Per-key model allow-list: if the key restricts access to specific
+        // models, reject requests outside that scope.
+        if (! $apiKey->canAccessModel($requestedModel)) {
+            return $this->jsonWithTrace(
+                $this->protocolTransformer->errorPayload($incomingProtocol, 'This API key is not permitted to use the requested model.', 'model_not_allowed', 'permission_error'),
+                403,
                 $traceId,
             );
         }
@@ -117,6 +132,40 @@ class GatewayRequestProcessor
             return $this->jsonWithTrace(
                 $this->protocolTransformer->errorPayload($incomingProtocol, $exception->getMessage(), 'quota_exceeded', 'rate_limit_error'),
                 429,
+                $traceId,
+            );
+        }
+
+        // Pre-paid wallet pre-flight: estimate the worst-case charge (input
+        // estimate + a generous output allowance) and reject early if the
+        // team can't afford it. This prevents leaking upstream tokens when
+        // the customer has no balance.
+        if ($this->debitTeamWallet->hasEnoughBalance($team, 0) === false) {
+            return $this->jsonWithTrace(
+                $this->protocolTransformer->errorPayload($incomingProtocol, 'Wallet balance is zero. Please recharge to continue.', 'insufficient_balance', 'billing_error'),
+                402,
+                $traceId,
+            );
+        }
+
+        // Reserve an output budget. We use the team's recent average output
+        // length as a heuristic to avoid over-blocking long-form requests.
+        $estimatedOutputTokens = max(256, $tokenInputEstimate);
+        $estimatedChargeCents = $this->resolveModelPricing->chargeCents(
+            $model,
+            $tokenInputEstimate,
+            $estimatedOutputTokens,
+        );
+
+        if ($estimatedChargeCents > 0 && ! $this->debitTeamWallet->hasEnoughBalance($team, $estimatedChargeCents)) {
+            return $this->jsonWithTrace(
+                $this->protocolTransformer->errorPayload(
+                    $incomingProtocol,
+                    'Insufficient wallet balance for this request. Please recharge.',
+                    'insufficient_balance',
+                    'billing_error',
+                ),
+                402,
                 $traceId,
             );
         }
@@ -214,6 +263,14 @@ class GatewayRequestProcessor
             $response = $this->sendWithRetry($headers, $url, $providerPayload, false);
         } catch (ConnectionException $exception) {
             $this->registerProviderFailure($provider);
+
+            Log::warning('gateway.provider.timeout', [
+                'provider_id' => $provider->id,
+                'provider_slug' => $provider->slug,
+                'url' => $url,
+                'trace_id' => $traceId,
+                'error' => $exception->getMessage(),
+            ]);
 
             $this->recordApiRequestUsage->handle(
                 team: $team,
@@ -315,6 +372,15 @@ class GatewayRequestProcessor
         } catch (ConnectionException $exception) {
             $this->registerProviderFailure($provider);
 
+            Log::warning('gateway.provider.timeout', [
+                'provider_id' => $provider->id,
+                'provider_slug' => $provider->slug,
+                'url' => $url,
+                'trace_id' => $traceId,
+                'streaming' => true,
+                'error' => $exception->getMessage(),
+            ]);
+
             $this->recordApiRequestUsage->handle(
                 team: $team,
                 protocol: $protocol,
@@ -348,50 +414,81 @@ class GatewayRequestProcessor
 
         $status = $response->status();
         $psrBody = $response->toPsrResponse()->getBody();
+        $startedAtStream = $startedAt;
+        $errorStream = $status >= 400 ? 'provider_error' : null;
+        $streamStatus = $status;
 
-        $this->recordApiRequestUsage->handle(
-            team: $team,
-            protocol: $protocol,
-            endpoint: $endpoint,
-            tokenInput: $inputEstimate,
-            tokenOutput: 0,
-            isStreaming: true,
-            statusCode: $status,
-            latencyMs: (int) round((microtime(true) - $startedAt) * 1000),
-            errorCode: $status >= 400 ? 'provider_error' : null,
-            traceId: $traceId,
-            apiKey: $apiKey,
-            provider: $provider,
-            llmModel: $model,
-            enforceQuota: false,
-        );
-
-        return response()->stream(function () use ($psrBody, $protocol, $providerProtocol, $model): void {
+        // Usage is recorded INSIDE the stream closure so we can bill the actual
+        // output tokens emitted by upstream SSE frames. If we recorded before
+        // streaming, every stream would show 0 output tokens and be billed as free.
+        return response()->stream(function () use (
+            $psrBody, $protocol, $providerProtocol, $model, $team, $apiKey,
+            $provider, $endpoint, $traceId, $inputEstimate, $startedAtStream, $errorStream, $streamStatus,
+        ): void {
             $buffer = '';
+            $streamInputTokens = 0;
+            $streamOutputTokens = 0;
+            $accumulatedText = '';
 
-            while (! $psrBody->eof()) {
-                $buffer .= $psrBody->read(8192);
+            try {
+                while (! $psrBody->eof()) {
+                    $buffer .= $psrBody->read(8192);
 
-                while (($separatorPosition = strpos($buffer, "\n\n")) !== false) {
-                    $frame = substr($buffer, 0, $separatorPosition);
-                    $buffer = substr($buffer, $separatorPosition + 2);
+                    while (($separatorPosition = strpos($buffer, "\n\n")) !== false) {
+                        $frame = substr($buffer, 0, $separatorPosition);
+                        $buffer = substr($buffer, $separatorPosition + 2);
 
-                    $adaptedFrame = $this->protocolTransformer->adaptStreamingFrame($frame, $protocol, $providerProtocol, $model->external_model_id);
+                        $telemetry = $this->protocolTransformer->extractStreamTelemetry($frame, $providerProtocol);
+                        $streamInputTokens += $telemetry['input'];
+                        $streamOutputTokens += $telemetry['output'];
+                        $accumulatedText .= $telemetry['text'];
+
+                        $adaptedFrame = $this->protocolTransformer->adaptStreamingFrame($frame, $protocol, $providerProtocol, $model->external_model_id);
+
+                        if ($adaptedFrame !== '') {
+                            echo $adaptedFrame;
+                            flush();
+                        }
+                    }
+                }
+
+                if ($buffer !== '') {
+                    $telemetry = $this->protocolTransformer->extractStreamTelemetry($buffer, $providerProtocol);
+                    $streamInputTokens += $telemetry['input'];
+                    $streamOutputTokens += $telemetry['output'];
+                    $accumulatedText .= $telemetry['text'];
+
+                    $adaptedFrame = $this->protocolTransformer->adaptStreamingFrame($buffer, $protocol, $providerProtocol, $model->external_model_id);
 
                     if ($adaptedFrame !== '') {
                         echo $adaptedFrame;
                         flush();
                     }
                 }
-            }
+            } finally {
+                // Prefer real upstream usage; fall back to estimate when provider
+                // didn't emit usage frames (e.g. older OpenAI-compatible backends).
+                $finalInput = $streamInputTokens > 0 ? $streamInputTokens : $inputEstimate;
+                $finalOutput = $streamOutputTokens > 0
+                    ? $streamOutputTokens
+                    : $this->protocolTransformer->estimateTextTokens($accumulatedText);
 
-            if ($buffer !== '') {
-                $adaptedFrame = $this->protocolTransformer->adaptStreamingFrame($buffer, $protocol, $providerProtocol, $model->external_model_id);
-
-                if ($adaptedFrame !== '') {
-                    echo $adaptedFrame;
-                    flush();
-                }
+                $this->recordApiRequestUsage->handle(
+                    team: $team,
+                    protocol: $protocol,
+                    endpoint: $endpoint,
+                    tokenInput: $finalInput,
+                    tokenOutput: $finalOutput,
+                    isStreaming: true,
+                    statusCode: $streamStatus,
+                    latencyMs: (int) round((microtime(true) - $startedAtStream) * 1000),
+                    errorCode: $errorStream,
+                    traceId: $traceId,
+                    apiKey: $apiKey,
+                    provider: $provider,
+                    llmModel: $model,
+                    enforceQuota: false,
+                );
             }
         }, $status, [
             'Content-Type' => $response->header('Content-Type', 'text/event-stream'),
@@ -536,13 +633,30 @@ class GatewayRequestProcessor
 
         if ($currentFailures >= $threshold) {
             Cache::put($this->providerCircuitOpenUntilCacheKey($provider), now()->addSeconds($cooldownSeconds)->timestamp, now()->addSeconds($cooldownSeconds));
+
+            Log::warning('gateway.circuit.opened', [
+                'provider_id' => $provider->id,
+                'provider_slug' => $provider->slug,
+                'failures' => $currentFailures,
+                'threshold' => $threshold,
+                'cooldown_seconds' => $cooldownSeconds,
+            ]);
         }
     }
 
     protected function registerProviderSuccess(LlmProvider $provider): void
     {
+        $wasOpen = $this->isProviderCircuitOpen($provider);
+
         Cache::forget($this->providerFailureCountCacheKey($provider));
         Cache::forget($this->providerCircuitOpenUntilCacheKey($provider));
+
+        if ($wasOpen) {
+            Log::info('gateway.circuit.closed', [
+                'provider_id' => $provider->id,
+                'provider_slug' => $provider->slug,
+            ]);
+        }
     }
 
     protected function providerFailureCountCacheKey(LlmProvider $provider): string

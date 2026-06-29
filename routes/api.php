@@ -11,6 +11,7 @@ Route::post('webhooks/stripe', StripeWebhookController::class);
 Route::prefix('v1')
     ->middleware([AuthenticateApiKey::class, ThrottleApiKeyRequests::class])
     ->group(function () {
+        Route::get('models', [CompatibilityGatewayController::class, 'listModels']);
         Route::post('chat/completions', [CompatibilityGatewayController::class, 'openAiChatCompletions']);
         Route::post('responses', [CompatibilityGatewayController::class, 'openAiResponses']);
         Route::post('messages', [CompatibilityGatewayController::class, 'anthropicMessages']);

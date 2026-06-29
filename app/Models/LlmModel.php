@@ -15,6 +15,11 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
     'pricing',
     'context_window',
     'max_output_tokens',
+    'cost_input_per_1m_usd',
+    'cost_output_per_1m_usd',
+    'sell_input_per_1m_usd',
+    'sell_output_per_1m_usd',
+    'markup_percent',
     'is_active',
 ])]
 class LlmModel extends Model
@@ -68,6 +73,11 @@ class LlmModel extends Model
             'capabilities' => 'array',
             'pricing' => 'array',
             'is_active' => 'boolean',
+            'cost_input_per_1m_usd' => 'float',
+            'cost_output_per_1m_usd' => 'float',
+            'sell_input_per_1m_usd' => 'float',
+            'sell_output_per_1m_usd' => 'float',
+            'markup_percent' => 'integer',
         ];
     }
 }

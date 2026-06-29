@@ -1,6 +1,7 @@
 <?php
 
 use App\Actions\ApiKeys\GenerateApiKey;
+use App\Actions\Billing\RechargeTeamWallet;
 use App\Models\LlmModel;
 use App\Models\LlmProvider;
 use App\Models\TeamModelEntitlement;
@@ -236,6 +237,57 @@ it('opens circuit breaker after repeated provider failures', function () {
     expect($upstreamCalls)->toBe(2);
 });
 
+it('lists entitled models via GET /v1/models in OpenAI-compatible format', function () {
+    [$plainTextKey, $modelExternalId] = provisionGatewayTargetForTeam('openai_compatible', 'gpt-4.1');
+
+    $response = $this->withToken($plainTextKey)->getJson('/api/v1/models');
+
+    $response->assertOk();
+    $response->assertHeader('X-Trace-Id');
+    $response->assertJsonPath('object', 'list');
+    $response->assertJsonStructure([
+        'object',
+        'data' => [
+            '*' => ['id', 'object', 'created', 'owned_by'],
+        ],
+    ]);
+
+    $modelIds = collect($response->json('data'))->pluck('id');
+    expect($modelIds)->toContain($modelExternalId);
+});
+
+it('excludes models the team is not entitled to use from GET /v1/models', function () {
+    [$plainTextKey] = provisionGatewayTargetForTeam('openai_compatible', 'gpt-4.1');
+
+    // Create a second provider+model that the team has NO entitlement to.
+    $otherProvider = LlmProvider::create([
+        'name' => 'Anthropic Direct',
+        'slug' => 'anthropic-direct-'.uniqid(),
+        'adapter_type' => 'anthropic_compatible',
+        'base_url' => 'https://anthropic.mock',
+        'auth_mode' => 'bearer',
+        'secret_ref' => 'test-secret',
+        'is_active' => true,
+    ]);
+
+    LlmModel::create([
+        'llm_provider_id' => $otherProvider->id,
+        'name' => 'CLAUDE-3-7-SONNET',
+        'external_model_id' => 'claude-3-7-sonnet',
+        'is_active' => true,
+    ]);
+
+    $response = $this->withToken($plainTextKey)->getJson('/api/v1/models');
+
+    $response->assertOk();
+    $modelIds = collect($response->json('data'))->pluck('id');
+    expect($modelIds)->not->toContain('claude-3-7-sonnet');
+});
+
+it('rejects GET /v1/models without a valid API key', function () {
+    $this->getJson('/api/v1/models')->assertUnauthorized();
+});
+
 function provisionGatewayTargetForTeam(string $adapterType, string $externalModelId): array
 {
     $user = User::factory()->create();
@@ -270,6 +322,10 @@ function provisionGatewayTargetForTeam(string $adapterType, string $externalMode
         'llm_provider_id' => $provider->id,
         'name' => strtoupper($externalModelId),
         'external_model_id' => $externalModelId,
+        'sell_input_per_1m_usd' => 1.0,
+        'sell_output_per_1m_usd' => 2.0,
+        'cost_input_per_1m_usd' => 0.5,
+        'cost_output_per_1m_usd' => 1.0,
         'is_active' => true,
     ]);
 
@@ -284,6 +340,13 @@ function provisionGatewayTargetForTeam(string $adapterType, string $externalMode
         'llm_model_id' => $model->id,
         'is_enabled' => true,
     ]);
+
+    // Pre-pay the wallet so the gateway pre-flight balance check passes.
+    app(RechargeTeamWallet::class)->handle(
+        team: $team,
+        amountCents: 100_00, // $100.00
+        description: 'Test seed balance',
+    );
 
     $apiKey = app(GenerateApiKey::class)->handle(
         team: $team,

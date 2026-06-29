@@ -1,7 +1,12 @@
 <?php
 
 use App\Actions\ApiKeys\GenerateApiKey;
+use App\Actions\Billing\DebitTeamWallet;
+use App\Actions\Billing\ResolveModelPricing;
+use App\Actions\Usage\CheckQuotaThresholds;
+use App\Actions\Usage\EnforceTeamTokenQuota;
 use App\Actions\Usage\RecordApiRequestUsage;
+use App\Exceptions\InsufficientWalletBalanceException;
 use App\Exceptions\QuotaExceededException;
 use App\Models\LlmModel;
 use App\Models\LlmProvider;
@@ -150,4 +155,60 @@ it('throws when recording would exceed token quota', function () {
         tokenInput: 45,
         tokenOutput: 10,
     ))->toThrow(QuotaExceededException::class);
+});
+
+it('does not propagate insufficient wallet balance exceptions during debit', function () {
+    $user = User::factory()->create();
+    $team = $user->currentTeam;
+
+    $provider = LlmProvider::create([
+        'name' => 'Insufficient Balance Provider',
+        'slug' => 'insufficient-balance-provider',
+        'adapter_type' => 'openai_compatible',
+        'base_url' => 'https://api.example.com',
+        'auth_mode' => 'bearer',
+        'is_active' => true,
+    ]);
+
+    $model = LlmModel::create([
+        'llm_provider_id' => $provider->id,
+        'name' => 'Paid Model',
+        'external_model_id' => 'paid-model',
+        'sell_input_per_1m_usd' => 1.0,
+        'sell_output_per_1m_usd' => 2.0,
+        'is_active' => true,
+    ]);
+
+    // Simulate the wallet debit failing (e.g. concurrent requests drained the
+    // balance mid-stream). The usage record must still be created and the
+    // exception swallowed — otherwise streaming responses would 500.
+    $debit = Mockery::mock(DebitTeamWallet::class);
+    $debit->shouldReceive('handle')
+        ->andThrow(new InsufficientWalletBalanceException(100, 10));
+
+    $recordApiRequestUsage = new RecordApiRequestUsage(
+        enforceTeamTokenQuota: app(EnforceTeamTokenQuota::class),
+        checkQuotaThresholds: app(CheckQuotaThresholds::class),
+        debitTeamWallet: $debit,
+        resolveModelPricing: app(ResolveModelPricing::class),
+    );
+
+    $requestLog = $recordApiRequestUsage->handle(
+        team: $team,
+        protocol: 'openai',
+        endpoint: '/v1/chat/completions',
+        tokenInput: 500,
+        tokenOutput: 200,
+        statusCode: 200,
+        provider: $provider,
+        llmModel: $model,
+    );
+
+    expect($requestLog)->not->toBeNull();
+    $this->assertDatabaseHas('request_logs', [
+        'id' => $requestLog->id,
+        'team_id' => $team->id,
+        'token_total' => 700,
+        'status_code' => 200,
+    ]);
 });

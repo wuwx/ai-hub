@@ -5,6 +5,7 @@ namespace App\Actions\Billing;
 use App\Models\Team;
 use App\Models\TeamBillingSubscription;
 use App\Models\TeamQuotaPolicy;
+use App\Models\TeamWallet;
 use Carbon\CarbonInterface;
 
 class SyncTeamQuotaFromSubscription
@@ -21,6 +22,22 @@ class SyncTeamQuotaFromSubscription
         }
 
         $plan = $this->resolvePlan($planCode);
+
+        // Provision a post-paid wallet for teams on an active subscription so
+        // the gateway's pre-flight balance check admits traffic. The wallet
+        // balance goes negative as usage is debited and is settled via the
+        // monthly invoice + Stripe checkout flow.
+        if (in_array($status, ['active', 'trialing'], true)) {
+            TeamWallet::query()->firstOrCreate(
+                ['team_id' => $subscription->team_id],
+                [
+                    'balance_cents' => 0,
+                    'credit_grant_cents' => 0,
+                    'currency' => (string) config('services.billing.currency', 'USD'),
+                    'is_postpaid' => true,
+                ],
+            );
+        }
 
         return $this->upsertPolicy(
             team: $subscription->team,

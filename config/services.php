@@ -45,6 +45,16 @@ return [
         'idempotency_ttl_seconds' => (int) env('LLM_GATEWAY_IDEMPOTENCY_TTL_SECONDS', 300),
         'api_key_rate_limit_per_minute' => (int) env('LLM_GATEWAY_API_KEY_RATE_LIMIT_PER_MINUTE', 120),
         'api_key_rate_limit_decay_seconds' => (int) env('LLM_GATEWAY_API_KEY_RATE_LIMIT_DECAY_SECONDS', 60),
+        // Provider upstream secrets. Each entry is loaded from env() here (so it
+        // survives `config:cache`) and referenced from llm_providers.secret_ref
+        // as `secret://KEY` (recommended) or legacy `env://KEY`.
+        'secrets' => array_filter([
+            'OPENAI_API_KEY' => env('OPENAI_API_KEY'),
+            'ANTHROPIC_API_KEY' => env('ANTHROPIC_API_KEY'),
+            'GROQ_API_KEY' => env('GROQ_API_KEY'),
+            'DEEPSEEK_API_KEY' => env('DEEPSEEK_API_KEY'),
+            'MISTRAL_API_KEY' => env('MISTRAL_API_KEY'),
+        ]),
     ],
 
     'billing' => [
@@ -52,6 +62,8 @@ return [
         'invoice_due_days' => (int) env('BILLING_INVOICE_DUE_DAYS', 7),
         'checkout_success_url' => env('BILLING_CHECKOUT_SUCCESS_URL', rtrim((string) env('APP_URL', 'http://localhost'), '/').'/billing/success'),
         'checkout_cancel_url' => env('BILLING_CHECKOUT_CANCEL_URL', rtrim((string) env('APP_URL', 'http://localhost'), '/').'/billing/cancel'),
+        'wallet_recharge_success_url' => env('BILLING_WALLET_RECHARGE_SUCCESS_URL', rtrim((string) env('APP_URL', 'http://localhost'), '/').'/billing/wallet/success'),
+        'wallet_recharge_cancel_url' => env('BILLING_WALLET_RECHARGE_CANCEL_URL', rtrim((string) env('APP_URL', 'http://localhost'), '/').'/billing/wallet/cancel'),
         'free_plan_code' => env('BILLING_FREE_PLAN_CODE', 'free'),
         'plans' => [
             'free' => [

@@ -71,7 +71,7 @@ class ProtocolTransformer
             ]);
         }
 
-        return $this->removeNulls([
+        $payload = $this->removeNulls([
             'model' => $canonical['model'] ?? null,
             'messages' => $messages,
             'tools' => $this->toOpenAiTools($canonical['tools'] ?? []),
@@ -79,6 +79,15 @@ class ProtocolTransformer
             'max_tokens' => $canonical['max_tokens'] ?? null,
             'temperature' => $canonical['temperature'] ?? null,
         ]);
+
+        // Ask OpenAI-compatible providers to emit a final usage chunk so we can
+        // bill streaming output tokens accurately. Providers that don't support
+        // this option typically ignore unknown fields.
+        if ((bool) ($canonical['stream'] ?? false)) {
+            $payload['stream_options'] = ['include_usage' => true];
+        }
+
+        return $payload;
     }
 
     public function providerProtocol(string $adapterType): string
@@ -153,14 +162,124 @@ class ProtocolTransformer
      */
     public function estimateInputTokens(array $canonical): int
     {
-        $messages = collect($canonical['messages'] ?? []);
-        $characters = $messages
+        $text = collect($canonical['messages'] ?? [])
             ->map(fn ($message) => $this->stringContent($message['content'] ?? ''))
             ->implode(' ');
 
-        $chars = mb_strlen($characters);
+        $system = $canonical['system'] ?? null;
+        if (! empty($system)) {
+            $text .= ' '.$this->stringContent($system);
+        }
 
-        return max(1, (int) ceil($chars / 4));
+        return $this->estimateTextTokens($text);
+    }
+
+    /**
+     * Estimate token count from text using a CJK-aware heuristic.
+     *
+     * The naive `chars / 4` rule underestimates CJK content (Chinese/Japanese/Korean),
+     * where each character typically maps to roughly one token. We split the count by
+     * script range to keep the estimate closer to real tokenizer behavior.
+     */
+    public function estimateTextTokens(string $text): int
+    {
+        if ($text === '') {
+            return 1;
+        }
+
+        $chars = mb_strlen($text);
+        $cjkCount = preg_match_all('/[\x{4E00}-\x{9FFF}\x{3040}-\x{309F}\x{30A0}-\x{30FF}\x{AC00}-\x{D7AF}]/u', $text) ?: 0;
+        $nonCjkChars = max(0, $chars - $cjkCount);
+
+        // CJK: ~1.5 chars per token; ASCII/latin: ~4 chars per token.
+        $tokens = ($cjkCount / 1.5) + ($nonCjkChars / 4);
+
+        return max(1, (int) ceil($tokens));
+    }
+
+    /**
+     * Extract usage tokens and text content from a single SSE frame.
+     *
+     * Used while streaming so we can bill output tokens accurately. Returns
+     * integers for input/output tokens (0 when the frame carries no usage)
+     * and any text delta accumulated from the frame.
+     *
+     * @return array{input: int, output: int, text: string}
+     */
+    public function extractStreamTelemetry(string $frame, string $providerProtocol): array
+    {
+        $data = $this->extractSseData($frame);
+
+        if ($data === null || $data === '' || trim($data) === '[DONE]') {
+            return ['input' => 0, 'output' => 0, 'text' => ''];
+        }
+
+        $json = json_decode($data, true);
+
+        if (! is_array($json)) {
+            return ['input' => 0, 'output' => 0, 'text' => ''];
+        }
+
+        if ($providerProtocol === 'anthropic') {
+            return $this->extractAnthropicStreamTelemetry($json);
+        }
+
+        return $this->extractOpenAiStreamTelemetry($json);
+    }
+
+    /**
+     * @param  array<string, mixed>  $payload
+     * @return array{input: int, output: int, text: string}
+     */
+    protected function extractAnthropicStreamTelemetry(array $payload): array
+    {
+        $type = (string) ($payload['type'] ?? '');
+
+        if ($type === 'message_start') {
+            return [
+                'input' => (int) data_get($payload, 'message.usage.input_tokens', 0),
+                'output' => (int) data_get($payload, 'message.usage.output_tokens', 0),
+                'text' => '',
+            ];
+        }
+
+        if ($type === 'message_delta') {
+            return [
+                'input' => 0,
+                'output' => (int) data_get($payload, 'usage.output_tokens', 0),
+                'text' => '',
+            ];
+        }
+
+        if ($type === 'content_block_delta' && data_get($payload, 'delta.type') === 'text_delta') {
+            return [
+                'input' => 0,
+                'output' => 0,
+                'text' => (string) data_get($payload, 'delta.text', ''),
+            ];
+        }
+
+        return ['input' => 0, 'output' => 0, 'text' => ''];
+    }
+
+    /**
+     * @param  array<string, mixed>  $payload
+     * @return array{input: int, output: int, text: string}
+     */
+    protected function extractOpenAiStreamTelemetry(array $payload): array
+    {
+        $text = (string) data_get($payload, 'choices.0.delta.content', '');
+        $usage = data_get($payload, 'usage');
+
+        if (is_array($usage)) {
+            return [
+                'input' => (int) data_get($usage, 'prompt_tokens', 0),
+                'output' => (int) data_get($usage, 'completion_tokens', 0),
+                'text' => $text,
+            ];
+        }
+
+        return ['input' => 0, 'output' => 0, 'text' => $text];
     }
 
     /**

@@ -13,6 +13,9 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
     'name',
     'key_hash',
     'last_four',
+    'allowed_models',
+    'daily_token_limit',
+    'rate_limit_per_minute',
     'last_used_at',
     'expires_at',
     'revoked_at',
@@ -78,9 +81,21 @@ class ApiKey extends Model
     protected function casts(): array
     {
         return [
+            'allowed_models' => 'array',
+            'daily_token_limit' => 'integer',
+            'rate_limit_per_minute' => 'integer',
             'last_used_at' => 'datetime',
             'expires_at' => 'datetime',
             'revoked_at' => 'datetime',
         ];
+    }
+
+    public function canAccessModel(string $externalModelId): bool
+    {
+        if (empty($this->allowed_models)) {
+            return true;
+        }
+
+        return in_array($externalModelId, $this->allowed_models, true);
     }
 }

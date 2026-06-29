@@ -3,6 +3,7 @@
 use App\Models\BillingInvoice;
 use App\Models\TeamBillingSubscription;
 use App\Models\TeamQuotaPolicy;
+use App\Models\TeamWallet;
 use App\Models\User;
 
 it('marks invoice as paid when stripe checkout completed webhook is valid', function () {
@@ -153,6 +154,12 @@ it('syncs team subscription and applies plan quota limits from stripe webhook', 
     expect($activePolicy->daily_token_limit)->toBe(123456);
     expect($activePolicy->weekly_token_limit)->toBe(654321);
     expect($activePolicy->monthly_token_limit)->toBe(987654);
+
+    // An active subscription must provision a post-paid wallet so the gateway
+    // pre-flight balance check admits traffic without requiring a manual top-up.
+    $wallet = TeamWallet::query()->where('team_id', $team->id)->first();
+    expect($wallet)->not->toBeNull()
+        ->and($wallet->is_postpaid)->toBeTrue();
 });
 
 it('downgrades subscription quota to free when stripe status is past_due', function () {

@@ -177,6 +177,26 @@ class Team extends Model
     }
 
     /**
+     * Get the team's pre-paid / post-paid wallet.
+     *
+     * @return HasOne<TeamWallet, $this>
+     */
+    public function wallet(): HasOne
+    {
+        return $this->hasOne(TeamWallet::class);
+    }
+
+    /**
+     * Get wallet transactions for this team.
+     *
+     * @return HasMany<TeamWalletTransaction, $this>
+     */
+    public function walletTransactions(): HasMany
+    {
+        return $this->hasMany(TeamWalletTransaction::class);
+    }
+
+    /**
      * Get the attributes that should be cast.
      *
      * @return array<string, string>

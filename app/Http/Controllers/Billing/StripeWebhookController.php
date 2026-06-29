@@ -2,18 +2,23 @@
 
 namespace App\Http\Controllers\Billing;
 
+use App\Actions\Billing\RechargeTeamWallet;
 use App\Actions\Billing\SyncTeamQuotaFromSubscription;
 use App\Http\Controllers\Controller;
 use App\Models\BillingInvoice;
 use App\Models\Team;
 use App\Models\TeamBillingSubscription;
+use App\Models\TeamWalletTransaction;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
 
 class StripeWebhookController extends Controller
 {
-    public function __construct(private readonly SyncTeamQuotaFromSubscription $syncTeamQuotaFromSubscription)
-    {
+    public function __construct(
+        private readonly SyncTeamQuotaFromSubscription $syncTeamQuotaFromSubscription,
+        private readonly RechargeTeamWallet $rechargeTeamWallet,
+    ) {
         //
     }
 
@@ -41,7 +46,13 @@ class StripeWebhookController extends Controller
         }
 
         if (in_array($eventType, ['checkout.session.completed', 'checkout.session.async_payment_succeeded', 'invoice.paid'], true)) {
-            $this->markInvoicePaid($dataObject);
+            // Wallet top-ups are routed through the same checkout.session.completed
+            // event but carry wallet_recharge metadata instead of invoice_number.
+            if ($this->isWalletRechargeEvent($dataObject)) {
+                $this->applyWalletRecharge($dataObject);
+            } else {
+                $this->markInvoicePaid($dataObject);
+            }
         }
 
         if (in_array($eventType, ['customer.subscription.created', 'customer.subscription.updated', 'customer.subscription.deleted'], true)) {
@@ -53,6 +64,77 @@ class StripeWebhookController extends Controller
         }
 
         return response()->json(['received' => true]);
+    }
+
+    /**
+     * @param  array<string, mixed>  $dataObject
+     */
+    protected function isWalletRechargeEvent(array $dataObject): bool
+    {
+        $teamId = (int) data_get($dataObject, 'metadata.wallet_recharge_team_id', 0);
+
+        return $teamId > 0;
+    }
+
+    /**
+     * @param  array<string, mixed>  $dataObject
+     */
+    protected function applyWalletRecharge(array $dataObject): void
+    {
+        $teamId = (int) data_get($dataObject, 'metadata.wallet_recharge_team_id', 0);
+        $team = Team::query()->find($teamId);
+
+        if (! $team) {
+            Log::warning('Stripe wallet recharge webhook: team not found', ['team_id' => $teamId]);
+
+            return;
+        }
+
+        // Idempotency: skip if we have already credited this Stripe session/charge.
+        $referenceId = (string) (data_get($dataObject, 'id')
+            ?? data_get($dataObject, 'payment_intent')
+            ?? '');
+
+        if ($referenceId === '') {
+            Log::warning('Stripe wallet recharge webhook: missing reference id', ['team_id' => $teamId]);
+
+            return;
+        }
+
+        $existing = TeamWalletTransaction::query()
+            ->where('reference_id', $referenceId)
+            ->where('type', 'recharge')
+            ->exists();
+
+        if ($existing) {
+            return;
+        }
+
+        // amount_total is in the smallest currency unit (cents). For USD it's
+        // 1:1 with our balance_cents column. Multi-currency wallets should
+        // convert at this boundary.
+        $amountCents = (int) data_get($dataObject, 'amount_total', data_get($dataObject, 'amount', 0));
+
+        if ($amountCents <= 0) {
+            Log::warning('Stripe wallet recharge webhook: non-positive amount', [
+                'team_id' => $teamId,
+                'amount_cents' => $amountCents,
+            ]);
+
+            return;
+        }
+
+        $this->rechargeTeamWallet->handle(
+            team: $team,
+            amountCents: $amountCents,
+            description: sprintf('Stripe recharge — session %s', $referenceId),
+            referenceId: $referenceId,
+            metadata: [
+                'stripe_event' => 'checkout.session.completed',
+                'stripe_session_id' => $referenceId,
+                'currency' => (string) data_get($dataObject, 'currency', 'usd'),
+            ],
+        );
     }
 
     /**

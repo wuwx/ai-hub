@@ -2,6 +2,9 @@
 
 namespace App\Actions\Usage;
 
+use App\Actions\Billing\DebitTeamWallet;
+use App\Actions\Billing\ResolveModelPricing;
+use App\Exceptions\InsufficientWalletBalanceException;
 use App\Models\ApiKey;
 use App\Models\LlmModel;
 use App\Models\LlmProvider;
@@ -10,11 +13,16 @@ use App\Models\Team;
 use App\Models\UsageLedger;
 use Carbon\CarbonInterface;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 
 class RecordApiRequestUsage
 {
-    public function __construct(private readonly EnforceTeamTokenQuota $enforceTeamTokenQuota)
-    {
+    public function __construct(
+        private readonly EnforceTeamTokenQuota $enforceTeamTokenQuota,
+        private readonly CheckQuotaThresholds $checkQuotaThresholds,
+        private readonly DebitTeamWallet $debitTeamWallet,
+        private readonly ResolveModelPricing $resolveModelPricing,
+    ) {
         //
     }
 
@@ -44,7 +52,7 @@ class RecordApiRequestUsage
         $tokenOutput = max(0, $tokenOutput);
         $tokenTotal = $tokenInput + $tokenOutput;
 
-        return DB::transaction(function () use (
+        $requestLog = DB::transaction(function () use (
             $team,
             $protocol,
             $endpoint,
@@ -133,6 +141,58 @@ class RecordApiRequestUsage
 
             return $requestLog;
         });
+
+        // Real-time wallet debit. Only charge for successful requests with
+        // actual token consumption — errors/timeouts are free for the customer
+        // (the operator eats the upstream cost, which is the standard model).
+        // For streaming responses the bytes have already been flushed to the
+        // client by the time we reach here, so a failed debit must not raise
+        // — otherwise the framework turns it into a 500 and corrupts the
+        // stream. Log the shortfall instead and let the monthly invoice
+        // reconciliation collect the gap for post-paid teams.
+        if ($tokenTotal > 0 && $llmModel && $statusCode !== null && $statusCode < 400 && empty($errorCode)) {
+            try {
+                $this->debitTeamWallet->handle(
+                    team: $team,
+                    amountCents: $this->resolveModelPricing->chargeCents($llmModel, $tokenInput, $tokenOutput),
+                    description: sprintf(
+                        '%s %s — %d in / %d out tokens',
+                        $protocol,
+                        $endpoint,
+                        $tokenInput,
+                        $tokenOutput,
+                    ),
+                    source: $requestLog,
+                    referenceId: 'reqlog:'.$requestLog->id,
+                    metadata: [
+                        'trace_id' => $traceId,
+                        'model_id' => $llmModel->id,
+                        'model_external_id' => $llmModel->external_model_id,
+                        'provider_id' => $provider?->id,
+                        'token_input' => $tokenInput,
+                        'token_output' => $tokenOutput,
+                        'cost_cents' => $this->resolveModelPricing->costCents($llmModel, $tokenInput, $tokenOutput),
+                    ],
+                );
+            } catch (InsufficientWalletBalanceException $exception) {
+                Log::warning('gateway.wallet.debit_failed', [
+                    'team_id' => $team->id,
+                    'request_log_id' => $requestLog->id,
+                    'trace_id' => $traceId,
+                    'amount_cents' => $exception->requestedCents,
+                    'available_cents' => $exception->availableCents,
+                    'message' => $exception->getMessage(),
+                ]);
+            }
+        }
+
+        // Threshold alerts run after the transaction commits so the latest
+        // ledger totals are visible. Only meaningful when tokens were consumed.
+        if ($tokenTotal > 0) {
+            $this->checkQuotaThresholds->handle($team, $requestedAt);
+        }
+
+        return $requestLog;
     }
 
     protected function incrementLedger(
