@@ -13,4 +13,12 @@ enum TeamPermission: string
 
     case CreateInvitation = 'invitation:create';
     case CancelInvitation = 'invitation:cancel';
+
+    case ManageApiKeys = 'api-key:manage';
+    case ManageQuota = 'quota:manage';
+    case ViewUsage = 'usage:view';
+    case ManageGatewayConfig = 'gateway:manage';
+    case ManageEntitlements = 'entitlement:manage';
+    case ViewBilling = 'billing:view';
+    case ManageBilling = 'billing:manage';
 }

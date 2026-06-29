@@ -11,6 +11,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Carbon;
 
@@ -93,6 +94,86 @@ class Team extends Model
     public function invitations(): HasMany
     {
         return $this->hasMany(TeamInvitation::class);
+    }
+
+    /**
+     * Get all API keys for this team.
+     *
+     * @return HasMany<ApiKey, $this>
+     */
+    public function apiKeys(): HasMany
+    {
+        return $this->hasMany(ApiKey::class);
+    }
+
+    /**
+     * Get all provider entitlements for this team.
+     *
+     * @return HasMany<TeamProviderEntitlement, $this>
+     */
+    public function providerEntitlements(): HasMany
+    {
+        return $this->hasMany(TeamProviderEntitlement::class);
+    }
+
+    /**
+     * Get all model entitlements for this team.
+     *
+     * @return HasMany<TeamModelEntitlement, $this>
+     */
+    public function modelEntitlements(): HasMany
+    {
+        return $this->hasMany(TeamModelEntitlement::class);
+    }
+
+    /**
+     * Get quota policy versions for this team.
+     *
+     * @return HasMany<TeamQuotaPolicy, $this>
+     */
+    public function quotaPolicies(): HasMany
+    {
+        return $this->hasMany(TeamQuotaPolicy::class);
+    }
+
+    /**
+     * Get usage ledgers for this team.
+     *
+     * @return HasMany<UsageLedger, $this>
+     */
+    public function usageLedgers(): HasMany
+    {
+        return $this->hasMany(UsageLedger::class);
+    }
+
+    /**
+     * Get request logs for this team.
+     *
+     * @return HasMany<RequestLog, $this>
+     */
+    public function requestLogs(): HasMany
+    {
+        return $this->hasMany(RequestLog::class);
+    }
+
+    /**
+     * Get billing invoices for this team.
+     *
+     * @return HasMany<BillingInvoice, $this>
+     */
+    public function billingInvoices(): HasMany
+    {
+        return $this->hasMany(BillingInvoice::class);
+    }
+
+    /**
+     * Get billing subscription profile for this team.
+     *
+     * @return HasOne<TeamBillingSubscription, $this>
+     */
+    public function billingSubscription(): HasOne
+    {
+        return $this->hasOne(TeamBillingSubscription::class);
     }
 
     /**
