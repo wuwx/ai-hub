@@ -14,6 +14,7 @@ use Illuminate\Database\Eloquent\Relations\MorphMany;
     'credit_grant_cents',
     'currency',
     'is_postpaid',
+    'credit_limit_cents',
     'last_recharged_at',
 ])]
 class TeamWallet extends Model
@@ -51,6 +52,7 @@ class TeamWallet extends Model
             'balance_cents' => 'integer',
             'credit_grant_cents' => 'integer',
             'is_postpaid' => 'boolean',
+            'credit_limit_cents' => 'integer',
             'last_recharged_at' => 'datetime',
         ];
     }
@@ -61,6 +63,20 @@ class TeamWallet extends Model
     public function availableCents(): int
     {
         return $this->balance_cents + $this->credit_grant_cents;
+    }
+
+    /**
+     * Check if this post-paid wallet has exceeded its credit limit.
+     * Pre-paid wallets are never over-limit (they reject at debit time).
+     */
+    public function isOverCreditLimit(): bool
+    {
+        if (! $this->is_postpaid || ! $this->credit_limit_cents) {
+            return false;
+        }
+
+        // Balance is negative; check if |balance| exceeds the credit limit.
+        return $this->availableCents() < -$this->credit_limit_cents;
     }
 
     public function isPrepaid(): bool

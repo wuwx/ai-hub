@@ -2,6 +2,7 @@
 
 namespace App\Actions\Webhooks;
 
+use App\Jobs\RetryWebhookDeliveryJob;
 use App\Models\Team;
 use App\Models\TeamWebhookEndpoint;
 use App\Models\WebhookDelivery;
@@ -63,7 +64,7 @@ class DispatchWebhookEvent
             $latencyMs = (int) round((microtime(true) - $startedAt) * 1000);
             $succeeded = $response->successful();
 
-            WebhookDelivery::create([
+            $delivery = WebhookDelivery::create([
                 'team_webhook_endpoint_id' => $endpoint->id,
                 'event' => $event,
                 'payload' => $payload,
@@ -83,10 +84,14 @@ class DispatchWebhookEvent
             }
 
             $this->recordFailure($endpoint, $response->status());
+
+            // Schedule retry with exponential backoff
+            $delivery->update(['next_retry_at' => now()->addSeconds(30)]);
+            RetryWebhookDeliveryJob::dispatch($delivery->id)->delay(now()->addSeconds(30));
         } catch (\Throwable $exception) {
             $latencyMs = (int) round((microtime(true) - $startedAt) * 1000);
 
-            WebhookDelivery::create([
+            $delivery = WebhookDelivery::create([
                 'team_webhook_endpoint_id' => $endpoint->id,
                 'event' => $event,
                 'payload' => $payload,
@@ -105,6 +110,10 @@ class DispatchWebhookEvent
             ]);
 
             $this->recordFailure($endpoint, 0);
+
+            // Schedule retry
+            $delivery->update(['next_retry_at' => now()->addSeconds(30)]);
+            RetryWebhookDeliveryJob::dispatch($delivery->id)->delay(now()->addSeconds(30));
         }
     }
 

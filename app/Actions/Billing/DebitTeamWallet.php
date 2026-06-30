@@ -55,6 +55,16 @@ class DebitTeamWallet
                 throw new InsufficientWalletBalanceException($amountCents, $available);
             }
 
+            // Post-paid: enforce credit limit. The wallet can go negative,
+            // but not beyond -credit_limit_cents.
+            if ($wallet->isPostpaid() && $wallet->credit_limit_cents !== null) {
+                $projectedBalance = $available - $amountCents;
+
+                if ($projectedBalance < -$wallet->credit_limit_cents) {
+                    throw new InsufficientWalletBalanceException($amountCents, $available);
+                }
+            }
+
             // Burn promo credit first, then cash balance.
             $creditUsed = min($wallet->credit_grant_cents, $amountCents);
             $cashUsed = $amountCents - $creditUsed;
@@ -97,6 +107,11 @@ class DebitTeamWallet
         }
 
         if ($wallet->isPostpaid()) {
+            // Post-paid: check credit limit if configured.
+            if ($wallet->credit_limit_cents !== null) {
+                return ($wallet->availableCents() - $amountCents) >= -$wallet->credit_limit_cents;
+            }
+
             return true;
         }
 

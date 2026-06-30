@@ -15,6 +15,8 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
     'succeeded',
     'latency_ms',
     'error',
+    'attempt_count',
+    'next_retry_at',
 ])]
 class WebhookDelivery extends Model
 {
@@ -36,6 +38,8 @@ class WebhookDelivery extends Model
             'response_status_code' => 'integer',
             'succeeded' => 'boolean',
             'latency_ms' => 'integer',
+            'attempt_count' => 'integer',
+            'next_retry_at' => 'datetime',
         ];
     }
 }

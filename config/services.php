@@ -45,6 +45,7 @@ return [
         'idempotency_ttl_seconds' => (int) env('LLM_GATEWAY_IDEMPOTENCY_TTL_SECONDS', 300),
         'api_key_rate_limit_per_minute' => (int) env('LLM_GATEWAY_API_KEY_RATE_LIMIT_PER_MINUTE', 120),
         'api_key_rate_limit_decay_seconds' => (int) env('LLM_GATEWAY_API_KEY_RATE_LIMIT_DECAY_SECONDS', 60),
+        'max_concurrent_per_team' => (int) env('LLM_GATEWAY_MAX_CONCURRENT_PER_TEAM', 50),
         // Provider upstream secrets. Each entry is loaded from env() here (so it
         // survives `config:cache`) and referenced from llm_providers.secret_ref
         // as `secret://KEY` (recommended) or legacy `env://KEY`.

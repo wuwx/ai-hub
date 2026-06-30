@@ -29,6 +29,7 @@ class GatewayRequestProcessor
         private readonly RecordApiRequestUsage $recordApiRequestUsage,
         private readonly DebitTeamWallet $debitTeamWallet,
         private readonly ResolveModelPricing $resolveModelPricing,
+        private readonly ContentFilter $contentFilter,
     ) {
         //
     }
@@ -295,6 +296,23 @@ class GatewayRequestProcessor
 
         $isStreaming = (bool) ($canonical['stream'] ?? false);
 
+        // Content safety filter: reject requests with prohibited content
+        // before forwarding to upstream providers.
+        $contentCheck = $this->contentFilter->check($canonical);
+
+        if ($contentCheck['blocked']) {
+            return $this->jsonWithTrace(
+                $this->protocolTransformer->errorPayload(
+                    $incomingProtocol,
+                    $contentCheck['reason'] ?? 'Request rejected by content filter.',
+                    'content_filtered',
+                    'permission_error',
+                ),
+                400,
+                $traceId,
+            );
+        }
+
         $providerPayload = $this->protocolTransformer->toProviderPayload($canonical, $providerProtocol);
         $tokenInputEstimate = $this->protocolTransformer->estimateInputTokens($canonical);
 
@@ -351,6 +369,21 @@ class GatewayRequestProcessor
             );
         }
 
+        // Post-paid credit limit pre-flight: reject if the team is already
+        // at or beyond its credit limit, regardless of the estimated charge.
+        if ($this->isOverCreditLimit($team)) {
+            return $this->jsonWithTrace(
+                $this->protocolTransformer->errorPayload(
+                    $incomingProtocol,
+                    'Credit limit exceeded. Please pay your outstanding balance to continue.',
+                    'insufficient_balance',
+                    'billing_error',
+                ),
+                402,
+                $traceId,
+            );
+        }
+
         // Reserve an output budget. We use the team's recent average output
         // length as a heuristic to avoid over-blocking long-form requests.
         $estimatedOutputTokens = max(256, $tokenInputEstimate);
@@ -374,11 +407,29 @@ class GatewayRequestProcessor
         }
 
         if ($this->isProviderCircuitOpen($provider)) {
-            return $this->jsonWithTrace(
-                $this->protocolTransformer->errorPayload($incomingProtocol, 'Provider is temporarily unavailable. Please retry later.', 'provider_circuit_open', 'api_error'),
-                503,
-                $traceId,
-            );
+            // Try fallback model if configured and available for this team.
+            $fallbackModel = $this->resolveFallbackModel($team, $model);
+
+            if ($fallbackModel) {
+                Log::info('gateway.fallback.activated', [
+                    'original_model' => $model->external_model_id,
+                    'fallback_model' => $fallbackModel->external_model_id,
+                    'provider_id' => $provider->id,
+                    'trace_id' => $traceId,
+                ]);
+
+                $model = $fallbackModel;
+                $provider = $model->provider;
+                $providerProtocol = $this->protocolTransformer->providerProtocol($provider->adapter_type);
+                $canonical['model'] = $model->external_model_id;
+                $providerPayload = $this->protocolTransformer->toProviderPayload($canonical, $providerProtocol);
+            } else {
+                return $this->jsonWithTrace(
+                    $this->protocolTransformer->errorPayload($incomingProtocol, 'Provider is temporarily unavailable. Please retry later.', 'provider_circuit_open', 'api_error'),
+                    503,
+                    $traceId,
+                );
+            }
         }
 
         $headers = $this->providerHeaders($provider, $providerProtocol);
@@ -870,5 +921,61 @@ class GatewayRequestProcessor
     protected function providerCircuitOpenUntilCacheKey(LlmProvider $provider): string
     {
         return sprintf('gateway:circuit:provider:%d:open_until', $provider->id);
+    }
+
+    /**
+     * Check if a post-paid team has exceeded its credit limit.
+     */
+    protected function isOverCreditLimit(Team $team): bool
+    {
+        $wallet = $team->wallet;
+
+        if (! $wallet) {
+            return false;
+        }
+
+        return $wallet->isOverCreditLimit();
+    }
+
+    /**
+     * Resolve a fallback model for the team when the primary provider is down.
+     * The fallback model must be active, entitled to the team, and its provider
+     * must not also have its circuit open.
+     */
+    protected function resolveFallbackModel(Team $team, LlmModel $primaryModel): ?LlmModel
+    {
+        $fallbackId = $primaryModel->fallback_model_id;
+
+        if (! $fallbackId) {
+            return null;
+        }
+
+        $fallback = LlmModel::query()
+            ->with('provider')
+            ->where('id', $fallbackId)
+            ->where('is_active', true)
+            ->whereHas('entitlements', function ($query) use ($team) {
+                $query->where('team_id', $team->id)
+                    ->where('is_enabled', true);
+            })
+            ->whereHas('provider', function ($query) use ($team) {
+                $query->where('is_active', true)
+                    ->whereHas('entitlements', function ($entitlements) use ($team) {
+                        $entitlements->where('team_id', $team->id)
+                            ->where('is_enabled', true);
+                    });
+            })
+            ->first();
+
+        if (! $fallback || ! $fallback->provider) {
+            return null;
+        }
+
+        // Don't fallback to a provider that's also circuit-open.
+        if ($this->isProviderCircuitOpen($fallback->provider)) {
+            return null;
+        }
+
+        return $fallback;
     }
 }

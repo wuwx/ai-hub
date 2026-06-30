@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Billing\StripePortalController;
 use App\Http\Controllers\Billing\WalletRechargeController;
 use App\Http\Controllers\DataExportController;
 use App\Http\Controllers\InvoiceViewController;
@@ -9,6 +10,10 @@ use Illuminate\Support\Facades\Route;
 Route::view('/', 'welcome')->name('home');
 
 Route::view('docs', 'docs')->name('docs');
+
+Route::view('terms', 'terms')->name('terms');
+
+Route::view('privacy', 'privacy')->name('privacy');
 
 Route::prefix('{current_team}')
     ->middleware(['auth', 'verified', EnsureTeamMembership::class])
@@ -28,6 +33,10 @@ Route::prefix('{current_team}')
         // Customer self-service wallet top-up endpoint.
         Route::post('billing/wallet/recharge', [WalletRechargeController::class, 'store'])
             ->name('billing.wallet.recharge');
+
+        // Stripe Customer Portal — manage subscription, payment methods, invoices.
+        Route::post('billing/portal', [StripePortalController::class, 'store'])
+            ->name('billing.portal');
 
         // CSV data export endpoints.
         Route::get('usage/export', [DataExportController::class, 'exportUsage'])

@@ -21,6 +21,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
     'sell_output_per_1m_usd',
     'markup_percent',
     'is_active',
+    'fallback_model_id',
 ])]
 class LlmModel extends Model
 {
@@ -30,6 +31,14 @@ class LlmModel extends Model
     public function provider(): BelongsTo
     {
         return $this->belongsTo(LlmProvider::class, 'llm_provider_id');
+    }
+
+    /**
+     * @return BelongsTo<self, $this>
+     */
+    public function fallbackModel(): BelongsTo
+    {
+        return $this->belongsTo(self::class, 'fallback_model_id');
     }
 
     /**
