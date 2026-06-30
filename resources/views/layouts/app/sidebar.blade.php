@@ -17,20 +17,26 @@
                     <flux:sidebar.item icon="home" :href="route('dashboard')" :current="request()->routeIs('dashboard')" wire:navigate>
                         {{ __('Dashboard') }}
                     </flux:sidebar.item>
+
+                    <flux:sidebar.item icon="key" :href="route('api-keys.index')" :current="request()->routeIs('api-keys.*')" wire:navigate>
+                        {{ __('API Keys') }}
+                    </flux:sidebar.item>
+
+                    <flux:sidebar.item icon="chart-bar" :href="route('usage.index')" :current="request()->routeIs('usage.*')" wire:navigate>
+                        {{ __('Usage') }}
+                    </flux:sidebar.item>
+
+                    <flux:sidebar.item icon="credit-card" :href="route('billing.index')" :current="request()->routeIs('billing.*')" wire:navigate>
+                        {{ __('Billing') }}
+                    </flux:sidebar.item>
+
+                    <flux:sidebar.item icon="document-text" :href="route('request-logs.index')" :current="request()->routeIs('request-logs.*')" wire:navigate>
+                        {{ __('Request Logs') }}
+                    </flux:sidebar.item>
                 </flux:sidebar.group>
             </flux:sidebar.nav>
 
             <flux:spacer />
-
-            <flux:sidebar.nav>
-                <flux:sidebar.item icon="folder-git-2" href="https://github.com/laravel/livewire-starter-kit" target="_blank">
-                    {{ __('Repository') }}
-                </flux:sidebar.item>
-
-                <flux:sidebar.item icon="book-open-text" href="https://laravel.com/docs/starter-kits#livewire" target="_blank">
-                    {{ __('Documentation') }}
-                </flux:sidebar.item>
-            </flux:sidebar.nav>
 
             <x-desktop-user-menu class="hidden lg:block" :name="auth()->user()->name" />
         </flux:sidebar>

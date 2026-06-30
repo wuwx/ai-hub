@@ -9,7 +9,15 @@ Route::view('/', 'welcome')->name('home');
 Route::prefix('{current_team}')
     ->middleware(['auth', 'verified', EnsureTeamMembership::class])
     ->group(function () {
-        Route::view('dashboard', 'dashboard')->name('dashboard');
+        Route::livewire('dashboard', 'pages::dashboard')->name('dashboard');
+
+        Route::livewire('api-keys', 'pages::api-keys')->name('api-keys.index');
+
+        Route::livewire('usage', 'pages::usage')->name('usage.index');
+
+        Route::livewire('billing', 'pages::billing')->name('billing.index');
+
+        Route::livewire('request-logs', 'pages::request-logs')->name('request-logs.index');
 
         // Customer self-service wallet top-up endpoint.
         Route::post('billing/wallet/recharge', [WalletRechargeController::class, 'store'])
