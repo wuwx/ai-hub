@@ -38,15 +38,26 @@ class ThrottleApiKeyRequests
         $rateLimitKey = sprintf('llm_gateway:api_key:%d', $apiKey->id);
 
         if (RateLimiter::tooManyAttempts($rateLimitKey, $maxAttemptsPerMinute)) {
-            return $this->tooManyRequests(RateLimiter::availableIn($rateLimitKey), $traceId);
+            $retryAfter = RateLimiter::availableIn($rateLimitKey);
+
+            return $this->tooManyRequests($retryAfter, $traceId, $maxAttemptsPerMinute, 0, $retryAfter);
         }
 
         RateLimiter::hit($rateLimitKey, $decaySeconds);
 
-        return $next($request);
+        $response = $next($request);
+
+        $remaining = max(0, $maxAttemptsPerMinute - RateLimiter::attempts($rateLimitKey));
+        $resetTimestamp = now()->addSeconds($decaySeconds)->timestamp;
+
+        $response->headers->set('X-RateLimit-Limit', (string) $maxAttemptsPerMinute);
+        $response->headers->set('X-RateLimit-Remaining', (string) $remaining);
+        $response->headers->set('X-RateLimit-Reset', (string) $resetTimestamp);
+
+        return $response;
     }
 
-    protected function tooManyRequests(int $retryAfterSeconds, string $traceId): JsonResponse
+    protected function tooManyRequests(int $retryAfterSeconds, string $traceId, int $limit, int $remaining, int $reset): JsonResponse
     {
         return response()->json([
             'error' => [
@@ -57,6 +68,10 @@ class ThrottleApiKeyRequests
             ],
         ], 429, [
             'X-Trace-Id' => $traceId,
+            'X-RateLimit-Limit' => (string) $limit,
+            'X-RateLimit-Remaining' => (string) $remaining,
+            'X-RateLimit-Reset' => (string) $reset,
+            'Retry-After' => (string) max(1, $retryAfterSeconds),
         ]);
     }
 }

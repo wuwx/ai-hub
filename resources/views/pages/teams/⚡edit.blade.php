@@ -1,5 +1,7 @@
 <?php
 
+use App\Actions\Audit\RecordAuditEvent;
+use App\Actions\Teams\TransferTeamOwnership;
 use App\Data\TeamPermissions;
 use App\Enums\TeamRole;
 use App\Models\Team;
@@ -78,6 +80,34 @@ new class extends Component
         $this->populateTeamData();
 
         Flux::toast(variant: 'success', text: __('Member role updated.'));
+    }
+
+    public function transferOwnership(int $userId): void
+    {
+        Gate::authorize('transferOwner', $this->teamModel);
+
+        $newOwner = \App\Models\User::findOrFail($userId);
+
+        app(TransferTeamOwnership::class)->handle($this->teamModel, $newOwner);
+
+        app(RecordAuditEvent::class)->handle(
+            team: $this->teamModel,
+            action: 'team.ownership_transferred',
+            subject: $this->teamModel,
+            properties: [
+                'new_owner_id' => $newOwner->id,
+                'new_owner_name' => $newOwner->name,
+            ],
+            actor: Auth::user(),
+            ipAddress: request()->ip(),
+            userAgent: request()->userAgent(),
+        );
+
+        $this->populateTeamData();
+
+        Flux::toast(variant: 'success', text: __('Ownership transferred.'));
+
+        $this->redirectRoute('teams.edit', ['team' => $this->teamModel->slug], navigate: true);
     }
 
     private function populateTeamData(): void
@@ -225,6 +255,19 @@ new class extends Component
                                             />
                                         </flux:tooltip>
                                     </flux:modal.trigger>
+                                @endif
+
+                                @if ($member['role'] !== 'owner' && $this->permissions->canDeleteTeam)
+                                    <flux:tooltip :content="__('Transfer ownership')">
+                                        <flux:button
+                                            variant="ghost"
+                                            size="sm"
+                                            icon="arrow-right-end-on-rectangle"
+                                            wire:click="transferOwnership({{ $member['id'] }})"
+                                            wire:confirm="{{ __('Transfer ownership to :name? You will become an Admin.', ['name' => $member['name']]) }}"
+                                            data-test="transfer-ownership-button"
+                                        />
+                                    </flux:tooltip>
                                 @endif
                             </div>
                         </div>

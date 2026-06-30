@@ -3,6 +3,7 @@
 namespace App\Console\Commands;
 
 use App\Actions\Billing\GenerateMonthlyTeamInvoice;
+use App\Jobs\GenerateTeamMonthlyInvoiceJob;
 use App\Models\Team;
 use App\Models\TeamWallet;
 use Carbon\CarbonImmutable;
@@ -78,17 +79,9 @@ class GenerateMonthlyInvoices extends Command
                 continue;
             }
 
-            $invoice = $this->generateMonthlyTeamInvoice->handle($team, $targetMonth);
+            GenerateTeamMonthlyInvoiceJob::dispatch($team->id, $targetMonth, $includePrepaid);
 
             $generatedCount++;
-
-            $this->line(sprintf(
-                'Generated %s (%s %0.2f) for team #%d',
-                $invoice->invoice_number,
-                $invoice->currency,
-                $invoice->total_cents / 100,
-                $team->id,
-            ));
         }
 
         $this->info(sprintf('Generated %d invoice(s) for %s.', $generatedCount, $targetMonth->format('Y-m')));

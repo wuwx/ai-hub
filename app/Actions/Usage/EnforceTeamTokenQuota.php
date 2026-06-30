@@ -5,6 +5,7 @@ namespace App\Actions\Usage;
 use App\Exceptions\QuotaExceededException;
 use App\Models\Team;
 use App\Models\TeamQuotaPolicy;
+use App\Models\TeamWalletTransaction;
 use App\Models\UsageLedger;
 use Carbon\CarbonInterface;
 
@@ -35,6 +36,7 @@ class EnforceTeamTokenQuota
         $this->enforceDailyLimit($team, $policy, $requestedTokens, $at);
         $this->enforceWeeklyLimit($team, $policy, $requestedTokens, $at);
         $this->enforceMonthlyLimit($team, $policy, $requestedTokens, $at);
+        $this->enforceDailySpendLimit($team, $policy, $at);
     }
 
     protected function enforceDailyLimit(Team $team, TeamQuotaPolicy $policy, int $requestedTokens, CarbonInterface $at): void
@@ -106,6 +108,34 @@ class EnforceTeamTokenQuota
 
         if ($usedThisMonth + $requestedTokens > $policy->monthly_token_limit) {
             throw new QuotaExceededException('monthly', $policy->monthly_token_limit, $usedThisMonth, $requestedTokens);
+        }
+    }
+
+    /**
+     * Enforce a daily spend cap (in cents) based on wallet debits recorded today.
+     * This is independent of token limits — it prevents runaway costs when
+     * expensive models are used heavily.
+     */
+    protected function enforceDailySpendLimit(Team $team, TeamQuotaPolicy $policy, CarbonInterface $at): void
+    {
+        if (! $policy->daily_spend_limit_cents || $policy->daily_spend_limit_cents <= 0) {
+            return;
+        }
+
+        $spentToday = (int) TeamWalletTransaction::query()
+            ->where('team_id', $team->id)
+            ->where('type', 'debit')
+            ->whereDate('created_at', $at->toDateString())
+            ->sum('amount_cents');
+
+        // amount_cents is stored as a positive number for debits
+        if ($spentToday >= $policy->daily_spend_limit_cents) {
+            throw new QuotaExceededException(
+                'daily_spend',
+                $policy->daily_spend_limit_cents,
+                $spentToday,
+                0,
+            );
         }
     }
 }

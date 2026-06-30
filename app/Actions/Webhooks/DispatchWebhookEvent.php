@@ -4,6 +4,7 @@ namespace App\Actions\Webhooks;
 
 use App\Models\Team;
 use App\Models\TeamWebhookEndpoint;
+use App\Models\WebhookDelivery;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 
@@ -38,13 +39,17 @@ class DispatchWebhookEvent
                 continue;
             }
 
-            $this->send($endpoint, $event, $body);
+            $this->send($endpoint, $event, $body, $payload);
         }
     }
 
-    protected function send(TeamWebhookEndpoint $endpoint, string $event, string $body): void
+    /**
+     * @param  array<string, mixed>  $payload
+     */
+    protected function send(TeamWebhookEndpoint $endpoint, string $event, string $body, array $payload): void
     {
         $signature = hash_hmac('sha256', $body, (string) $endpoint->secret);
+        $startedAt = microtime(true);
 
         try {
             $response = Http::timeout(10)
@@ -55,7 +60,20 @@ class DispatchWebhookEvent
                 ])
                 ->post($endpoint->url, json_decode($body, true));
 
-            if ($response->successful()) {
+            $latencyMs = (int) round((microtime(true) - $startedAt) * 1000);
+            $succeeded = $response->successful();
+
+            WebhookDelivery::create([
+                'team_webhook_endpoint_id' => $endpoint->id,
+                'event' => $event,
+                'payload' => $payload,
+                'response_status_code' => $response->status(),
+                'response_body' => mb_substr($response->body(), 0, 10000),
+                'succeeded' => $succeeded,
+                'latency_ms' => $latencyMs,
+            ]);
+
+            if ($succeeded) {
                 $endpoint->update([
                     'last_triggered_at' => now(),
                     'failure_count' => 0,
@@ -66,6 +84,19 @@ class DispatchWebhookEvent
 
             $this->recordFailure($endpoint, $response->status());
         } catch (\Throwable $exception) {
+            $latencyMs = (int) round((microtime(true) - $startedAt) * 1000);
+
+            WebhookDelivery::create([
+                'team_webhook_endpoint_id' => $endpoint->id,
+                'event' => $event,
+                'payload' => $payload,
+                'response_status_code' => null,
+                'response_body' => null,
+                'succeeded' => false,
+                'latency_ms' => $latencyMs,
+                'error' => $exception->getMessage(),
+            ]);
+
             Log::warning('webhook.dispatch.failed', [
                 'webhook_id' => $endpoint->id,
                 'url' => $endpoint->url,

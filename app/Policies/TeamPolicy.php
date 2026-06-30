@@ -97,4 +97,12 @@ class TeamPolicy
     {
         return ! $team->is_personal && $user->hasTeamPermission($team, TeamPermission::DeleteTeam);
     }
+
+    /**
+     * Determine whether the user can transfer ownership of the team.
+     */
+    public function transferOwner(User $user, Team $team): bool
+    {
+        return ! $team->is_personal && $user->ownsTeam($team);
+    }
 }

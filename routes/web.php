@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Billing\WalletRechargeController;
 use App\Http\Controllers\DataExportController;
+use App\Http\Controllers\InvoiceViewController;
 use App\Http\Middleware\EnsureTeamMembership;
 use Illuminate\Support\Facades\Route;
 
@@ -17,6 +18,8 @@ Route::prefix('{current_team}')
         Route::livewire('api-keys', 'pages::api-keys')->name('api-keys.index');
 
         Route::livewire('usage', 'pages::usage')->name('usage.index');
+
+        Route::livewire('playground', 'pages::playground')->name('playground.index');
 
         Route::livewire('billing', 'pages::billing')->name('billing.index');
 
@@ -35,6 +38,9 @@ Route::prefix('{current_team}')
 
         Route::get('billing/invoices/export', [DataExportController::class, 'exportInvoices'])
             ->name('billing.invoices.export');
+
+        Route::get('billing/invoices/{invoice}', [InvoiceViewController::class, 'show'])
+            ->name('billing.invoices.show');
     });
 
 Route::middleware(['auth'])->group(function () {

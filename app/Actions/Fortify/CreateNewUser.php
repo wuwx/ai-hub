@@ -2,6 +2,7 @@
 
 namespace App\Actions\Fortify;
 
+use App\Actions\Billing\RechargeTeamWallet;
 use App\Actions\Teams\CreateTeam;
 use App\Concerns\PasswordValidationRules;
 use App\Concerns\ProfileValidationRules;
@@ -14,8 +15,10 @@ class CreateNewUser implements CreatesNewUsers
 {
     use PasswordValidationRules, ProfileValidationRules;
 
-    public function __construct(private CreateTeam $createTeam)
-    {
+    public function __construct(
+        private CreateTeam $createTeam,
+        private RechargeTeamWallet $rechargeTeamWallet,
+    ) {
         //
     }
 
@@ -38,9 +41,30 @@ class CreateNewUser implements CreatesNewUsers
                 'password' => $input['password'],
             ]);
 
-            $this->createTeam->handle($user, $user->name."'s Team", isPersonal: true);
+            $team = $this->createTeam->handle($user, $user->name."'s Team", isPersonal: true);
+
+            $this->grantSignupCredit($team);
 
             return $user;
         });
+    }
+
+    /**
+     * Grant the configured signup credit to the team's wallet.
+     */
+    protected function grantSignupCredit($team): void
+    {
+        $creditCents = (int) config('services.billing.signup_credit_cents', 0);
+
+        if ($creditCents <= 0) {
+            return;
+        }
+
+        $this->rechargeTeamWallet->handle(
+            team: $team,
+            amountCents: $creditCents,
+            description: 'Signup credit',
+            metadata: ['type' => 'signup_bonus'],
+        );
     }
 }
