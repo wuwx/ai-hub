@@ -1,5 +1,6 @@
 <?php
 
+use App\Actions\Audit\RecordAuditEvent;
 use App\Enums\TeamRole;
 use App\Models\Team;
 use App\Notifications\Teams\TeamInvitation as TeamInvitationNotification;
@@ -39,6 +40,19 @@ new class extends Component {
             'invited_by' => Auth::id(),
             'expires_at' => now()->addDays(3),
         ]);
+
+        app(RecordAuditEvent::class)->handle(
+            team: $this->team,
+            action: 'team.member.invited',
+            subject: $invitation,
+            properties: [
+                'email' => $invitation->email,
+                'role' => $invitation->role->value,
+            ],
+            actor: Auth::user(),
+            ipAddress: request()->ip(),
+            userAgent: request()->userAgent(),
+        );
 
         Notification::route('mail', $invitation->email)
             ->notify(new TeamInvitationNotification($invitation));

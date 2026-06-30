@@ -14,6 +14,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
     'key_hash',
     'last_four',
     'allowed_models',
+    'allowed_ips',
     'daily_token_limit',
     'rate_limit_per_minute',
     'last_used_at',
@@ -82,6 +83,7 @@ class ApiKey extends Model
     {
         return [
             'allowed_models' => 'array',
+            'allowed_ips' => 'array',
             'daily_token_limit' => 'integer',
             'rate_limit_per_minute' => 'integer',
             'last_used_at' => 'datetime',
@@ -97,5 +99,60 @@ class ApiKey extends Model
         }
 
         return in_array($externalModelId, $this->allowed_models, true);
+    }
+
+    /**
+     * Determine if the given IP address is allowed to use this key.
+     *
+     * Supports individual IP addresses and CIDR ranges (e.g. 192.168.1.0/24).
+     * An empty allow-list means "any IP".
+     */
+    public function isIpAllowed(string $ip): bool
+    {
+        $allowedIps = $this->allowed_ips;
+
+        if (empty($allowedIps)) {
+            return true;
+        }
+
+        foreach ($allowedIps as $allowed) {
+            if ($this->ipMatches($ip, $allowed)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * Check if an IP matches a pattern (single IP or CIDR range).
+     */
+    protected function ipMatches(string $ip, string $pattern): bool
+    {
+        if (str_contains($pattern, '/')) {
+            return $this->ipInCidr($ip, $pattern);
+        }
+
+        return $ip === $pattern;
+    }
+
+    /**
+     * Check if an IP is within a CIDR range.
+     */
+    protected function ipInCidr(string $ip, string $cidr): bool
+    {
+        [$subnet, $maskBits] = explode('/', $cidr, 2);
+        $maskBits = (int) $maskBits;
+
+        $ipLong = ip2long($ip);
+        $subnetLong = ip2long($subnet);
+
+        if ($ipLong === false || $subnetLong === false) {
+            return false;
+        }
+
+        $mask = $maskBits === 0 ? 0 : (~0 << (32 - $maskBits));
+
+        return ($ipLong & $mask) === ($subnetLong & $mask);
     }
 }

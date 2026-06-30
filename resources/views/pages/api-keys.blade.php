@@ -2,6 +2,7 @@
 
 use App\Actions\ApiKeys\GenerateApiKey;
 use App\Actions\ApiKeys\RotateApiKey;
+use App\Actions\Audit\RecordAuditEvent;
 use App\Models\ApiKey;
 use App\Models\Team;
 use Illuminate\Support\Facades\Auth;
@@ -87,6 +88,20 @@ new #[Title('API Keys')] class extends Component
             createdBy: Auth::id(),
         );
 
+        app(RecordAuditEvent::class)->handle(
+            team: $this->team,
+            action: 'api_key.created',
+            subject: $generated->apiKey,
+            properties: [
+                'name' => $generated->apiKey->name,
+                'last_four' => $generated->apiKey->last_four,
+                'expires_at' => $generated->apiKey->expires_at?->toDateTimeString(),
+            ],
+            actor: Auth::user(),
+            ipAddress: request()->ip(),
+            userAgent: request()->userAgent(),
+        );
+
         $this->generatedPlainTextKey = $generated->plainTextKey;
         $this->generatedKeyId = $generated->apiKey->id;
         $this->newKeyName = '';
@@ -107,6 +122,19 @@ new #[Title('API Keys')] class extends Component
 
         $apiKey->update(['revoked_at' => now()]);
 
+        app(RecordAuditEvent::class)->handle(
+            team: $this->team,
+            action: 'api_key.revoked',
+            subject: $apiKey,
+            properties: [
+                'name' => $apiKey->name,
+                'last_four' => $apiKey->last_four,
+            ],
+            actor: Auth::user(),
+            ipAddress: request()->ip(),
+            userAgent: request()->userAgent(),
+        );
+
         $this->dispatch('api-key-revoked');
 
         \Flux\Flux::toast(variant: 'success', text: __('API key revoked.'));
@@ -123,6 +151,19 @@ new #[Title('API Keys')] class extends Component
         abort_unless($apiKey, 404);
 
         $generated = app(RotateApiKey::class)->handle($apiKey);
+
+        app(RecordAuditEvent::class)->handle(
+            team: $this->team,
+            action: 'api_key.rotated',
+            subject: $generated->apiKey,
+            properties: [
+                'name' => $generated->apiKey->name,
+                'last_four' => $generated->apiKey->last_four,
+            ],
+            actor: Auth::user(),
+            ipAddress: request()->ip(),
+            userAgent: request()->userAgent(),
+        );
 
         $this->rotatedPlainTextKey = $generated->plainTextKey;
         $this->rotatedKeyId = $generated->apiKey->id;

@@ -13,6 +13,11 @@ Schedule::command('billing:mark-overdue-invoices')
     ->withoutOverlapping()
     ->description('Mark issued invoices as overdue after due date');
 
+Schedule::command('billing:check-wallet-balances --threshold=500')
+    ->hourly()
+    ->withoutOverlapping()
+    ->description('Notify team owners when pre-paid wallet balance is low');
+
 Schedule::call(function () {
     TeamInvitation::query()
         ->whereNotNull('expires_at')

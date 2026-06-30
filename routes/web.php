@@ -1,10 +1,13 @@
 <?php
 
 use App\Http\Controllers\Billing\WalletRechargeController;
+use App\Http\Controllers\DataExportController;
 use App\Http\Middleware\EnsureTeamMembership;
 use Illuminate\Support\Facades\Route;
 
 Route::view('/', 'welcome')->name('home');
+
+Route::view('docs', 'docs')->name('docs');
 
 Route::prefix('{current_team}')
     ->middleware(['auth', 'verified', EnsureTeamMembership::class])
@@ -22,6 +25,16 @@ Route::prefix('{current_team}')
         // Customer self-service wallet top-up endpoint.
         Route::post('billing/wallet/recharge', [WalletRechargeController::class, 'store'])
             ->name('billing.wallet.recharge');
+
+        // CSV data export endpoints.
+        Route::get('usage/export', [DataExportController::class, 'exportUsage'])
+            ->name('usage.export');
+
+        Route::get('billing/transactions/export', [DataExportController::class, 'exportWalletTransactions'])
+            ->name('billing.transactions.export');
+
+        Route::get('billing/invoices/export', [DataExportController::class, 'exportInvoices'])
+            ->name('billing.invoices.export');
     });
 
 Route::middleware(['auth'])->group(function () {

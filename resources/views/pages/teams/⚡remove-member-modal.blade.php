@@ -1,8 +1,10 @@
 <?php
 
+use App\Actions\Audit\RecordAuditEvent;
 use App\Models\Team;
 use App\Models\User;
 use Flux\Flux;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Gate;
 use Livewire\Component;
 
@@ -41,6 +43,19 @@ new class extends Component {
         $this->team->memberships()
             ->where('user_id', $user->id)
             ->delete();
+
+        app(RecordAuditEvent::class)->handle(
+            team: $this->team,
+            action: 'team.member.removed',
+            subject: $user,
+            properties: [
+                'user_name' => $user->name,
+                'user_email' => $user->email,
+            ],
+            actor: Auth::user(),
+            ipAddress: request()->ip(),
+            userAgent: request()->userAgent(),
+        );
 
         if ($user->isCurrentTeam($this->team)) {
             $user->switchTeam($user->personalTeam());

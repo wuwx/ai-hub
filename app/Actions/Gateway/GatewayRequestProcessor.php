@@ -33,6 +33,209 @@ class GatewayRequestProcessor
         //
     }
 
+    /**
+     * Handle an OpenAI-compatible embeddings request.
+     *
+     * Unlike chat completions, embeddings are always non-streaming and only
+     * consume input tokens. The response is returned as-is from the provider
+     * (OpenAI-compatible) since there is no Anthropic embeddings protocol to
+     * translate from.
+     */
+    public function handleEmbeddings(Request $request): Response
+    {
+        /** @var Team|null $team */
+        $team = $request->attributes->get('gateway.team');
+        /** @var ApiKey|null $apiKey */
+        $apiKey = $request->attributes->get('gateway.api_key');
+
+        $traceId = (string) ($request->attributes->get('gateway.trace_id') ?: Str::uuid()->toString());
+        $request->attributes->set('gateway.trace_id', $traceId);
+
+        if (! $team || ! $apiKey) {
+            return $this->jsonWithTrace(
+                $this->protocolTransformer->errorPayload('openai', 'Unauthorized', 'unauthorized', 'authentication_error'),
+                401,
+                $traceId,
+            );
+        }
+
+        /** @var array<string, mixed> $payload */
+        $payload = $request->json()->all();
+
+        $requestedModel = (string) ($payload['model'] ?? '');
+
+        if ($requestedModel === '') {
+            return $this->jsonWithTrace(
+                $this->protocolTransformer->errorPayload('openai', 'The model field is required.', 'missing_model'),
+                422,
+                $traceId,
+            );
+        }
+
+        $input = $payload['input'] ?? null;
+
+        if ($input === null || $input === '') {
+            return $this->jsonWithTrace(
+                $this->protocolTransformer->errorPayload('openai', 'The input field is required.', 'missing_input'),
+                422,
+                $traceId,
+            );
+        }
+
+        $model = $this->resolveModelForTeam($team, $requestedModel);
+
+        if (! $model) {
+            return $this->jsonWithTrace(
+                $this->protocolTransformer->errorPayload('openai', 'Model is unavailable for this team.', 'model_unavailable'),
+                422,
+                $traceId,
+            );
+        }
+
+        if (! $apiKey->canAccessModel($requestedModel)) {
+            return $this->jsonWithTrace(
+                $this->protocolTransformer->errorPayload('openai', 'This API key is not permitted to use the requested model.', 'model_not_allowed', 'permission_error'),
+                403,
+                $traceId,
+            );
+        }
+
+        $provider = $model->provider;
+
+        // Embeddings input can be a string or an array of strings. Normalize
+        // to a single string for token estimation.
+        $inputText = is_array($input) ? implode("\n", array_map(fn ($v) => is_string($v) ? $v : '', $input)) : (string) $input;
+        $tokenInputEstimate = $this->protocolTransformer->estimateTextTokens($inputText);
+
+        try {
+            $this->enforceTeamTokenQuota->handle($team, $tokenInputEstimate);
+        } catch (QuotaExceededException $exception) {
+            return $this->jsonWithTrace(
+                $this->protocolTransformer->errorPayload('openai', $exception->getMessage(), 'quota_exceeded', 'rate_limit_error'),
+                429,
+                $traceId,
+            );
+        }
+
+        if ($this->debitTeamWallet->hasEnoughBalance($team, 0) === false) {
+            return $this->jsonWithTrace(
+                $this->protocolTransformer->errorPayload('openai', 'Wallet balance is zero. Please recharge to continue.', 'insufficient_balance', 'billing_error'),
+                402,
+                $traceId,
+            );
+        }
+
+        $estimatedChargeCents = $this->resolveModelPricing->chargeCents($model, $tokenInputEstimate, 0);
+
+        if ($estimatedChargeCents > 0 && ! $this->debitTeamWallet->hasEnoughBalance($team, $estimatedChargeCents)) {
+            return $this->jsonWithTrace(
+                $this->protocolTransformer->errorPayload(
+                    'openai',
+                    'Insufficient wallet balance for this request. Please recharge.',
+                    'insufficient_balance',
+                    'billing_error',
+                ),
+                402,
+                $traceId,
+            );
+        }
+
+        if ($this->isProviderCircuitOpen($provider)) {
+            return $this->jsonWithTrace(
+                $this->protocolTransformer->errorPayload('openai', 'Provider is temporarily unavailable. Please retry later.', 'provider_circuit_open', 'api_error'),
+                503,
+                $traceId,
+            );
+        }
+
+        $headers = $this->providerHeaders($provider, 'openai');
+        $endpoint = (string) data_get($provider->options, 'endpoints.embeddings', '/v1/embeddings');
+        $url = rtrim($provider->base_url, '/').$endpoint;
+
+        $providerPayload = collect([
+            'model' => $model->external_model_id,
+            'input' => $input,
+            'encoding_format' => $payload['encoding_format'] ?? null,
+            'dimensions' => $payload['dimensions'] ?? null,
+        ])->reject(fn ($value) => $value === null)->all();
+
+        $startedAt = microtime(true);
+
+        try {
+            $response = $this->sendWithRetry($headers, $url, $providerPayload, false);
+        } catch (ConnectionException $exception) {
+            $this->registerProviderFailure($provider);
+
+            Log::warning('gateway.provider.timeout', [
+                'provider_id' => $provider->id,
+                'provider_slug' => $provider->slug,
+                'url' => $url,
+                'trace_id' => $traceId,
+                'endpoint' => 'embeddings',
+                'error' => $exception->getMessage(),
+            ]);
+
+            $this->recordApiRequestUsage->handle(
+                team: $team,
+                protocol: 'openai',
+                endpoint: '/v1/embeddings',
+                tokenInput: $tokenInputEstimate,
+                tokenOutput: 0,
+                statusCode: 504,
+                latencyMs: (int) round((microtime(true) - $startedAt) * 1000),
+                errorCode: 'provider_timeout',
+                errorMessage: $exception->getMessage(),
+                traceId: $traceId,
+                apiKey: $apiKey,
+                provider: $provider,
+                llmModel: $model,
+                enforceQuota: false,
+            );
+
+            return $this->jsonWithTrace(
+                $this->protocolTransformer->errorPayload('openai', 'Provider timeout.', 'provider_timeout', 'api_error'),
+                504,
+                $traceId,
+            );
+        }
+
+        if ($response->status() >= 500) {
+            $this->registerProviderFailure($provider);
+        } else {
+            $this->registerProviderSuccess($provider);
+        }
+
+        $status = $response->status();
+        $body = $response->json();
+
+        if (! is_array($body)) {
+            $body = ['error' => ['message' => (string) $response->body()]];
+        }
+
+        $usageInput = (int) data_get($body, 'usage.prompt_tokens', 0);
+        $finalInput = $usageInput > 0 ? $usageInput : $tokenInputEstimate;
+
+        $this->recordApiRequestUsage->handle(
+            team: $team,
+            protocol: 'openai',
+            endpoint: '/v1/embeddings',
+            tokenInput: $finalInput,
+            tokenOutput: 0,
+            isStreaming: false,
+            statusCode: $status,
+            latencyMs: (int) round((microtime(true) - $startedAt) * 1000),
+            errorCode: $status >= 400 ? (string) data_get($body, 'error.code', 'provider_error') : null,
+            errorMessage: $status >= 400 ? (string) data_get($body, 'error.message', '') : null,
+            traceId: $traceId,
+            apiKey: $apiKey,
+            provider: $provider,
+            llmModel: $model,
+            enforceQuota: false,
+        );
+
+        return $this->jsonWithTrace($body, $status, $traceId);
+    }
+
     public function handle(Request $request, string $incomingProtocol, string $incomingEndpoint): Response
     {
         /** @var Team|null $team */

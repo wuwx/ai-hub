@@ -40,6 +40,10 @@ class AuthenticateApiKey
             return $this->unauthorized('Invalid API key.', $traceId);
         }
 
+        if (! $apiKey->isIpAllowed($request->ip())) {
+            return $this->forbidden('This API key is not allowed from this IP address.', $traceId);
+        }
+
         $apiKey->forceFill(['last_used_at' => now()])->save();
 
         $request->attributes->set('gateway.api_key', $apiKey);
@@ -56,6 +60,18 @@ class AuthenticateApiKey
                 'message' => $message,
             ],
         ], 401, [
+            'X-Trace-Id' => $traceId,
+        ]);
+    }
+
+    protected function forbidden(string $message, string $traceId): JsonResponse
+    {
+        return response()->json([
+            'error' => [
+                'type' => 'permission_error',
+                'message' => $message,
+            ],
+        ], 403, [
             'X-Trace-Id' => $traceId,
         ]);
     }

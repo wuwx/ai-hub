@@ -23,6 +23,11 @@ class CompatibilityGatewayController extends Controller
         return $this->gatewayRequestProcessor->handle($request, 'openai', '/v1/chat/completions');
     }
 
+    public function openAiEmbeddings(Request $request): Response
+    {
+        return $this->gatewayRequestProcessor->handleEmbeddings($request);
+    }
+
     public function openAiResponses(Request $request): Response
     {
         return $this->gatewayRequestProcessor->handle($request, 'openai', '/v1/responses');

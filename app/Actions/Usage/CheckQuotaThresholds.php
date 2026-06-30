@@ -2,6 +2,7 @@
 
 namespace App\Actions\Usage;
 
+use App\Actions\Webhooks\DispatchWebhookEvent;
 use App\Models\Team;
 use App\Models\TeamQuotaPolicy;
 use App\Models\UsageLedger;
@@ -11,6 +12,12 @@ use Illuminate\Support\Facades\Cache;
 
 class CheckQuotaThresholds
 {
+    public function __construct(
+        private readonly DispatchWebhookEvent $dispatchWebhookEvent,
+    ) {
+        //
+    }
+
     /**
      * Inspect the team's current usage against its active quota policy and
      * notify the team owner when a configured alert threshold is crossed.
@@ -91,5 +98,12 @@ class CheckQuotaThresholds
                 teamName: $team->name,
             ));
         }
+
+        $this->dispatchWebhookEvent->handle($team, 'quota.threshold_exceeded', [
+            'period' => $period,
+            'used' => $used,
+            'limit' => $limit,
+            'percentage' => $percentage,
+        ]);
     }
 }
