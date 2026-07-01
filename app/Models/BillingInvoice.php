@@ -13,7 +13,6 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
     'billing_month',
     'currency',
     'status',
-    'payment_provider',
     'payment_reference',
     'payment_url',
     'subtotal_cents',
@@ -60,7 +59,6 @@ class BillingInvoice extends Model
             'subtotal_cents' => 'integer',
             'tax_cents' => 'integer',
             'total_cents' => 'integer',
-            'payment_provider' => 'string',
             'payment_reference' => 'string',
             'payment_url' => 'string',
         ];

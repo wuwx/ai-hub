@@ -27,8 +27,6 @@ class BillingInvoiceForm
                         'paid' => 'Paid',
                         'void' => 'Void',
                     ]),
-                TextInput::make('payment_provider')
-                    ->disabled(),
                 TextInput::make('payment_reference')
                     ->disabled(),
                 TextInput::make('payment_url')

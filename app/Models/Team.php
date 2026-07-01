@@ -168,16 +168,6 @@ class Team extends Model
     }
 
     /**
-     * Get billing subscription profile for this team.
-     *
-     * @return HasOne<TeamBillingSubscription, $this>
-     */
-    public function billingSubscription(): HasOne
-    {
-        return $this->hasOne(TeamBillingSubscription::class);
-    }
-
-    /**
      * Get the team's pre-paid / post-paid wallet.
      *
      * @return HasOne<TeamWallet, $this>

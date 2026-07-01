@@ -6,12 +6,12 @@ use App\Actions\Billing\RechargeTeamWallet;
 use App\Actions\Billing\SyncTeamQuotaFromSubscription;
 use App\Models\BillingInvoice;
 use App\Models\Team;
-use App\Models\TeamBillingSubscription;
 use App\Models\TeamWalletTransaction;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
 use Laravel\Cashier\Events\WebhookHandled;
 use Laravel\Cashier\Http\Controllers\WebhookController as CashierBaseWebhookController;
+use Laravel\Cashier\Subscription as CashierSubscription;
 use Symfony\Component\HttpFoundation\Response;
 
 class CashierWebhookController extends CashierBaseWebhookController
@@ -40,6 +40,9 @@ class CashierWebhookController extends CashierBaseWebhookController
             'invoice.paid' => $this->handleCheckoutOrInvoicePaid($payload),
             'charge.refunded',
             'charge.refund.updated' => $this->handleChargeRefunded($payload),
+            'customer.subscription.created',
+            'customer.subscription.updated',
+            'customer.subscription.deleted' => $this->handleSubscriptionChange($payload),
             default => parent::handleWebhook($request),
         };
     }
@@ -69,6 +72,29 @@ class CashierWebhookController extends CashierBaseWebhookController
     }
 
     /**
+     * Handle subscription lifecycle events — sync quota policy from Cashier subscription.
+     *
+     * @param  array<string, mixed>  $payload
+     */
+    protected function handleSubscriptionChange(array $payload): Response
+    {
+        // Let Cashier's parent handle the subscription record first.
+        $response = parent::handleWebhook(
+            new Request([], [], [], [], [], [], json_encode($payload)),
+        );
+
+        $dataObject = data_get($payload, 'data.object');
+
+        if (is_array($dataObject)) {
+            $this->syncQuotaFromStripeSubscription($dataObject);
+        }
+
+        WebhookHandled::dispatch($payload);
+
+        return $response;
+    }
+
+    /**
      * Record Stripe refund events against the local invoice.
      *
      * @param  array<string, mixed>  $payload
@@ -87,117 +113,54 @@ class CashierWebhookController extends CashierBaseWebhookController
     }
 
     // ------------------------------------------------------------------
-    //  Subscription events — delegate to Cashier, then sync local quota
+    //  Subscription quota sync
     // ------------------------------------------------------------------
 
     /**
-     * @param  array<string, mixed>  $payload
-     */
-    protected function handleCustomerSubscriptionCreated(array $payload): Response
-    {
-        $response = parent::handleCustomerSubscriptionCreated($payload);
-
-        $this->syncLocalSubscription($payload);
-
-        return $response;
-    }
-
-    /**
-     * @param  array<string, mixed>  $payload
-     */
-    protected function handleCustomerSubscriptionUpdated(array $payload): Response
-    {
-        $response = parent::handleCustomerSubscriptionUpdated($payload);
-
-        $this->syncLocalSubscription($payload);
-
-        return $response;
-    }
-
-    /**
-     * @param  array<string, mixed>  $payload
-     */
-    protected function handleCustomerSubscriptionDeleted(array $payload): Response
-    {
-        $response = parent::handleCustomerSubscriptionDeleted($payload);
-
-        $this->handleLocalSubscriptionDeleted($payload);
-
-        return $response;
-    }
-
-    // ------------------------------------------------------------------
-    //  Local subscription projection (plan code + quota sync)
-    // ------------------------------------------------------------------
-
-    /**
-     * Sync the local TeamBillingSubscription from a Stripe subscription event.
+     * Sync quota policy from a Stripe subscription event payload.
      *
-     * @param  array<string, mixed>  $payload
+     * @param  array<string, mixed>  $dataObject
      */
-    protected function syncLocalSubscription(array $payload): void
+    protected function syncQuotaFromStripeSubscription(array $dataObject): void
     {
-        $dataObject = data_get($payload, 'data.object');
-
-        if (! is_array($dataObject)) {
-            return;
-        }
-
         $team = $this->resolveTeamFromPayload($dataObject);
 
         if (! $team) {
             return;
         }
 
-        $planCode = $this->resolvePlanCodeFromPayload($dataObject);
+        $stripeSubscriptionId = $this->nullableString(data_get($dataObject, 'id'));
+        $stripeStatus = (string) data_get($dataObject, 'status', 'inactive');
 
-        $subscription = TeamBillingSubscription::query()->updateOrCreate(
-            ['team_id' => $team->id],
-            [
-                'payment_provider' => 'stripe',
-                'stripe_customer_id' => $this->nullableString(data_get($dataObject, 'customer')),
-                'stripe_subscription_id' => $this->nullableString(data_get($dataObject, 'id')),
-                'plan_code' => $planCode,
-                'status' => (string) data_get($dataObject, 'status', 'inactive'),
-                'cancel_at_period_end' => (bool) data_get($dataObject, 'cancel_at_period_end', false),
-                'current_period_start' => $this->toDateTime(data_get($dataObject, 'current_period_start')),
-                'current_period_end' => $this->toDateTime(data_get($dataObject, 'current_period_end')),
-                'meta' => ['event_source' => 'cashier_webhook'],
-            ],
+        // Resolve plan code from the Stripe price ID in the subscription items.
+        $stripePriceId = (string) data_get($dataObject, 'items.data.0.price.id', '');
+        $planCode = $this->resolvePlanCodeFromPriceId($stripePriceId);
+
+        $this->syncTeamQuotaFromSubscription->handle(
+            team: $team,
+            planCode: $planCode,
+            status: $stripeStatus,
         );
-
-        $this->syncTeamQuotaFromSubscription->handle($subscription);
     }
 
     /**
-     * Handle local cleanup when a subscription is deleted in Stripe.
-     *
-     * @param  array<string, mixed>  $payload
+     * Resolve our internal plan code from a Stripe price ID.
      */
-    protected function handleLocalSubscriptionDeleted(array $payload): void
+    protected function resolvePlanCodeFromPriceId(string $stripePriceId): string
     {
-        $dataObject = data_get($payload, 'data.object');
-
-        if (! is_array($dataObject)) {
-            return;
+        if ($stripePriceId === '') {
+            return (string) config('services.billing.free_plan_code', 'free');
         }
 
-        $team = $this->resolveTeamFromPayload($dataObject);
+        $plans = (array) config('services.billing.plans', []);
 
-        if (! $team) {
-            return;
+        foreach ($plans as $code => $plan) {
+            if (($plan['stripe_price_id'] ?? null) === $stripePriceId) {
+                return (string) $code;
+            }
         }
 
-        $subscription = TeamBillingSubscription::query()->where('team_id', $team->id)->first();
-
-        if ($subscription) {
-            $subscription->update([
-                'status' => 'canceled',
-                'cancel_at_period_end' => true,
-            ]);
-
-            $this->syncTeamQuotaFromSubscription->handle($subscription);
-        }
+        return (string) config('services.billing.free_plan_code', 'free');
     }
 
     // ------------------------------------------------------------------
@@ -272,7 +235,7 @@ class CashierWebhookController extends CashierBaseWebhookController
     }
 
     // ------------------------------------------------------------------
-    //  Invoice payment
+    //  Invoice Payment
     // ------------------------------------------------------------------
 
     /**
@@ -303,7 +266,6 @@ class CashierWebhookController extends CashierBaseWebhookController
         $invoice->forceFill([
             'status' => 'paid',
             'paid_at' => now(),
-            'payment_provider' => 'stripe',
             'payment_reference' => $paymentReference,
         ])->save();
     }
@@ -368,17 +330,22 @@ class CashierWebhookController extends CashierBaseWebhookController
             return $this->resolveTeamById($teamId);
         }
 
+        // Fallback: resolve via Cashier subscription record.
         $customerId = (string) data_get($dataObject, 'customer', '');
 
         if ($customerId === '') {
             return null;
         }
 
-        $existingSubscription = TeamBillingSubscription::query()
-            ->where('stripe_customer_id', $customerId)
+        $cashierSubscription = CashierSubscription::query()
+            ->whereHas('owner', fn ($q) => $q->where('stripe_id', $customerId))
             ->first();
 
-        return $existingSubscription?->team;
+        if ($cashierSubscription && $cashierSubscription->owner instanceof Team) {
+            return $cashierSubscription->owner;
+        }
+
+        return null;
     }
 
     protected function resolveTeamById(int $teamId): ?Team
@@ -388,45 +355,6 @@ class CashierWebhookController extends CashierBaseWebhookController
         }
 
         return Team::query()->find($teamId);
-    }
-
-    /**
-     * Resolve the plan code from a Stripe subscription payload.
-     *
-     * Priority: metadata.plan_code → price lookup via config mapping → free plan.
-     *
-     * @param  array<string, mixed>  $dataObject
-     */
-    protected function resolvePlanCodeFromPayload(array $dataObject): string
-    {
-        $metadataPlanCode = (string) data_get($dataObject, 'metadata.plan_code', '');
-
-        if ($metadataPlanCode !== '') {
-            return $metadataPlanCode;
-        }
-
-        $stripePrice = (string) data_get($dataObject, 'items.data.0.price.id', '');
-
-        if ($stripePrice !== '') {
-            $plans = (array) config('services.billing.plans', []);
-
-            foreach ($plans as $code => $plan) {
-                if (($plan['stripe_price_id'] ?? null) === $stripePrice) {
-                    return (string) $code;
-                }
-            }
-        }
-
-        return (string) config('services.billing.free_plan_code', 'free');
-    }
-
-    protected function toDateTime(mixed $value): ?string
-    {
-        if (! is_numeric($value)) {
-            return null;
-        }
-
-        return now()->setTimestamp((int) $value)->toDateTimeString();
     }
 
     protected function nullableString(mixed $value): ?string

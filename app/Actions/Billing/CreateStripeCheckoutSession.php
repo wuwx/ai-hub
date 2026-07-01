@@ -42,7 +42,6 @@ class CreateStripeCheckoutSession
         }
 
         $invoice->forceFill([
-            'payment_provider' => 'stripe',
             'payment_reference' => $checkout->id,
             'payment_url' => $checkout->url,
             'status' => $invoice->status === 'draft' ? 'issued' : $invoice->status,

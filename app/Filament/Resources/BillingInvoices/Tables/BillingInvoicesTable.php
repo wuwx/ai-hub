@@ -20,9 +20,6 @@ class BillingInvoicesTable
                     ->sortable(),
                 TextColumn::make('status')
                     ->badge(),
-                TextColumn::make('payment_provider')
-                    ->badge()
-                    ->toggleable(),
                 TextColumn::make('payment_reference')
                     ->searchable()
                     ->toggleable(),

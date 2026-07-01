@@ -4,9 +4,9 @@ use App\Enums\TeamRole;
 use App\Models\LlmModel;
 use App\Models\LlmProvider;
 use App\Models\Team;
-use App\Models\TeamBillingSubscription;
 use App\Models\UsageLedger;
 use App\Models\User;
+use Laravel\Cashier\Subscription as CashierSubscription;
 use Livewire\Livewire;
 
 test('usage page requires authentication', function () {
@@ -72,21 +72,24 @@ test('usage page shows billing cycle from subscription', function () {
     $user->switchTeam($team);
     $user->refresh();
 
-    TeamBillingSubscription::create([
+    $subscription = CashierSubscription::create([
         'team_id' => $team->id,
-        'payment_provider' => 'stripe',
-        'plan_code' => 'pro',
-        'status' => 'active',
-        'current_period_start' => '2026-06-01',
-        'current_period_end' => '2026-07-01',
+        'type' => 'default',
+        'stripe_id' => 'sub_test123',
+        'stripe_status' => 'active',
+        'stripe_price' => 'price_pro',
+        'quantity' => 1,
     ]);
+
+    // Fix created_at to a known date so the billing cycle assertion is deterministic.
+    $subscription->forceFill(['created_at' => '2026-06-15 12:00:00'])->save();
 
     $this->actingAs($user);
 
     $component = Livewire::test('pages::usage');
 
     expect($component->instance()->billingCycle['start'])->toBe('2026-06-01');
-    expect($component->instance()->billingCycle['end'])->toBe('2026-07-01');
+    expect($component->instance()->billingCycle['end'])->toBe('2026-06-30');
 });
 
 test('usage page defaults to current month when no subscription', function () {

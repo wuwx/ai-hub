@@ -89,7 +89,6 @@ class CheckoutReturnController
         $invoice->forceFill([
             'status' => 'paid',
             'paid_at' => now(),
-            'payment_provider' => 'stripe',
             'payment_reference' => $paymentReference,
         ])->save();
     }

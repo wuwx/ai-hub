@@ -3,7 +3,6 @@
 use App\Enums\TeamPermission;
 use App\Models\LlmModel;
 use App\Models\Team;
-use App\Models\TeamBillingSubscription;
 use App\Models\UsageLedger;
 use Carbon\Carbon;
 use Illuminate\Support\Collection;
@@ -43,15 +42,15 @@ new #[Title('Usage')] class extends Component
             return ['start' => $now->startOfMonth()->toDateString(), 'end' => $now->endOfMonth()->toDateString()];
         }
 
-        $subscription = TeamBillingSubscription::where('team_id', $this->team->id)
-            ->where('status', 'active')
-            ->latest('current_period_start')
-            ->first();
+        $subscription = $this->team->subscription();
 
-        if ($subscription && $subscription->current_period_start && $subscription->current_period_end) {
+        if ($subscription && $subscription->valid() && $subscription->created_at) {
+            $start = $subscription->created_at->startOfMonth();
+            $end = $start->copy()->endOfMonth();
+
             return [
-                'start' => $subscription->current_period_start->toDateString(),
-                'end' => $subscription->current_period_end->toDateString(),
+                'start' => $start->toDateString(),
+                'end' => $end->toDateString(),
             ];
         }
 

@@ -4,7 +4,6 @@ use App\Actions\Billing\CreateStripeCheckoutSession;
 use App\Enums\TeamPermission;
 use App\Models\BillingInvoice;
 use App\Models\Team;
-use App\Models\TeamBillingSubscription;
 use App\Models\TeamQuotaPolicy;
 use App\Models\TeamWallet;
 use App\Models\TeamWalletTransaction;
@@ -52,15 +51,13 @@ new #[Title('Billing')] class extends Component
     }
 
     #[Computed]
-    public function currentSubscription(): ?TeamBillingSubscription
+    public function currentSubscription(): ?\Laravel\Cashier\Subscription
     {
         if (! $this->team) {
             return null;
         }
 
-        return TeamBillingSubscription::where('team_id', $this->team->id)
-            ->latest('current_period_start')
-            ->first();
+        return $this->team->subscription();
     }
 
     #[Computed]
@@ -68,8 +65,25 @@ new #[Title('Billing')] class extends Component
     {
         $subscription = $this->currentSubscription;
 
-        if ($subscription && in_array(strtolower($subscription->status), ['active', 'trialing'], true)) {
-            return $subscription->plan_code;
+        if ($subscription && $subscription->valid()) {
+            return $this->resolvePlanCodeFromPriceId($subscription->stripe_price ?? '');
+        }
+
+        return (string) config('services.billing.free_plan_code', 'free');
+    }
+
+    protected function resolvePlanCodeFromPriceId(string $stripePriceId): string
+    {
+        if ($stripePriceId === '') {
+            return (string) config('services.billing.free_plan_code', 'free');
+        }
+
+        $plans = (array) config('services.billing.plans', []);
+
+        foreach ($plans as $code => $plan) {
+            if (($plan['stripe_price_id'] ?? null) === $stripePriceId) {
+                return (string) $code;
+            }
         }
 
         return (string) config('services.billing.free_plan_code', 'free');
@@ -260,17 +274,12 @@ new #[Title('Billing')] class extends Component
                 </flux:heading>
                 @if ($this->currentSubscription)
                     <div class="mt-2 flex items-center gap-2">
-                        @if (in_array(strtolower($this->currentSubscription->status), ['active', 'trialing']))
-                            <flux:badge color="green" size="sm">{{ __(ucfirst($this->currentSubscription->status)) }}</flux:badge>
+                        @if ($this->currentSubscription->valid())
+                            <flux:badge color="green" size="sm">{{ __(ucfirst($this->currentSubscription->stripe_status)) }}</flux:badge>
                         @else
-                            <flux:badge color="red" size="sm">{{ __(ucfirst($this->currentSubscription->status)) }}</flux:badge>
+                            <flux:badge color="red" size="sm">{{ __(ucfirst($this->currentSubscription->stripe_status)) }}</flux:badge>
                         @endif
                     </div>
-                    @if ($this->currentSubscription->current_period_end)
-                        <flux:text class="mt-2 text-xs text-zinc-400 dark:text-zinc-500">
-                            {{ __('Renews :date', ['date' => $this->currentSubscription->current_period_end->toDateString()]) }}
-                        </flux:text>
-                    @endif
                 @else
                     <flux:badge color="zinc" size="sm" class="mt-2">{{ __('No active subscription') }}</flux:badge>
                 @endif

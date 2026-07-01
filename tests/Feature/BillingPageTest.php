@@ -3,10 +3,10 @@
 use App\Enums\TeamRole;
 use App\Models\BillingInvoice;
 use App\Models\Team;
-use App\Models\TeamBillingSubscription;
 use App\Models\TeamWallet;
 use App\Models\TeamWalletTransaction;
 use App\Models\User;
+use Laravel\Cashier\Subscription as CashierSubscription;
 use Livewire\Livewire;
 
 test('billing page requires authentication', function () {
@@ -80,16 +80,13 @@ test('billing page shows active subscription plan', function () {
     $user->switchTeam($team);
     $user->refresh();
 
-    TeamBillingSubscription::create([
+    CashierSubscription::create([
         'team_id' => $team->id,
-        'payment_provider' => 'stripe',
-        'stripe_customer_id' => 'cus_test123',
-        'stripe_subscription_id' => 'sub_test123',
-        'plan_code' => 'pro',
-        'status' => 'active',
-        'cancel_at_period_end' => false,
-        'current_period_start' => now()->startOfMonth(),
-        'current_period_end' => now()->endOfMonth(),
+        'type' => 'default',
+        'stripe_id' => 'sub_test123',
+        'stripe_status' => 'active',
+        'stripe_price' => 'price_pro',
+        'quantity' => 1,
     ]);
 
     $this->actingAs($user);

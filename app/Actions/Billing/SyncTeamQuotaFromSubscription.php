@@ -3,19 +3,17 @@
 namespace App\Actions\Billing;
 
 use App\Models\Team;
-use App\Models\TeamBillingSubscription;
 use App\Models\TeamQuotaPolicy;
 use App\Models\TeamWallet;
 use Carbon\CarbonInterface;
 
 class SyncTeamQuotaFromSubscription
 {
-    public function handle(TeamBillingSubscription $subscription, ?CarbonInterface $at = null): TeamQuotaPolicy
+    public function handle(Team $team, string $planCode, string $status = 'active', ?CarbonInterface $at = null): TeamQuotaPolicy
     {
         $at ??= now();
 
-        $planCode = $subscription->plan_code;
-        $status = strtolower($subscription->status);
+        $status = strtolower($status);
 
         if (! in_array($status, ['active', 'trialing'], true)) {
             $planCode = (string) config('services.billing.free_plan_code', 'free');
@@ -29,7 +27,7 @@ class SyncTeamQuotaFromSubscription
         // monthly invoice + Stripe checkout flow.
         if (in_array($status, ['active', 'trialing'], true)) {
             TeamWallet::query()->firstOrCreate(
-                ['team_id' => $subscription->team_id],
+                ['team_id' => $team->id],
                 [
                     'balance_cents' => 0,
                     'credit_grant_cents' => 0,
@@ -40,7 +38,7 @@ class SyncTeamQuotaFromSubscription
         }
 
         return $this->upsertPolicy(
-            team: $subscription->team,
+            team: $team,
             dailyTokenLimit: $plan['daily_token_limit'],
             weeklyTokenLimit: $plan['weekly_token_limit'],
             monthlyTokenLimit: $plan['monthly_token_limit'],

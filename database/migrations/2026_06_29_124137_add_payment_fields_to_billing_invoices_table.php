@@ -12,11 +12,10 @@ return new class extends Migration
     public function up(): void
     {
         Schema::table('billing_invoices', function (Blueprint $table) {
-            $table->string('payment_provider', 32)->nullable()->after('status');
-            $table->string('payment_reference')->nullable()->after('payment_provider');
+            $table->string('payment_reference')->nullable()->after('status');
             $table->text('payment_url')->nullable()->after('payment_reference');
 
-            $table->index(['payment_provider', 'payment_reference'], 'billing_invoice_payment_idx');
+            $table->index(['payment_reference'], 'billing_invoice_payment_idx');
         });
     }
 
@@ -27,7 +26,7 @@ return new class extends Migration
     {
         Schema::table('billing_invoices', function (Blueprint $table) {
             $table->dropIndex('billing_invoice_payment_idx');
-            $table->dropColumn(['payment_provider', 'payment_reference', 'payment_url']);
+            $table->dropColumn(['payment_reference', 'payment_url']);
         });
     }
 };

@@ -58,7 +58,6 @@ it('creates a stripe checkout session and stores payment reference on invoice', 
 
     $updatedInvoice = app(CreateStripeCheckoutSession::class)->handle($invoice);
 
-    expect($updatedInvoice->payment_provider)->toBe('stripe');
     expect($updatedInvoice->payment_reference)->toBe('cs_test_123');
     expect($updatedInvoice->payment_url)->toBe('https://checkout.stripe.com/pay/cs_test_123');
 });

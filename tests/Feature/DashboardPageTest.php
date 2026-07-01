@@ -2,9 +2,9 @@
 
 use App\Enums\TeamRole;
 use App\Models\Team;
-use App\Models\TeamBillingSubscription;
 use App\Models\UsageLedger;
 use App\Models\User;
+use Laravel\Cashier\Subscription as CashierSubscription;
 use Livewire\Livewire;
 
 test('dashboard page requires authentication', function () {
@@ -50,16 +50,13 @@ test('dashboard shows active subscription plan in badge', function () {
     $user->switchTeam($team);
     $user->refresh();
 
-    TeamBillingSubscription::create([
+    CashierSubscription::create([
         'team_id' => $team->id,
-        'payment_provider' => 'stripe',
-        'stripe_customer_id' => 'cus_test123',
-        'stripe_subscription_id' => 'sub_test123',
-        'plan_code' => 'pro',
-        'status' => 'active',
-        'cancel_at_period_end' => false,
-        'current_period_start' => now()->startOfMonth(),
-        'current_period_end' => now()->endOfMonth(),
+        'type' => 'default',
+        'stripe_id' => 'sub_test123',
+        'stripe_status' => 'active',
+        'stripe_price' => 'price_pro',
+        'quantity' => 1,
     ]);
 
     $this->actingAs($user);

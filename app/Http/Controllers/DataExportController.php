@@ -5,7 +5,6 @@ namespace App\Http\Controllers;
 use App\Enums\TeamPermission;
 use App\Models\BillingInvoice;
 use App\Models\Team;
-use App\Models\TeamBillingSubscription;
 use App\Models\TeamWalletTransaction;
 use App\Models\UsageLedger;
 use Carbon\Carbon;
@@ -127,15 +126,15 @@ class DataExportController extends Controller
      */
     protected function billingCycle(Team $team): array
     {
-        $subscription = TeamBillingSubscription::where('team_id', $team->id)
-            ->where('status', 'active')
-            ->latest('current_period_start')
-            ->first();
+        $subscription = $team->subscription();
 
-        if ($subscription && $subscription->current_period_start && $subscription->current_period_end) {
+        if ($subscription && $subscription->valid() && $subscription->created_at) {
+            $start = $subscription->created_at->startOfMonth();
+            $end = $start->copy()->endOfMonth();
+
             return [
-                'start' => $subscription->current_period_start->toDateString(),
-                'end' => $subscription->current_period_end->toDateString(),
+                'start' => $start->toDateString(),
+                'end' => $end->toDateString(),
             ];
         }
 

@@ -1,11 +1,11 @@
 <?php
 
 use App\Models\BillingInvoice;
-use App\Models\TeamBillingSubscription;
 use App\Models\TeamQuotaPolicy;
 use App\Models\TeamWallet;
 use App\Models\User;
 use Illuminate\Testing\TestResponse;
+use Laravel\Cashier\Subscription as CashierSubscription;
 
 beforeEach(function () {
     config()->set('cashier.webhook.secret', 'whsec_test_123');
@@ -70,7 +70,6 @@ it('marks invoice as paid when stripe checkout completed webhook is valid', func
     $invoice->refresh();
 
     expect($invoice->status)->toBe('paid');
-    expect($invoice->payment_provider)->toBe('stripe');
     expect($invoice->payment_reference)->toBe('cs_live_paid_1');
     expect($invoice->paid_at)->not->toBeNull();
 });
@@ -140,12 +139,13 @@ it('syncs team subscription and applies plan quota limits from stripe webhook', 
 
     $response->assertSuccessful();
 
-    $subscription = TeamBillingSubscription::query()->where('team_id', $team->id)->first();
+    // Cashier should have created a subscription record.
+    $subscription = CashierSubscription::query()->where('team_id', $team->id)->first();
 
     expect($subscription)->not->toBeNull();
-    expect($subscription->plan_code)->toBe('pro');
-    expect($subscription->status)->toBe('active');
-    expect($subscription->stripe_subscription_id)->toBe('sub_123');
+    expect($subscription->stripe_id)->toBe('sub_123');
+    expect($subscription->stripe_status)->toBe('active');
+    expect($subscription->stripe_price)->toBe('price_pro_test');
 
     $activePolicy = TeamQuotaPolicy::query()
         ->where('team_id', $team->id)
@@ -210,11 +210,12 @@ it('downgrades subscription quota to free when stripe status is past_due', funct
 
     $response->assertSuccessful();
 
-    $subscription = TeamBillingSubscription::query()->where('team_id', $team->id)->first();
+    // Cashier should have created/updated the subscription record.
+    $subscription = CashierSubscription::query()->where('team_id', $team->id)->first();
 
     expect($subscription)->not->toBeNull();
-    expect($subscription->plan_code)->toBe('pro');
-    expect($subscription->status)->toBe('past_due');
+    expect($subscription->stripe_id)->toBe('sub_past_due_001');
+    expect($subscription->stripe_status)->toBe('past_due');
 
     $activePolicy = TeamQuotaPolicy::query()
         ->where('team_id', $team->id)
@@ -240,7 +241,6 @@ it('marks invoice as void when a matching stripe refund event is received', func
         'billing_month' => '2026-06-01',
         'currency' => 'USD',
         'status' => 'paid',
-        'payment_provider' => 'stripe',
         'payment_reference' => 'pi_paid_123',
         'subtotal_cents' => 500,
         'tax_cents' => 0,
@@ -279,7 +279,6 @@ it('keeps invoice paid when stripe refund event is partial', function () {
         'billing_month' => '2026-06-01',
         'currency' => 'USD',
         'status' => 'paid',
-        'payment_provider' => 'stripe',
         'payment_reference' => 'pi_paid_456',
         'subtotal_cents' => 900,
         'tax_cents' => 0,

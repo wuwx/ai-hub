@@ -3,7 +3,6 @@
 use App\Actions\Usage\GetTeamUsageSnapshot;
 use App\Enums\TeamPermission;
 use App\Models\Team;
-use App\Models\TeamBillingSubscription;
 use Illuminate\Support\Facades\Auth;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\Title;
@@ -24,12 +23,20 @@ new #[Title('Dashboard')] class extends Component
             return 'free';
         }
 
-        $subscription = TeamBillingSubscription::where('team_id', $this->team->id)
-            ->latest('current_period_start')
-            ->first();
+        $subscription = $this->team->subscription();
 
-        if ($subscription && in_array(strtolower($subscription->status), ['active', 'trialing'], true)) {
-            return $subscription->plan_code;
+        if ($subscription && $subscription->valid()) {
+            $stripePriceId = $subscription->stripe_price ?? '';
+
+            if ($stripePriceId !== '') {
+                $plans = (array) config('services.billing.plans', []);
+
+                foreach ($plans as $code => $plan) {
+                    if (($plan['stripe_price_id'] ?? null) === $stripePriceId) {
+                        return (string) $code;
+                    }
+                }
+            }
         }
 
         return (string) config('services.billing.free_plan_code', 'free');
