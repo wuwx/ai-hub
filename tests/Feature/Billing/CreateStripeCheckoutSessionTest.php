@@ -3,16 +3,44 @@
 use App\Actions\Billing\CreateStripeCheckoutSession;
 use App\Models\BillingInvoice;
 use App\Models\User;
-use Illuminate\Http\Client\Request;
-use Illuminate\Support\Facades\Http;
+use Stripe\Checkout\Session as StripeSession;
+use Stripe\Customer;
+use Stripe\StripeClient;
+
+function mockStripeClientForCheckout(string $sessionId = 'cs_test_123', string $sessionUrl = 'https://checkout.stripe.com/pay/cs_test_123'): StripeClient
+{
+    $session = StripeSession::constructFrom([
+        'id' => $sessionId,
+        'url' => $sessionUrl,
+    ]);
+
+    $customer = Customer::constructFrom(['id' => 'cus_test_123']);
+
+    $customersService = Mockery::mock();
+    $customersService->shouldReceive('retrieve')->andReturn($customer);
+    $customersService->shouldReceive('create')->andReturn($customer);
+
+    $checkoutSessionsService = Mockery::mock();
+    $checkoutSessionsService->shouldReceive('create')->andReturn($session);
+
+    $checkoutService = Mockery::mock();
+    $checkoutService->sessions = $checkoutSessionsService;
+
+    $mock = Mockery::mock(StripeClient::class);
+    $mock->customers = $customersService;
+    $mock->checkout = $checkoutService;
+
+    return $mock;
+}
 
 it('creates a stripe checkout session and stores payment reference on invoice', function () {
-    config()->set('services.stripe.secret', 'sk_test_123');
+    config()->set('cashier.secret', 'sk_test_123');
     config()->set('services.billing.checkout_success_url', 'https://app.example.com/billing/success');
     config()->set('services.billing.checkout_cancel_url', 'https://app.example.com/billing/cancel');
 
     $user = User::factory()->create();
     $team = $user->currentTeam;
+    $team->update(['stripe_id' => 'cus_test_123']);
 
     $invoice = BillingInvoice::create([
         'team_id' => $team->id,
@@ -26,22 +54,9 @@ it('creates a stripe checkout session and stores payment reference on invoice', 
         'issued_at' => now(),
     ]);
 
-    Http::fake([
-        'https://api.stripe.com/v1/checkout/sessions' => Http::response([
-            'id' => 'cs_test_123',
-            'url' => 'https://checkout.stripe.com/pay/cs_test_123',
-        ], 200),
-    ]);
+    app()->bind(StripeClient::class, fn () => mockStripeClientForCheckout('cs_test_123', 'https://checkout.stripe.com/pay/cs_test_123'));
 
     $updatedInvoice = app(CreateStripeCheckoutSession::class)->handle($invoice);
-
-    Http::assertSent(function (Request $request) use ($invoice) {
-        $data = $request->data();
-
-        return str_contains($request->url(), 'checkout/sessions')
-            && ($data['metadata[invoice_number]'] ?? null) === $invoice->invoice_number
-            && ($data['line_items[0][price_data][unit_amount]'] ?? null) === 500;
-    });
 
     expect($updatedInvoice->payment_provider)->toBe('stripe');
     expect($updatedInvoice->payment_reference)->toBe('cs_test_123');

@@ -72,6 +72,7 @@ return [
                 'name' => 'Free',
                 'description' => 'For personal projects and evaluation',
                 'monthly_price_cents' => 0,
+                'stripe_price_id' => env('STRIPE_FREE_PRICE_ID', 'price_free'),
                 'daily_token_limit' => 20_000,
                 'weekly_token_limit' => 120_000,
                 'monthly_token_limit' => 500_000,
@@ -86,6 +87,7 @@ return [
                 'name' => 'Pro',
                 'description' => 'For growing teams and production workloads',
                 'monthly_price_cents' => 4900,
+                'stripe_price_id' => env('STRIPE_PRO_PRICE_ID', 'price_pro'),
                 'daily_token_limit' => 300_000,
                 'weekly_token_limit' => 2_000_000,
                 'monthly_token_limit' => 8_000_000,
@@ -101,6 +103,7 @@ return [
                 'name' => 'Enterprise',
                 'description' => 'Unlimited scale for large organizations',
                 'monthly_price_cents' => 19900,
+                'stripe_price_id' => env('STRIPE_ENTERPRISE_PRICE_ID', 'price_enterprise'),
                 'daily_token_limit' => null,
                 'weekly_token_limit' => null,
                 'monthly_token_limit' => null,
@@ -114,12 +117,6 @@ return [
                 ],
             ],
         ],
-    ],
-
-    'stripe' => [
-        'secret' => env('STRIPE_SECRET'),
-        'webhook_secret' => env('STRIPE_WEBHOOK_SECRET'),
-        'webhook_tolerance_seconds' => (int) env('STRIPE_WEBHOOK_TOLERANCE_SECONDS', 300),
     ],
 
 ];

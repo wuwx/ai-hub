@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Billing\CashierWebhookController;
 use App\Http\Controllers\Billing\StripePortalController;
 use App\Http\Controllers\Billing\WalletRechargeController;
 use App\Http\Controllers\DataExportController;
@@ -14,6 +15,14 @@ Route::view('docs', 'docs')->name('docs');
 Route::view('terms', 'terms')->name('terms');
 
 Route::view('privacy', 'privacy')->name('privacy');
+
+// Cashier webhook & payment confirmation routes (no auth — called by Stripe).
+Route::prefix(config('cashier.path', 'stripe'))
+    ->name('cashier.')
+    ->group(function () {
+        Route::post('webhook', [CashierWebhookController::class, 'handleWebhook'])->name('webhook');
+        Route::get('payment/{id}', '\Laravel\Cashier\Http\Controllers\PaymentController@show')->name('payment');
+    });
 
 Route::prefix('{current_team}')
     ->middleware(['auth', 'verified', EnsureTeamMembership::class])

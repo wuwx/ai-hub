@@ -1,6 +1,5 @@
 <?php
 
-use App\Http\Controllers\Billing\StripeWebhookController;
 use App\Http\Controllers\Gateway\CompatibilityGatewayController;
 use App\Http\Controllers\HealthCheckController;
 use App\Http\Controllers\PrometheusMetricsController;
@@ -12,8 +11,6 @@ use Illuminate\Support\Facades\Route;
 Route::get('health', HealthCheckController::class);
 
 Route::get('metrics', PrometheusMetricsController::class);
-
-Route::post('webhooks/stripe', StripeWebhookController::class);
 
 Route::prefix('v1')
     ->middleware([AuthenticateApiKey::class, ThrottleApiKeyRequests::class, EnforceConcurrentRequestLimit::class])

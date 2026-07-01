@@ -5,13 +5,41 @@ use App\Models\TeamBillingSubscription;
 use App\Models\TeamQuotaPolicy;
 use App\Models\TeamWallet;
 use App\Models\User;
+use Illuminate\Testing\TestResponse;
+
+beforeEach(function () {
+    config()->set('cashier.webhook.secret', 'whsec_test_123');
+    config()->set('cashier.webhook.tolerance', 300);
+});
+
+/**
+ * Helper to send a signed webhook payload to the Cashier webhook endpoint.
+ */
+function sendWebhook(array $payloadArray, string $secret = 'whsec_test_123'): TestResponse
+{
+    $payload = json_encode($payloadArray, JSON_UNESCAPED_UNICODE);
+    $timestamp = now()->timestamp;
+    $signature = hash_hmac('sha256', $timestamp.'.'.$payload, $secret);
+
+    return test()->call(
+        method: 'POST',
+        uri: '/stripe/webhook',
+        parameters: [],
+        cookies: [],
+        files: [],
+        server: [
+            'CONTENT_TYPE' => 'application/json',
+            'HTTP_STRIPE_SIGNATURE' => 't='.$timestamp.',v1='.$signature,
+        ],
+        content: $payload,
+    );
+}
 
 it('marks invoice as paid when stripe checkout completed webhook is valid', function () {
-    config()->set('services.stripe.webhook_secret', 'whsec_test_123');
-    config()->set('services.stripe.webhook_tolerance_seconds', 300);
-
     $user = User::factory()->create();
     $team = $user->currentTeam;
+    $team->stripe_id = 'cus_test_invoice_1';
+    $team->save();
 
     $invoice = BillingInvoice::create([
         'team_id' => $team->id,
@@ -25,7 +53,7 @@ it('marks invoice as paid when stripe checkout completed webhook is valid', func
         'issued_at' => now(),
     ]);
 
-    $payloadArray = [
+    $response = sendWebhook([
         'type' => 'checkout.session.completed',
         'data' => [
             'object' => [
@@ -35,24 +63,7 @@ it('marks invoice as paid when stripe checkout completed webhook is valid', func
                 ],
             ],
         ],
-    ];
-
-    $payload = json_encode($payloadArray, JSON_UNESCAPED_UNICODE);
-    $timestamp = now()->timestamp;
-    $signature = hash_hmac('sha256', $timestamp.'.'.$payload, 'whsec_test_123');
-
-    $response = $this->call(
-        method: 'POST',
-        uri: '/api/webhooks/stripe',
-        parameters: [],
-        cookies: [],
-        files: [],
-        server: [
-            'CONTENT_TYPE' => 'application/json',
-            'HTTP_STRIPE_SIGNATURE' => 't='.$timestamp.',v1='.$signature,
-        ],
-        content: $payload,
-    );
+    ]);
 
     $response->assertSuccessful();
 
@@ -65,8 +76,6 @@ it('marks invoice as paid when stripe checkout completed webhook is valid', func
 });
 
 it('rejects stripe webhook request with invalid signature', function () {
-    config()->set('services.stripe.webhook_secret', 'whsec_test_123');
-
     $payload = json_encode([
         'type' => 'checkout.session.completed',
         'data' => ['object' => ['id' => 'cs_invalid']],
@@ -74,7 +83,7 @@ it('rejects stripe webhook request with invalid signature', function () {
 
     $response = $this->call(
         method: 'POST',
-        uri: '/api/webhooks/stripe',
+        uri: '/stripe/webhook',
         parameters: [],
         cookies: [],
         files: [],
@@ -85,13 +94,13 @@ it('rejects stripe webhook request with invalid signature', function () {
         content: $payload,
     );
 
-    $response->assertStatus(400);
+    $response->assertStatus(403);
 });
 
 it('syncs team subscription and applies plan quota limits from stripe webhook', function () {
-    config()->set('services.stripe.webhook_secret', 'whsec_test_123');
     config()->set('services.billing.free_plan_code', 'free');
     config()->set('services.billing.plans.pro', [
+        'stripe_price_id' => 'price_pro_test',
         'daily_token_limit' => 123456,
         'weekly_token_limit' => 654321,
         'monthly_token_limit' => 987654,
@@ -99,8 +108,10 @@ it('syncs team subscription and applies plan quota limits from stripe webhook', 
 
     $user = User::factory()->create();
     $team = $user->currentTeam;
+    $team->stripe_id = 'cus_123';
+    $team->save();
 
-    $payloadArray = [
+    $response = sendWebhook([
         'type' => 'customer.subscription.updated',
         'data' => [
             'object' => [
@@ -110,30 +121,22 @@ it('syncs team subscription and applies plan quota limits from stripe webhook', 
                 'current_period_start' => now()->subDay()->timestamp,
                 'current_period_end' => now()->addMonth()->timestamp,
                 'cancel_at_period_end' => false,
+                'items' => [
+                    'data' => [
+                        [
+                            'id' => 'si_123',
+                            'price' => ['id' => 'price_pro_test', 'product' => 'prod_123'],
+                            'quantity' => 1,
+                        ],
+                    ],
+                ],
                 'metadata' => [
                     'team_id' => (string) $team->id,
                     'plan_code' => 'pro',
                 ],
             ],
         ],
-    ];
-
-    $payload = json_encode($payloadArray, JSON_UNESCAPED_UNICODE);
-    $timestamp = now()->timestamp;
-    $signature = hash_hmac('sha256', $timestamp.'.'.$payload, 'whsec_test_123');
-
-    $response = $this->call(
-        method: 'POST',
-        uri: '/api/webhooks/stripe',
-        parameters: [],
-        cookies: [],
-        files: [],
-        server: [
-            'CONTENT_TYPE' => 'application/json',
-            'HTTP_STRIPE_SIGNATURE' => 't='.$timestamp.',v1='.$signature,
-        ],
-        content: $payload,
-    );
+    ]);
 
     $response->assertSuccessful();
 
@@ -163,7 +166,6 @@ it('syncs team subscription and applies plan quota limits from stripe webhook', 
 });
 
 it('downgrades subscription quota to free when stripe status is past_due', function () {
-    config()->set('services.stripe.webhook_secret', 'whsec_test_123');
     config()->set('services.billing.free_plan_code', 'free');
     config()->set('services.billing.plans.free', [
         'daily_token_limit' => 20000,
@@ -171,6 +173,7 @@ it('downgrades subscription quota to free when stripe status is past_due', funct
         'monthly_token_limit' => 500000,
     ]);
     config()->set('services.billing.plans.pro', [
+        'stripe_price_id' => 'price_pro_test',
         'daily_token_limit' => 123456,
         'weekly_token_limit' => 654321,
         'monthly_token_limit' => 987654,
@@ -178,38 +181,32 @@ it('downgrades subscription quota to free when stripe status is past_due', funct
 
     $user = User::factory()->create();
     $team = $user->currentTeam;
+    $team->stripe_id = 'cus_past_due_001';
+    $team->save();
 
-    $payloadArray = [
+    $response = sendWebhook([
         'type' => 'customer.subscription.updated',
         'data' => [
             'object' => [
                 'id' => 'sub_past_due_001',
                 'customer' => 'cus_past_due_001',
                 'status' => 'past_due',
+                'items' => [
+                    'data' => [
+                        [
+                            'id' => 'si_past_due',
+                            'price' => ['id' => 'price_pro_test', 'product' => 'prod_123'],
+                            'quantity' => 1,
+                        ],
+                    ],
+                ],
                 'metadata' => [
                     'team_id' => (string) $team->id,
                     'plan_code' => 'pro',
                 ],
             ],
         ],
-    ];
-
-    $payload = json_encode($payloadArray, JSON_UNESCAPED_UNICODE);
-    $timestamp = now()->timestamp;
-    $signature = hash_hmac('sha256', $timestamp.'.'.$payload, 'whsec_test_123');
-
-    $response = $this->call(
-        method: 'POST',
-        uri: '/api/webhooks/stripe',
-        parameters: [],
-        cookies: [],
-        files: [],
-        server: [
-            'CONTENT_TYPE' => 'application/json',
-            'HTTP_STRIPE_SIGNATURE' => 't='.$timestamp.',v1='.$signature,
-        ],
-        content: $payload,
-    );
+    ]);
 
     $response->assertSuccessful();
 
@@ -232,10 +229,10 @@ it('downgrades subscription quota to free when stripe status is past_due', funct
 });
 
 it('marks invoice as void when a matching stripe refund event is received', function () {
-    config()->set('services.stripe.webhook_secret', 'whsec_test_123');
-
     $user = User::factory()->create();
     $team = $user->currentTeam;
+    $team->stripe_id = 'cus_refund_1';
+    $team->save();
 
     $invoice = BillingInvoice::create([
         'team_id' => $team->id,
@@ -252,7 +249,7 @@ it('marks invoice as void when a matching stripe refund event is received', func
         'paid_at' => now(),
     ]);
 
-    $payloadArray = [
+    $response = sendWebhook([
         'type' => 'charge.refunded',
         'data' => [
             'object' => [
@@ -260,24 +257,7 @@ it('marks invoice as void when a matching stripe refund event is received', func
                 'payment_intent' => 'pi_paid_123',
             ],
         ],
-    ];
-
-    $payload = json_encode($payloadArray, JSON_UNESCAPED_UNICODE);
-    $timestamp = now()->timestamp;
-    $signature = hash_hmac('sha256', $timestamp.'.'.$payload, 'whsec_test_123');
-
-    $response = $this->call(
-        method: 'POST',
-        uri: '/api/webhooks/stripe',
-        parameters: [],
-        cookies: [],
-        files: [],
-        server: [
-            'CONTENT_TYPE' => 'application/json',
-            'HTTP_STRIPE_SIGNATURE' => 't='.$timestamp.',v1='.$signature,
-        ],
-        content: $payload,
-    );
+    ]);
 
     $response->assertSuccessful();
 
@@ -288,10 +268,10 @@ it('marks invoice as void when a matching stripe refund event is received', func
 });
 
 it('keeps invoice paid when stripe refund event is partial', function () {
-    config()->set('services.stripe.webhook_secret', 'whsec_test_123');
-
     $user = User::factory()->create();
     $team = $user->currentTeam;
+    $team->stripe_id = 'cus_refund_2';
+    $team->save();
 
     $invoice = BillingInvoice::create([
         'team_id' => $team->id,
@@ -308,7 +288,7 @@ it('keeps invoice paid when stripe refund event is partial', function () {
         'paid_at' => now(),
     ]);
 
-    $payloadArray = [
+    $response = sendWebhook([
         'type' => 'charge.refund.updated',
         'data' => [
             'object' => [
@@ -318,24 +298,7 @@ it('keeps invoice paid when stripe refund event is partial', function () {
                 'amount_refunded' => 200,
             ],
         ],
-    ];
-
-    $payload = json_encode($payloadArray, JSON_UNESCAPED_UNICODE);
-    $timestamp = now()->timestamp;
-    $signature = hash_hmac('sha256', $timestamp.'.'.$payload, 'whsec_test_123');
-
-    $response = $this->call(
-        method: 'POST',
-        uri: '/api/webhooks/stripe',
-        parameters: [],
-        cookies: [],
-        files: [],
-        server: [
-            'CONTENT_TYPE' => 'application/json',
-            'HTTP_STRIPE_SIGNATURE' => 't='.$timestamp.',v1='.$signature,
-        ],
-        content: $payload,
-    );
+    ]);
 
     $response->assertSuccessful();
 

@@ -9,11 +9,12 @@ function postStripeWalletRechargeWebhook(array $eventPayload): TestResponse
 {
     $payload = json_encode($eventPayload, JSON_UNESCAPED_UNICODE);
     $timestamp = now()->timestamp;
-    $signature = hash_hmac('sha256', $timestamp.'.'.$payload, 'whsec_test_123');
+    $secret = config('cashier.webhook.secret');
+    $signature = hash_hmac('sha256', $timestamp.'.'.$payload, $secret);
 
     return test()->call(
         method: 'POST',
-        uri: '/api/webhooks/stripe',
+        uri: '/stripe/webhook',
         parameters: [],
         cookies: [],
         files: [],
@@ -26,7 +27,7 @@ function postStripeWalletRechargeWebhook(array $eventPayload): TestResponse
 }
 
 it('credits the team wallet when a stripe checkout session completed webhook carries wallet_recharge metadata', function () {
-    config()->set('services.stripe.webhook_secret', 'whsec_test_123');
+    config()->set('cashier.webhook.secret', 'whsec_test_123');
 
     $user = User::factory()->create();
     $team = $user->currentTeam;
@@ -62,7 +63,7 @@ it('credits the team wallet when a stripe checkout session completed webhook car
 });
 
 it('skips duplicate wallet recharge webhook events to preserve idempotency', function () {
-    config()->set('services.stripe.webhook_secret', 'whsec_test_123');
+    config()->set('cashier.webhook.secret', 'whsec_test_123');
 
     $user = User::factory()->create();
     $team = $user->currentTeam;
@@ -98,7 +99,7 @@ it('skips duplicate wallet recharge webhook events to preserve idempotency', fun
 });
 
 it('does not credit the wallet when the stripe event has no wallet_recharge metadata', function () {
-    config()->set('services.stripe.webhook_secret', 'whsec_test_123');
+    config()->set('cashier.webhook.secret', 'whsec_test_123');
 
     $user = User::factory()->create();
     $team = $user->currentTeam;
@@ -123,7 +124,7 @@ it('does not credit the wallet when the stripe event has no wallet_recharge meta
 });
 
 it('ignores wallet recharge webhook for a non-existent team', function () {
-    config()->set('services.stripe.webhook_secret', 'whsec_test_123');
+    config()->set('cashier.webhook.secret', 'whsec_test_123');
 
     postStripeWalletRechargeWebhook([
         'type' => 'checkout.session.completed',
