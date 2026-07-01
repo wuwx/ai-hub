@@ -24,8 +24,9 @@ class CreateWalletRechargeSession
             throw new RuntimeException('Stripe secret key is not configured.');
         }
 
-        $successUrl = (string) config('services.billing.wallet_recharge_success_url', rtrim((string) config('app.url'), '/').'/billing/wallet/success');
-        $cancelUrl = (string) config('services.billing.wallet_recharge_cancel_url', rtrim((string) config('app.url'), '/').'/billing/wallet/cancel');
+        $baseUrl = rtrim((string) config('app.url'), '/');
+        $successUrl = (string) config('services.billing.wallet_recharge_success_url', $baseUrl.'/'.$team->slug.'/billing/wallet/success');
+        $cancelUrl = (string) config('services.billing.wallet_recharge_cancel_url', $baseUrl.'/'.$team->slug.'/billing/wallet/cancel');
 
         try {
             $checkout = $team->checkoutCharge(

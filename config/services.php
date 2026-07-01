@@ -61,10 +61,6 @@ return [
     'billing' => [
         'currency' => env('BILLING_CURRENCY', 'USD'),
         'invoice_due_days' => (int) env('BILLING_INVOICE_DUE_DAYS', 7),
-        'checkout_success_url' => env('BILLING_CHECKOUT_SUCCESS_URL', rtrim((string) env('APP_URL', 'http://localhost'), '/').'/billing/success'),
-        'checkout_cancel_url' => env('BILLING_CHECKOUT_CANCEL_URL', rtrim((string) env('APP_URL', 'http://localhost'), '/').'/billing/cancel'),
-        'wallet_recharge_success_url' => env('BILLING_WALLET_RECHARGE_SUCCESS_URL', rtrim((string) env('APP_URL', 'http://localhost'), '/').'/billing/wallet/success'),
-        'wallet_recharge_cancel_url' => env('BILLING_WALLET_RECHARGE_CANCEL_URL', rtrim((string) env('APP_URL', 'http://localhost'), '/').'/billing/wallet/cancel'),
         'free_plan_code' => env('BILLING_FREE_PLAN_CODE', 'free'),
         'signup_credit_cents' => (int) env('BILLING_SIGNUP_CREDIT_CENTS', 500),
         'plans' => [

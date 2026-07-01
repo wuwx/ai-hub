@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Billing\CashierWebhookController;
+use App\Http\Controllers\Billing\CheckoutReturnController;
 use App\Http\Controllers\Billing\StripePortalController;
 use App\Http\Controllers\Billing\WalletRechargeController;
 use App\Http\Controllers\DataExportController;
@@ -38,6 +39,12 @@ Route::prefix('{current_team}')
         Route::livewire('billing', 'pages::billing')->name('billing.index');
 
         Route::livewire('request-logs', 'pages::request-logs')->name('request-logs.index');
+
+        // Stripe checkout return handlers — verify payment & redirect to billing.
+        Route::get('billing/success', [CheckoutReturnController::class, 'invoice'])->name('billing.success');
+        Route::get('billing/cancel', fn () => to_route('billing.index'))->name('billing.cancel');
+        Route::get('billing/wallet/success', [CheckoutReturnController::class, 'wallet'])->name('billing.wallet.success');
+        Route::get('billing/wallet/cancel', fn () => to_route('billing.index'))->name('billing.wallet.cancel');
 
         // Customer self-service wallet top-up endpoint.
         Route::post('billing/wallet/recharge', [WalletRechargeController::class, 'store'])

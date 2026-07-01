@@ -20,8 +20,9 @@ class CreateStripeCheckoutSession
             throw new RuntimeException('Team not found for invoice.');
         }
 
-        $successUrl = (string) config('services.billing.checkout_success_url', rtrim((string) config('app.url'), '/').'/billing/success');
-        $cancelUrl = (string) config('services.billing.checkout_cancel_url', rtrim((string) config('app.url'), '/').'/billing/cancel');
+        $baseUrl = rtrim((string) config('app.url'), '/');
+        $successUrl = (string) config('services.billing.checkout_success_url', $baseUrl.'/'.$team->slug.'/billing/success');
+        $cancelUrl = (string) config('services.billing.checkout_cancel_url', $baseUrl.'/'.$team->slug.'/billing/cancel');
 
         try {
             $checkout = $team->checkoutCharge(
