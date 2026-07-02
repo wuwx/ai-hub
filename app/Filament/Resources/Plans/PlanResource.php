@@ -5,6 +5,8 @@ namespace App\Filament\Resources\Plans;
 use App\Filament\Resources\Plans\Pages\CreatePlan;
 use App\Filament\Resources\Plans\Pages\EditPlan;
 use App\Filament\Resources\Plans\Pages\ListPlans;
+use App\Filament\Resources\Plans\RelationManagers\ModelEntitlementsRelationManager;
+use App\Filament\Resources\Plans\RelationManagers\ProviderEntitlementsRelationManager;
 use App\Filament\Resources\Plans\Schemas\PlanForm;
 use App\Filament\Resources\Plans\Tables\PlansTable;
 use App\Models\Plan;
@@ -57,7 +59,8 @@ class PlanResource extends Resource
     public static function getRelations(): array
     {
         return [
-            //
+            ModelEntitlementsRelationManager::class,
+            ProviderEntitlementsRelationManager::class,
         ];
     }
 
