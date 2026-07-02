@@ -4,8 +4,10 @@ namespace App\Filament\Pages;
 
 use App\Actions\Billing\ResolveModelPricing;
 use App\Models\LlmModel;
+use App\Models\Plan;
 use App\Models\QuotaPolicy;
 use App\Models\RequestLog;
+use App\Services\PlanService;
 use BackedEnum;
 use Carbon\CarbonInterface;
 use Filament\Pages\Page;
@@ -60,7 +62,7 @@ class ProfitDashboard extends Page
         CarbonInterface $monthStart,
         CarbonInterface $monthEnd,
     ): array {
-        $freeCode = (string) config('services.billing.free_plan_code', 'free');
+        $freeCode = app(PlanService::class)->freePlanCode();
         $planCounts = $this->activePlanCounts();
 
         $revenueCents = $this->monthlyRecurringRevenueCents($planCounts);
@@ -99,12 +101,12 @@ class ProfitDashboard extends Page
      */
     protected function monthlyRecurringRevenueCents(Collection $planCounts): int
     {
-        $plans = (array) config('services.billing.plans', []);
+        $plans = Plan::query()->active()->get()->keyBy('code');
         $revenueCents = 0;
 
         foreach ($planCounts as $planCode => $userCount) {
             $revenueCents +=
-                (int) ($plans[$planCode]['monthly_price_cents'] ?? 0) *
+                (int) ($plans[$planCode]->monthly_price_cents ?? 0) *
                 $userCount;
         }
 
@@ -172,8 +174,8 @@ class ProfitDashboard extends Page
         CarbonInterface $monthStart,
         CarbonInterface $monthEnd,
     ): array {
-        $plans = (array) config('services.billing.plans', []);
-        $freeCode = (string) config('services.billing.free_plan_code', 'free');
+        $plans = Plan::query()->active()->get()->keyBy('code');
+        $freeCode = app(PlanService::class)->freePlanCode();
         $resolver = app(ResolveModelPricing::class);
 
         $policies = QuotaPolicy::query()
@@ -217,7 +219,7 @@ class ProfitDashboard extends Page
             }
 
             $revenueCents =
-                (int) ($plans[$planCode]['monthly_price_cents'] ?? 0);
+                (int) ($plans[$planCode]->monthly_price_cents ?? 0);
 
             $byUser[] = [
                 'user_name' => $policy?->user?->name ?? "User #{$userId}",

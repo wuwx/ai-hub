@@ -2,6 +2,7 @@
 
 namespace App\Actions\Billing;
 
+use App\Models\Plan;
 use App\Models\QuotaPolicy;
 use App\Models\User;
 use Carbon\CarbonInterface;
@@ -30,51 +31,24 @@ class SyncQuotaFromSubscription
         return $this->upsertPolicy(
             user: $user,
             planCode: $planCode,
-            dailyTokenLimit: $plan['daily_token_limit'],
-            weeklyTokenLimit: $plan['weekly_token_limit'],
-            monthlyTokenLimit: $plan['monthly_token_limit'],
+            dailyTokenLimit: $plan->daily_token_limit,
+            weeklyTokenLimit: $plan->weekly_token_limit,
+            monthlyTokenLimit: $plan->monthly_token_limit,
             at: $at,
         );
     }
 
-    /**
-     * @return array{daily_token_limit: ?int, weekly_token_limit: ?int, monthly_token_limit: ?int}
-     */
-    protected function resolvePlan(string $planCode): array
+    protected function resolvePlan(string $planCode): Plan
     {
-        $plans = (array) config('services.billing.plans', []);
+        $plan = Plan::query()->byCode($planCode)->first();
 
-        $plan =
-            $plans[$planCode] ??
-            ($plans[
-                (string) config('services.billing.free_plan_code', 'free')
-            ] ??
-                []);
-
-        return [
-            'daily_token_limit' => $this->nullableInt(
-                $plan['daily_token_limit'] ?? null,
-            ),
-            'weekly_token_limit' => $this->nullableInt(
-                $plan['weekly_token_limit'] ?? null,
-            ),
-            'monthly_token_limit' => $this->nullableInt(
-                $plan['monthly_token_limit'] ?? null,
-            ),
-        ];
-    }
-
-    protected function nullableInt(mixed $value): ?int
-    {
-        if ($value === null || $value === '') {
-            return null;
+        if ($plan) {
+            return $plan;
         }
 
-        if (! is_numeric($value)) {
-            return null;
-        }
+        $freeCode = (string) config('services.billing.free_plan_code', 'free');
 
-        return max(0, (int) $value);
+        return Plan::query()->byCode($freeCode)->first() ?? new Plan;
     }
 
     protected function upsertPolicy(

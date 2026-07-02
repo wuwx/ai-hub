@@ -81,58 +81,5 @@ return [
     'billing' => [
         'currency' => env('BILLING_CURRENCY', 'USD'),
         'free_plan_code' => env('BILLING_FREE_PLAN_CODE', 'free'),
-        'plans' => [
-            'free' => [
-                'name' => 'Free',
-                'description' => 'For personal projects and evaluation',
-                'monthly_price_cents' => 0,
-                'stripe_price_id' => env('STRIPE_FREE_PRICE_ID', 'price_free'),
-                'daily_token_limit' => 20_000,
-                'weekly_token_limit' => 120_000,
-                'monthly_token_limit' => 500_000,
-                'features' => [
-                    '20K daily tokens',
-                    '500K monthly tokens',
-                    'All LLM providers',
-                    'Community support',
-                ],
-            ],
-            'pro' => [
-                'name' => 'Pro',
-                'description' => 'For growing teams and production workloads',
-                'monthly_price_cents' => 4900,
-                'stripe_price_id' => env('STRIPE_PRO_PRICE_ID', 'price_pro'),
-                'daily_token_limit' => 300_000,
-                'weekly_token_limit' => 2_000_000,
-                'monthly_token_limit' => 8_000_000,
-                'features' => [
-                    '300K daily tokens',
-                    '8M monthly tokens',
-                    'Priority routing',
-                    'Email support',
-                    'Advanced collaboration',
-                ],
-            ],
-            'enterprise' => [
-                'name' => 'Enterprise',
-                'description' => 'Unlimited scale for large organizations',
-                'monthly_price_cents' => 19900,
-                'stripe_price_id' => env(
-                    'STRIPE_ENTERPRISE_PRICE_ID',
-                    'price_enterprise',
-                ),
-                'daily_token_limit' => null,
-                'weekly_token_limit' => null,
-                'monthly_token_limit' => null,
-                'features' => [
-                    'Unlimited tokens',
-                    'Dedicated infrastructure',
-                    'Custom SLA',
-                    'Priority support',
-                    'SSO & audit logs',
-                    'Custom models',
-                ],
-            ],
-        ],
     ],
 ];

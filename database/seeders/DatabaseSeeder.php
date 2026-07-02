@@ -26,6 +26,10 @@ class DatabaseSeeder extends Seeder
             'email' => 'test@example.com',
         ]);
 
+        $this->call([
+            PlanSeeder::class,
+        ]);
+
         $this->seedLlmProviders();
         $this->seedPlanEntitlements();
     }

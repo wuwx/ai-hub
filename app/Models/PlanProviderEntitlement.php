@@ -10,6 +10,14 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 class PlanProviderEntitlement extends Model
 {
     /**
+     * @return BelongsTo<Plan, $this>
+     */
+    public function plan(): BelongsTo
+    {
+        return $this->belongsTo(Plan::class, 'plan_code', 'code');
+    }
+
+    /**
      * @return BelongsTo<LlmProvider, $this>
      */
     public function provider(): BelongsTo

@@ -1,5 +1,6 @@
 <?php
 
+use App\Models\Plan;
 use App\Models\UsageLedger;
 use App\Models\User;
 use Laravel\Cashier\Subscription as CashierSubscription;
@@ -34,6 +35,14 @@ test('dashboard shows current plan badge', function () {
 
 test('dashboard shows active subscription plan in badge', function () {
     $user = User::factory()->create();
+
+    Plan::updateOrCreate(['code' => 'pro'], [
+        'name' => 'Pro',
+        'stripe_price_id' => 'price_pro',
+        'monthly_price_cents' => 4900,
+        'is_active' => true,
+        'sort_order' => 1,
+    ]);
 
     CashierSubscription::create([
         'user_id' => $user->id,

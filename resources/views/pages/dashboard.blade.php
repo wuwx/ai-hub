@@ -1,6 +1,7 @@
 <?php
 
 use App\Actions\Usage\GetUsageSnapshot;
+use App\Services\PlanService;
 use Illuminate\Support\Facades\Auth;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\Title;
@@ -21,17 +22,11 @@ new #[Title("Dashboard")] class extends Component {
             $stripePriceId = $subscription->stripe_price ?? "";
 
             if ($stripePriceId !== "") {
-                $plans = (array) config("services.billing.plans", []);
-
-                foreach ($plans as $code => $plan) {
-                    if (($plan["stripe_price_id"] ?? null) === $stripePriceId) {
-                        return (string) $code;
-                    }
-                }
+                return app(PlanService::class)->resolveCodeFromPriceId($stripePriceId);
             }
         }
 
-        return (string) config("services.billing.free_plan_code", "free");
+        return app(PlanService::class)->freePlanCode();
     }
 
     /**

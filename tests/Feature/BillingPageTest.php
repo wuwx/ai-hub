@@ -1,6 +1,7 @@
 <?php
 
 use App\Actions\Billing\SyncQuotaFromSubscription;
+use App\Models\Plan;
 use App\Models\QuotaPolicy;
 use App\Models\User;
 use Laravel\Cashier\Subscription as CashierSubscription;
@@ -173,7 +174,16 @@ test(
 test('billing page shows active subscription plan', function () {
     $user = User::factory()->create();
 
-    config()->set('services.billing.plans.pro.stripe_price_id', 'price_pro');
+    Plan::updateOrCreate(['code' => 'pro'], [
+        'name' => 'Pro',
+        'stripe_price_id' => 'price_pro',
+        'monthly_price_cents' => 4900,
+        'daily_token_limit' => 300000,
+        'weekly_token_limit' => 2000000,
+        'monthly_token_limit' => 8000000,
+        'is_active' => true,
+        'sort_order' => 1,
+    ]);
 
     CashierSubscription::create([
         'user_id' => $user->id,
@@ -194,6 +204,10 @@ test('billing page shows active subscription plan', function () {
 test('billing page displays all available plans', function () {
     $user = User::factory()->create();
 
+    Plan::updateOrCreate(['code' => 'free'], ['name' => 'Free', 'monthly_price_cents' => 0, 'is_active' => true, 'sort_order' => 0]);
+    Plan::updateOrCreate(['code' => 'pro'], ['name' => 'Pro', 'monthly_price_cents' => 4900, 'is_active' => true, 'sort_order' => 1]);
+    Plan::updateOrCreate(['code' => 'enterprise'], ['name' => 'Enterprise', 'monthly_price_cents' => 19900, 'is_active' => true, 'sort_order' => 2]);
+
     $this->actingAs($user);
 
     Livewire::test('pages::billing')
@@ -203,6 +217,9 @@ test('billing page displays all available plans', function () {
 });
 
 test('billing page shows subscribe button for free plan users', function () {
+    Plan::updateOrCreate(['code' => 'free'], ['name' => 'Free', 'monthly_price_cents' => 0, 'is_active' => true, 'sort_order' => 0]);
+    Plan::updateOrCreate(['code' => 'pro'], ['name' => 'Pro', 'monthly_price_cents' => 4900, 'stripe_price_id' => 'price_pro', 'is_active' => true, 'sort_order' => 1]);
+
     $user = User::factory()->create();
 
     $this->actingAs($user);
@@ -214,11 +231,17 @@ test(
     'subscribing a free-plan team to a paid plan starts a stripe checkout session',
     function () {
         config()->set('cashier.secret', 'sk_test_123');
-        config()->set(
-            'services.billing.plans.pro.stripe_price_id',
-            'price_pro',
-        );
-        config()->set('services.billing.plans.pro.monthly_price_cents', 4900);
+
+        Plan::updateOrCreate(['code' => 'pro'], [
+            'name' => 'Pro',
+            'stripe_price_id' => 'price_pro',
+            'monthly_price_cents' => 4900,
+            'daily_token_limit' => 300000,
+            'weekly_token_limit' => 2000000,
+            'monthly_token_limit' => 8000000,
+            'is_active' => true,
+            'sort_order' => 1,
+        ]);
 
         $user = User::factory()->create();
 
@@ -239,21 +262,24 @@ test(
 );
 
 test('switching to the free plan syncs quota back to free limits', function () {
-    config()->set('services.billing.free_plan_code', 'free');
-    config()->set('services.billing.plans.free', [
+    Plan::updateOrCreate(['code' => 'free'], [
         'name' => 'Free',
         'monthly_price_cents' => 0,
         'daily_token_limit' => 20000,
         'weekly_token_limit' => 120000,
         'monthly_token_limit' => 500000,
+        'is_active' => true,
+        'sort_order' => 0,
     ]);
-    config()->set('services.billing.plans.pro', [
+    Plan::updateOrCreate(['code' => 'pro'], [
         'name' => 'Pro',
         'stripe_price_id' => 'price_pro',
         'monthly_price_cents' => 4900,
         'daily_token_limit' => 300000,
         'weekly_token_limit' => 2000000,
         'monthly_token_limit' => 8000000,
+        'is_active' => true,
+        'sort_order' => 1,
     ]);
 
     $user = User::factory()->create();
@@ -283,22 +309,25 @@ test('switching to the free plan syncs quota back to free limits', function () {
 test(
     'switching plans while already subscribed swaps the stripe price in place',
     function () {
-        config()->set('services.billing.free_plan_code', 'free');
-        config()->set('services.billing.plans.pro', [
+        Plan::updateOrCreate(['code' => 'pro'], [
             'name' => 'Pro',
             'stripe_price_id' => 'price_pro',
             'monthly_price_cents' => 4900,
             'daily_token_limit' => 300000,
             'weekly_token_limit' => 2000000,
             'monthly_token_limit' => 8000000,
+            'is_active' => true,
+            'sort_order' => 1,
         ]);
-        config()->set('services.billing.plans.enterprise', [
+        Plan::updateOrCreate(['code' => 'enterprise'], [
             'name' => 'Enterprise',
             'stripe_price_id' => 'price_enterprise',
             'monthly_price_cents' => 19900,
             'daily_token_limit' => null,
             'weekly_token_limit' => null,
             'monthly_token_limit' => null,
+            'is_active' => true,
+            'sort_order' => 2,
         ]);
 
         $user = User::factory()->create();

@@ -1,7 +1,9 @@
 <?php
 
 use App\Actions\Billing\SyncQuotaFromSubscription;
+use App\Models\Plan;
 use App\Models\QuotaPolicy;
+use App\Services\PlanService;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
 use Livewire\Attributes\Computed;
@@ -43,7 +45,7 @@ new #[Title("Billing")] class extends Component {
         $subscription = $this->currentSubscription;
 
         if ($subscription && $subscription->valid()) {
-            return $this->resolvePlanCodeFromPriceId(
+            return app(PlanService::class)->resolveCodeFromPriceId(
                 $subscription->stripe_price ?? "",
             );
         }
@@ -58,7 +60,7 @@ new #[Title("Billing")] class extends Component {
             );
         }
 
-        return (string) config("services.billing.free_plan_code", "free");
+        return app(PlanService::class)->freePlanCode();
     }
 
     protected function resolvePlanCodeFromLimits(
@@ -66,36 +68,13 @@ new #[Title("Billing")] class extends Component {
         ?int $weekly,
         ?int $monthly,
     ): string {
-        $plans = (array) config("services.billing.plans", []);
+        $plan = Plan::query()
+            ->where('daily_token_limit', $daily)
+            ->where('weekly_token_limit', $weekly)
+            ->where('monthly_token_limit', $monthly)
+            ->first();
 
-        foreach ($plans as $code => $plan) {
-            if (
-                ($plan["daily_token_limit"] ?? null) === $daily &&
-                ($plan["weekly_token_limit"] ?? null) === $weekly &&
-                ($plan["monthly_token_limit"] ?? null) === $monthly
-            ) {
-                return (string) $code;
-            }
-        }
-
-        return (string) config("services.billing.free_plan_code", "free");
-    }
-
-    protected function resolvePlanCodeFromPriceId(string $stripePriceId): string
-    {
-        if ($stripePriceId === "") {
-            return (string) config("services.billing.free_plan_code", "free");
-        }
-
-        $plans = (array) config("services.billing.plans", []);
-
-        foreach ($plans as $code => $plan) {
-            if (($plan["stripe_price_id"] ?? null) === $stripePriceId) {
-                return (string) $code;
-            }
-        }
-
-        return (string) config("services.billing.free_plan_code", "free");
+        return $plan?->code ?? app(PlanService::class)->freePlanCode();
     }
 
     #[Computed]
@@ -118,31 +97,23 @@ new #[Title("Billing")] class extends Component {
     #[Computed]
     public function plans(): Collection
     {
-        $plans = (array) config("services.billing.plans", []);
         $currentPlanCode = $this->currentPlanCode;
 
-        return collect($plans)
-            ->map(function (array $plan, string $code) use ($currentPlanCode) {
+        return app(PlanService::class)
+            ->allPlans()
+            ->map(function (Plan $plan) use ($currentPlanCode) {
                 return [
-                    "code" => $code,
-                    "name" => $plan["name"] ?? ucfirst($code),
-                    "description" => $plan["description"] ?? "",
-                    "monthly_price_cents" =>
-                        (int) ($plan["monthly_price_cents"] ?? 0),
-                    "features" => (array) ($plan["features"] ?? []),
-                    "daily_token_limit" => isset($plan["daily_token_limit"])
-                        ? (int) $plan["daily_token_limit"]
-                        : null,
-                    "weekly_token_limit" => isset($plan["weekly_token_limit"])
-                        ? (int) $plan["weekly_token_limit"]
-                        : null,
-                    "monthly_token_limit" => isset($plan["monthly_token_limit"])
-                        ? (int) $plan["monthly_token_limit"]
-                        : null,
-                    "is_current" => $code === $currentPlanCode,
+                    "code" => $plan->code,
+                    "name" => $plan->name,
+                    "description" => $plan->description ?? "",
+                    "monthly_price_cents" => (int) $plan->monthly_price_cents,
+                    "features" => (array) $plan->features,
+                    "daily_token_limit" => $plan->daily_token_limit,
+                    "weekly_token_limit" => $plan->weekly_token_limit,
+                    "monthly_token_limit" => $plan->monthly_token_limit,
+                    "is_current" => $plan->code === $currentPlanCode,
                 ];
-            })
-            ->values();
+            });
     }
 
     /**
@@ -159,11 +130,11 @@ new #[Title("Billing")] class extends Component {
         $user = Auth::user();
         abort_unless($user, 404);
 
-        $planConfig = config("services.billing.plans.{$planCode}");
-        abort_unless($planConfig, 404);
+        $plan = Plan::query()->byCode($planCode)->first();
+        abort_unless($plan, 404);
 
-        $stripePriceId = (string) ($planConfig["stripe_price_id"] ?? "");
-        $monthlyPriceCents = (int) ($planConfig["monthly_price_cents"] ?? 0);
+        $stripePriceId = (string) ($plan->stripe_price_id ?? "");
+        $monthlyPriceCents = (int) ($plan->monthly_price_cents ?? 0);
 
         if ($stripePriceId === "" || $monthlyPriceCents === 0) {
             $this->switchToFreePlan();
@@ -200,7 +171,7 @@ new #[Title("Billing")] class extends Component {
                 \Flux\Flux::toast(
                     variant: "success",
                     text: __("Plan updated to :plan.", [
-                        "plan" => $planConfig["name"] ?? $planCode,
+                        "plan" => $plan->name ?? $planCode,
                     ]),
                 );
 
@@ -253,10 +224,7 @@ new #[Title("Billing")] class extends Component {
 
         app(SyncQuotaFromSubscription::class)->handle(
             user: $user,
-            planCode: (string) config(
-                "services.billing.free_plan_code",
-                "free",
-            ),
+            planCode: app(PlanService::class)->freePlanCode(),
             status: "canceled",
         );
 

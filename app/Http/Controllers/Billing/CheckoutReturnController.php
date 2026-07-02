@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Billing;
 
 use App\Actions\Billing\SyncQuotaFromSubscription;
 use App\Models\User;
+use App\Services\PlanService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
 
@@ -19,6 +20,7 @@ class CheckoutReturnController
 {
     public function __construct(
         private readonly SyncQuotaFromSubscription $syncQuotaFromSubscription,
+        private readonly PlanService $planService,
     ) {}
 
     /**
@@ -70,32 +72,12 @@ class CheckoutReturnController
             'items.data.0.price.id',
             '',
         );
-        $planCode = $this->resolvePlanCodeFromPriceId($stripePriceId);
+        $planCode = $this->planService->resolveCodeFromPriceId($stripePriceId);
 
         $this->syncQuotaFromSubscription->handle(
             user: $user,
             planCode: $planCode,
             status: (string) ($subscription->status ?? 'active'),
         );
-    }
-
-    /**
-     * Resolve our internal plan code from a Stripe price ID.
-     */
-    protected function resolvePlanCodeFromPriceId(string $stripePriceId): string
-    {
-        if ($stripePriceId === '') {
-            return (string) config('services.billing.free_plan_code', 'free');
-        }
-
-        $plans = (array) config('services.billing.plans', []);
-
-        foreach ($plans as $code => $plan) {
-            if (($plan['stripe_price_id'] ?? null) === $stripePriceId) {
-                return (string) $code;
-            }
-        }
-
-        return (string) config('services.billing.free_plan_code', 'free');
     }
 }

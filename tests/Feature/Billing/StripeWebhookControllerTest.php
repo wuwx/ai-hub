@@ -1,5 +1,6 @@
 <?php
 
+use App\Models\Plan;
 use App\Models\QuotaPolicy;
 use App\Models\User;
 use Illuminate\Testing\TestResponse;
@@ -63,12 +64,14 @@ it('rejects stripe webhook request with invalid signature', function () {
 it(
     'syncs user subscription and applies plan quota limits from stripe webhook',
     function () {
-        config()->set('services.billing.free_plan_code', 'free');
-        config()->set('services.billing.plans.pro', [
+        Plan::updateOrCreate(['code' => 'pro'], [
+            'name' => 'Pro',
             'stripe_price_id' => 'price_pro_test',
             'daily_token_limit' => 123456,
             'weekly_token_limit' => 654321,
             'monthly_token_limit' => 987654,
+            'is_active' => true,
+            'sort_order' => 1,
         ]);
 
         $user = User::factory()->create();
@@ -133,17 +136,22 @@ it(
 it(
     'downgrades subscription quota to free when stripe status is past_due',
     function () {
-        config()->set('services.billing.free_plan_code', 'free');
-        config()->set('services.billing.plans.free', [
+        Plan::updateOrCreate(['code' => 'free'], [
+            'name' => 'Free',
             'daily_token_limit' => 20000,
             'weekly_token_limit' => 120000,
             'monthly_token_limit' => 500000,
+            'is_active' => true,
+            'sort_order' => 0,
         ]);
-        config()->set('services.billing.plans.pro', [
+        Plan::updateOrCreate(['code' => 'pro'], [
+            'name' => 'Pro',
             'stripe_price_id' => 'price_pro_test',
             'daily_token_limit' => 123456,
             'weekly_token_limit' => 654321,
             'monthly_token_limit' => 987654,
+            'is_active' => true,
+            'sort_order' => 1,
         ]);
 
         $user = User::factory()->create();
@@ -204,12 +212,14 @@ it(
 it(
     'resolves the user from the stripe customer id when metadata is missing',
     function () {
-        config()->set('services.billing.free_plan_code', 'free');
-        config()->set('services.billing.plans.pro', [
+        Plan::updateOrCreate(['code' => 'pro'], [
+            'name' => 'Pro',
             'stripe_price_id' => 'price_pro_test',
             'daily_token_limit' => 123456,
             'weekly_token_limit' => 654321,
             'monthly_token_limit' => 987654,
+            'is_active' => true,
+            'sort_order' => 1,
         ]);
 
         $user = User::factory()->create();

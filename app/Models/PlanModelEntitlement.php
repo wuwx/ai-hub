@@ -10,6 +10,14 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 class PlanModelEntitlement extends Model
 {
     /**
+     * @return BelongsTo<Plan, $this>
+     */
+    public function plan(): BelongsTo
+    {
+        return $this->belongsTo(Plan::class, 'plan_code', 'code');
+    }
+
+    /**
      * @return BelongsTo<LlmModel, $this>
      */
     public function llmModel(): BelongsTo
