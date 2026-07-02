@@ -1,40 +1,29 @@
 <?php
 
-use App\Enums\TeamRole;
-use App\Models\Team;
 use App\Models\UsageLedger;
 use App\Models\User;
 use Laravel\Cashier\Subscription as CashierSubscription;
 use Livewire\Livewire;
 
 test('dashboard page requires authentication', function () {
-    $team = Team::factory()->create();
 
-    $response = $this->get(route('dashboard', ['current_team' => $team->slug]));
+    $response = $this->get(route('dashboard'));
 
     $response->assertRedirect(route('login'));
 });
 
 test('authenticated users can view dashboard', function () {
     $user = User::factory()->create();
-    $team = Team::factory()->create();
-    $team->members()->attach($user, ['role' => TeamRole::Owner->value]);
-    $user->switchTeam($team);
-    $user->refresh();
 
     $response = $this
         ->actingAs($user)
-        ->get(route('dashboard', ['current_team' => $team->slug]));
+        ->get(route('dashboard'));
 
     $response->assertOk();
 });
 
 test('dashboard shows current plan badge', function () {
     $user = User::factory()->create();
-    $team = Team::factory()->create();
-    $team->members()->attach($user, ['role' => TeamRole::Owner->value]);
-    $user->switchTeam($team);
-    $user->refresh();
 
     $this->actingAs($user);
 
@@ -45,13 +34,9 @@ test('dashboard shows current plan badge', function () {
 
 test('dashboard shows active subscription plan in badge', function () {
     $user = User::factory()->create();
-    $team = Team::factory()->create();
-    $team->members()->attach($user, ['role' => TeamRole::Owner->value]);
-    $user->switchTeam($team);
-    $user->refresh();
 
     CashierSubscription::create([
-        'team_id' => $team->id,
+        'user_id' => $user->id,
         'type' => 'default',
         'stripe_id' => 'sub_test123',
         'stripe_status' => 'active',
@@ -67,10 +52,6 @@ test('dashboard shows active subscription plan in badge', function () {
 
 test('dashboard displays stat cards with zero data when no usage', function () {
     $user = User::factory()->create();
-    $team = Team::factory()->create();
-    $team->members()->attach($user, ['role' => TeamRole::Owner->value]);
-    $user->switchTeam($team);
-    $user->refresh();
 
     $this->actingAs($user);
 
@@ -83,14 +64,10 @@ test('dashboard displays stat cards with zero data when no usage', function () {
 
 test('dashboard displays real usage data from usage ledger', function () {
     $user = User::factory()->create();
-    $team = Team::factory()->create();
-    $team->members()->attach($user, ['role' => TeamRole::Owner->value]);
-    $user->switchTeam($team);
-    $user->refresh();
 
     // Create usage ledger entries
     UsageLedger::create([
-        'team_id' => $team->id,
+        'user_id' => $user->id,
         'bucket_type' => 'day',
         'bucket_date' => now()->toDateString(),
         'token_input' => 500,
@@ -108,10 +85,6 @@ test('dashboard displays real usage data from usage ledger', function () {
 
 test('dashboard shows quick actions section', function () {
     $user = User::factory()->create();
-    $team = Team::factory()->create();
-    $team->members()->attach($user, ['role' => TeamRole::Owner->value]);
-    $user->switchTeam($team);
-    $user->refresh();
 
     $this->actingAs($user);
 
@@ -124,10 +97,6 @@ test('dashboard shows quick actions section', function () {
 
 test('dashboard shows request trend chart section', function () {
     $user = User::factory()->create();
-    $team = Team::factory()->create();
-    $team->members()->attach($user, ['role' => TeamRole::Owner->value]);
-    $user->switchTeam($team);
-    $user->refresh();
 
     $this->actingAs($user);
 

@@ -28,7 +28,7 @@ class AuthenticateApiKey
         }
 
         $apiKey = ApiKey::query()
-            ->with('team')
+            ->with('user')
             ->where('key_hash', ApiKey::hashPlainTextKey($plainTextKey))
             ->whereNull('revoked_at')
             ->where(function ($query) {
@@ -36,7 +36,7 @@ class AuthenticateApiKey
             })
             ->first();
 
-        if (! $apiKey || ! $apiKey->team) {
+        if (! $apiKey || ! $apiKey->user) {
             return $this->unauthorized('Invalid API key.', $traceId);
         }
 
@@ -47,7 +47,7 @@ class AuthenticateApiKey
         $apiKey->forceFill(['last_used_at' => now()])->save();
 
         $request->attributes->set('gateway.api_key', $apiKey);
-        $request->attributes->set('gateway.team', $apiKey->team);
+        $request->attributes->set('gateway.user', $apiKey->user);
 
         return $next($request);
     }

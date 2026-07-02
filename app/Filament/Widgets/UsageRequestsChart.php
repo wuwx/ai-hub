@@ -2,9 +2,7 @@
 
 namespace App\Filament\Widgets;
 
-use App\Actions\Usage\GetTeamUsageSnapshot;
-use App\Enums\TeamPermission;
-use App\Models\User;
+use App\Actions\Usage\GetUsageSnapshot;
 use Filament\Widgets\ChartWidget;
 use Illuminate\Support\Facades\Auth;
 
@@ -14,29 +12,21 @@ class UsageRequestsChart extends ChartWidget
 
     public static function canView(): bool
     {
-        /** @var User|null $user */
-        $user = Auth::user();
-        $team = $user?->currentTeam;
-
-        if (! $user || ! $team) {
-            return false;
-        }
-
-        return $user->hasTeamPermission($team, TeamPermission::ViewUsage);
+        return Auth::check();
     }
 
     protected function getData(): array
     {
-        $team = Auth::user()?->currentTeam;
+        $user = Auth::user();
 
-        if (! $team) {
+        if (! $user) {
             return [
                 'datasets' => [],
                 'labels' => [],
             ];
         }
 
-        $snapshot = app(GetTeamUsageSnapshot::class)->handle($team);
+        $snapshot = app(GetUsageSnapshot::class)->handle($user);
         $chart = $snapshot['requests_chart'];
 
         return [

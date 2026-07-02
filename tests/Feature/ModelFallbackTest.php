@@ -5,17 +5,16 @@ use App\Models\LlmModel;
 use App\Models\LlmProvider;
 use App\Models\PlanModelEntitlement;
 use App\Models\PlanProviderEntitlement;
-use App\Models\TeamQuotaPolicy;
+use App\Models\QuotaPolicy;
 use App\Models\User;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 
 beforeEach(function () {
     $this->user = User::factory()->create();
-    $this->team = $this->user->currentTeam;
 
-    TeamQuotaPolicy::create([
-        'team_id' => $this->team->id,
+    QuotaPolicy::create([
+        'user_id' => $this->user->id,
         'plan_code' => 'free',
         'daily_token_limit' => 100000,
         'monthly_token_limit' => 1000000,
@@ -73,7 +72,7 @@ beforeEach(function () {
     PlanModelEntitlement::create(['plan_code' => 'free', 'llm_model_id' => $this->fallbackModel->id, 'is_enabled' => true]);
 
     $this->apiKey = app(GenerateApiKey::class)->handle(
-        team: $this->team,
+        user: $this->user,
         name: 'Fallback Test Key',
         createdBy: $this->user->id,
     );

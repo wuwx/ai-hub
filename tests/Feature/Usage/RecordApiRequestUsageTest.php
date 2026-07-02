@@ -5,16 +5,15 @@ use App\Actions\Usage\RecordApiRequestUsage;
 use App\Exceptions\QuotaExceededException;
 use App\Models\LlmModel;
 use App\Models\LlmProvider;
-use App\Models\TeamQuotaPolicy;
+use App\Models\QuotaPolicy;
 use App\Models\UsageLedger;
 use App\Models\User;
 
 it('records request log and updates day/week/month ledgers', function () {
     $user = User::factory()->create();
-    $team = $user->currentTeam;
 
-    TeamQuotaPolicy::create([
-        'team_id' => $team->id,
+    QuotaPolicy::create([
+        'user_id' => $user->id,
         'daily_token_limit' => 10_000,
         'monthly_token_limit' => 50_000,
         'effective_from' => now()->subDay(),
@@ -38,13 +37,13 @@ it('records request log and updates day/week/month ledgers', function () {
     ]);
 
     $apiKey = app(GenerateApiKey::class)->handle(
-        team: $team,
+        user: $user,
         name: 'Gateway Key',
         createdBy: $user->id,
     )->apiKey;
 
     app(RecordApiRequestUsage::class)->handle(
-        team: $team,
+        user: $user,
         protocol: 'openai',
         endpoint: '/v1/chat/completions',
         httpMethod: 'POST',
@@ -59,7 +58,7 @@ it('records request log and updates day/week/month ledgers', function () {
     );
 
     $this->assertDatabaseHas('request_logs', [
-        'team_id' => $team->id,
+        'user_id' => $user->id,
         'api_key_id' => $apiKey->id,
         'llm_provider_id' => $provider->id,
         'llm_model_id' => $model->id,
@@ -68,7 +67,7 @@ it('records request log and updates day/week/month ledgers', function () {
     ]);
 
     $todayLedger = UsageLedger::query()
-        ->where('team_id', $team->id)
+        ->where('user_id', $user->id)
         ->where('bucket_type', 'day')
         ->whereDate('bucket_date', now()->toDateString())
         ->first();
@@ -79,13 +78,13 @@ it('records request log and updates day/week/month ledgers', function () {
     expect($todayLedger->error_count)->toBe(0);
 
     $monthLedger = UsageLedger::query()
-        ->where('team_id', $team->id)
+        ->where('user_id', $user->id)
         ->where('bucket_type', 'month')
         ->whereDate('bucket_date', now()->startOfMonth()->toDateString())
         ->first();
 
     $weekLedger = UsageLedger::query()
-        ->where('team_id', $team->id)
+        ->where('user_id', $user->id)
         ->where('bucket_type', 'week')
         ->whereDate('bucket_date', now()->startOfWeek()->toDateString())
         ->first();
@@ -101,10 +100,9 @@ it('records request log and updates day/week/month ledgers', function () {
 
 it('increments error counters when status indicates failure', function () {
     $user = User::factory()->create();
-    $team = $user->currentTeam;
 
-    TeamQuotaPolicy::create([
-        'team_id' => $team->id,
+    QuotaPolicy::create([
+        'user_id' => $user->id,
         'daily_token_limit' => 10_000,
         'monthly_token_limit' => 50_000,
         'effective_from' => now()->subDay(),
@@ -112,7 +110,7 @@ it('increments error counters when status indicates failure', function () {
     ]);
 
     app(RecordApiRequestUsage::class)->handle(
-        team: $team,
+        user: $user,
         protocol: 'anthropic',
         endpoint: '/v1/messages',
         tokenInput: 80,
@@ -122,7 +120,7 @@ it('increments error counters when status indicates failure', function () {
     );
 
     $todayLedger = UsageLedger::query()
-        ->where('team_id', $team->id)
+        ->where('user_id', $user->id)
         ->where('bucket_type', 'day')
         ->whereDate('bucket_date', now()->toDateString())
         ->first();
@@ -133,10 +131,9 @@ it('increments error counters when status indicates failure', function () {
 
 it('throws when recording would exceed token quota', function () {
     $user = User::factory()->create();
-    $team = $user->currentTeam;
 
-    TeamQuotaPolicy::create([
-        'team_id' => $team->id,
+    QuotaPolicy::create([
+        'user_id' => $user->id,
         'daily_token_limit' => 50,
         'monthly_token_limit' => 100,
         'effective_from' => now()->subDay(),
@@ -144,7 +141,7 @@ it('throws when recording would exceed token quota', function () {
     ]);
 
     expect(fn () => app(RecordApiRequestUsage::class)->handle(
-        team: $team,
+        user: $user,
         protocol: 'openai',
         endpoint: '/v1/responses',
         tokenInput: 45,

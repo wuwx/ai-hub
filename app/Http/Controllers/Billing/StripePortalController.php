@@ -2,22 +2,19 @@
 
 namespace App\Http\Controllers\Billing;
 
-use App\Enums\TeamPermission;
 use App\Http\Controllers\Controller;
-use App\Models\Team;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
 class StripePortalController extends Controller
 {
-    public function store(Request $request, Team $current_team): JsonResponse
+    public function store(Request $request): JsonResponse
     {
         $user = $request->user();
 
-        abort_if(! $user || ! $user->belongsToTeam($current_team), 403);
-        abort_if(! $user->hasTeamPermission($current_team, TeamPermission::ManageBilling), 403);
+        abort_if(! $user, 403);
 
-        if (! $current_team->hasStripeId()) {
+        if (! $user->hasStripeId()) {
             return response()->json([
                 'error' => [
                     'message' => 'No Stripe customer found. Please subscribe to a plan first.',
@@ -25,10 +22,10 @@ class StripePortalController extends Controller
             ], 422);
         }
 
-        $returnUrl = rtrim((string) config('app.url'), '/').'/'.(string) $current_team->slug.'/billing';
+        $returnUrl = rtrim((string) config('app.url'), '/').'/billing';
 
         try {
-            $url = $current_team->billingPortalUrl($returnUrl);
+            $url = $user->billingPortalUrl($returnUrl);
         } catch (\Exception $exception) {
             return response()->json([
                 'error' => [

@@ -4,8 +4,8 @@ namespace App\Console\Commands;
 
 use App\Models\ApiKey;
 use App\Models\RequestLog;
-use App\Models\Team;
-use App\Notifications\Teams\AnomalousUsageDetected;
+use App\Models\User;
+use App\Notifications\AnomalousUsageDetected;
 use Illuminate\Console\Attributes\Description;
 use Illuminate\Console\Attributes\Signature;
 use Illuminate\Console\Command;
@@ -14,7 +14,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Notification;
 
 #[Signature('gateway:detect-anomalous-usage {--window=60 : Analysis window in minutes} {--min-requests=50 : Minimum requests to flag} {--error-rate=50 : Error-rate percentage threshold} {--dedupe-hours=6 : Suppress repeat alerts for the same API key within this window}')]
-#[Description('Scan recent traffic for anomalous API key usage (high error rate, traffic spikes). Notifies team owners.')]
+#[Description('Scan recent traffic for anomalous API key usage (high error rate, traffic spikes). Notifies users.')]
 class DetectAnomalousUsage extends Command
 {
     /**
@@ -29,18 +29,18 @@ class DetectAnomalousUsage extends Command
 
         $since = now()->subMinutes($windowMinutes);
 
-        // Aggregate per API key + team in the window
+        // Aggregate per API key + user in the window
         $rows = RequestLog::query()
             ->select([
                 'api_key_id',
-                'team_id',
+                'user_id',
                 DB::raw('COUNT(*) as request_count'),
                 DB::raw('SUM(CASE WHEN status_code >= 400 OR error_code IS NOT NULL THEN 1 ELSE 0 END) as error_count'),
                 DB::raw('SUM(token_total) as tokens'),
             ])
             ->where('requested_at', '>=', $since)
             ->whereNotNull('api_key_id')
-            ->groupBy('api_key_id', 'team_id')
+            ->groupBy('api_key_id', 'user_id')
             ->having('request_count', '>=', $minRequests)
             ->get();
 
@@ -60,16 +60,16 @@ class DetectAnomalousUsage extends Command
                 continue;
             }
 
-            $team = Team::find($row->team_id);
+            $user = User::find($row->user_id);
             $apiKey = ApiKey::find($row->api_key_id);
 
-            if (! $team || ! $apiKey) {
+            if (! $user || ! $apiKey) {
                 continue;
             }
 
             // Dedupe: suppress repeat notifications for the same API key within
             // the configured window so a persistently failing key doesn't spam
-            // the team owner every hour.
+            // the user every hour.
             $dedupeKey = sprintf('gateway:anomaly-alert:%d', $apiKey->id);
 
             if (! Cache::add($dedupeKey, true, now()->addHours($dedupeHours))) {
@@ -78,18 +78,14 @@ class DetectAnomalousUsage extends Command
                 continue;
             }
 
-            $owner = $team->owner();
-
-            if ($owner) {
-                Notification::send($owner, new AnomalousUsageDetected(
-                    teamName: $team->name,
-                    apiKeyName: $apiKey->name,
-                    requestCount: (int) $row->request_count,
-                    errorCount: (int) $row->error_count,
-                    errorRate: $errorRate,
-                    windowMinutes: $windowMinutes,
-                ));
-            }
+            Notification::send($user, new AnomalousUsageDetected(
+                userName: $user->name,
+                apiKeyName: $apiKey->name,
+                requestCount: (int) $row->request_count,
+                errorCount: (int) $row->error_count,
+                errorRate: $errorRate,
+                windowMinutes: $windowMinutes,
+            ));
 
             $flagged++;
         }

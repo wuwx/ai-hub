@@ -5,7 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\ApiKey;
 use App\Models\LlmProvider;
 use App\Models\RequestLog;
-use App\Models\Team;
+use App\Models\User;
 use Illuminate\Http\Response;
 use Laravel\Cashier\Subscription;
 
@@ -44,8 +44,8 @@ class PrometheusMetricsController extends Controller
         $metrics[] = '# TYPE ai_hub_tokens_output_total counter';
         $metrics[] = "ai_hub_tokens_output_total {$totalTokensOutput}";
 
-        // Team and API key counts
-        $totalTeams = Team::count();
+        // User and API key counts
+        $totalUsers = User::count();
         $totalApiKeys = ApiKey::count();
         $activeApiKeys = ApiKey::whereNull('revoked_at')
             ->where(function ($query) {
@@ -55,8 +55,8 @@ class PrometheusMetricsController extends Controller
             })
             ->count();
 
-        $metrics[] = '# TYPE ai_hub_teams gauge';
-        $metrics[] = "ai_hub_teams {$totalTeams}";
+        $metrics[] = '# TYPE ai_hub_users gauge';
+        $metrics[] = "ai_hub_users {$totalUsers}";
         $metrics[] = '# TYPE ai_hub_api_keys gauge';
         $metrics[] = "ai_hub_api_keys {$totalApiKeys}";
         $metrics[] = '# TYPE ai_hub_api_keys_active gauge';

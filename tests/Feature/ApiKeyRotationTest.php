@@ -1,20 +1,14 @@
 <?php
 
 use App\Actions\ApiKeys\GenerateApiKey;
-use App\Enums\TeamRole;
-use App\Models\Team;
 use App\Models\User;
 use Livewire\Livewire;
 
-test('owners can rotate api keys', function () {
+test('users can rotate their api keys', function () {
     $user = User::factory()->create();
-    $team = Team::factory()->create();
-    $team->members()->attach($user, ['role' => TeamRole::Owner->value]);
-    $user->switchTeam($team);
-    $user->refresh();
 
     $generated = app(GenerateApiKey::class)->handle(
-        team: $team,
+        user: $user,
         name: 'Test Key',
         expiresAt: null,
         createdBy: $user->id,
@@ -33,41 +27,11 @@ test('owners can rotate api keys', function () {
     expect($generated->apiKey->revoked_at)->toBeNull();
 });
 
-test('members cannot rotate api keys', function () {
-    $owner = User::factory()->create();
-    $team = Team::factory()->create();
-    $team->members()->attach($owner, ['role' => TeamRole::Owner->value]);
-    $owner->switchTeam($team);
-    $owner->refresh();
-
-    $generated = app(GenerateApiKey::class)->handle(
-        team: $team,
-        name: 'Test Key',
-        expiresAt: null,
-        createdBy: $owner->id,
-    );
-
-    $member = User::factory()->create();
-    $team->members()->attach($member, ['role' => TeamRole::Member->value]);
-    $member->switchTeam($team);
-    $member->refresh();
-
-    $this->actingAs($member);
-
-    Livewire::test('pages::api-keys')
-        ->call('rotateKey', $generated->apiKey->id)
-        ->assertForbidden();
-});
-
 test('rotating key shows new key to user', function () {
     $user = User::factory()->create();
-    $team = Team::factory()->create();
-    $team->members()->attach($user, ['role' => TeamRole::Owner->value]);
-    $user->switchTeam($team);
-    $user->refresh();
 
     $generated = app(GenerateApiKey::class)->handle(
-        team: $team,
+        user: $user,
         name: 'Test Key',
         expiresAt: null,
         createdBy: $user->id,
@@ -86,13 +50,9 @@ test('rotating key shows new key to user', function () {
 
 test('dismiss rotated key clears state', function () {
     $user = User::factory()->create();
-    $team = Team::factory()->create();
-    $team->members()->attach($user, ['role' => TeamRole::Owner->value]);
-    $user->switchTeam($team);
-    $user->refresh();
 
     $generated = app(GenerateApiKey::class)->handle(
-        team: $team,
+        user: $user,
         name: 'Test Key',
         expiresAt: null,
         createdBy: $user->id,

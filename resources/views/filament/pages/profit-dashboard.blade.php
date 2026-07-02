@@ -31,19 +31,19 @@
             </div>
         </div>
 
-        {{-- Team counts --}}
+        {{-- User counts --}}
         <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div class="rounded-xl bg-white p-6 shadow-sm dark:bg-zinc-800">
                 <div class="text-sm font-medium text-zinc-500 dark:text-zinc-400">Active Paid Subscriptions</div>
                 <div class="mt-2 text-2xl font-bold">
-                    {{ number_format($totals['active_paid_teams']) }}
+                    {{ number_format($totals['active_paid_users']) }}
                 </div>
             </div>
 
             <div class="rounded-xl bg-white p-6 shadow-sm dark:bg-zinc-800">
-                <div class="text-sm font-medium text-zinc-500 dark:text-zinc-400">Free Tier Teams</div>
+                <div class="text-sm font-medium text-zinc-500 dark:text-zinc-400">Free Tier Users</div>
                 <div class="mt-2 text-2xl font-bold">
-                    {{ number_format($totals['free_teams']) }}
+                    {{ number_format($totals['free_users']) }}
                 </div>
             </div>
         </div>
@@ -79,16 +79,16 @@
             </div>
         </div>
 
-        {{-- Profit by Team --}}
+        {{-- Profit by User --}}
         <div class="rounded-xl bg-white shadow-sm dark:bg-zinc-800">
             <div class="border-b border-zinc-200 px-6 py-4 dark:border-zinc-700">
-                <h3 class="text-lg font-semibold">Profit by Team (This Month)</h3>
+                <h3 class="text-lg font-semibold">Profit by User (This Month)</h3>
             </div>
             <div class="overflow-x-auto">
                 <table class="w-full">
                     <thead>
                         <tr class="border-b border-zinc-200 text-left text-sm text-zinc-500 dark:border-zinc-700 dark:text-zinc-400">
-                            <th class="px-6 py-3">Team</th>
+                            <th class="px-6 py-3">User</th>
                             <th class="px-6 py-3">Plan</th>
                             <th class="px-6 py-3 text-right">Requests</th>
                             <th class="px-6 py-3 text-right">Revenue</th>
@@ -97,9 +97,9 @@
                         </tr>
                     </thead>
                     <tbody>
-                        @forelse ($byTeam as $row)
+                        @forelse ($byUser as $row)
                             <tr class="border-b border-zinc-100 text-sm dark:border-zinc-700/50">
-                                <td class="px-6 py-3">{{ $row['team_name'] }}</td>
+                                <td class="px-6 py-3">{{ $row['user_name'] }}</td>
                                 <td class="px-6 py-3 capitalize">{{ $row['plan_code'] }}</td>
                                 <td class="px-6 py-3 text-right">{{ number_format($row['request_count']) }}</td>
                                 <td class="px-6 py-3 text-right text-green-600 dark:text-green-400">${{ number_format($row['revenue_cents'] / 100, 2) }}</td>

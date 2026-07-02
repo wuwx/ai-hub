@@ -9,7 +9,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 #[Fillable([
-    'team_id',
+    'user_id',
     'name',
     'key_hash',
     'last_four',
@@ -25,11 +25,11 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 class ApiKey extends Model
 {
     /**
-     * @return BelongsTo<Team, $this>
+     * @return BelongsTo<User, $this>
      */
-    public function team(): BelongsTo
+    public function user(): BelongsTo
     {
-        return $this->belongsTo(Team::class);
+        return $this->belongsTo(User::class);
     }
 
     /**

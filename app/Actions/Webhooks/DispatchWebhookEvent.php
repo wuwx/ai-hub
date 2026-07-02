@@ -3,9 +3,9 @@
 namespace App\Actions\Webhooks;
 
 use App\Jobs\RetryWebhookDeliveryJob;
-use App\Models\Team;
-use App\Models\TeamWebhookEndpoint;
+use App\Models\User;
 use App\Models\WebhookDelivery;
+use App\Models\WebhookEndpoint;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 
@@ -16,10 +16,10 @@ class DispatchWebhookEvent
      *
      * @param  array<string, mixed>  $data
      */
-    public function handle(Team $team, string $event, array $data = []): void
+    public function handle(User $user, string $event, array $data = []): void
     {
-        $endpoints = TeamWebhookEndpoint::query()
-            ->where('team_id', $team->id)
+        $endpoints = WebhookEndpoint::query()
+            ->where('user_id', $user->id)
             ->where('is_active', true)
             ->get();
 
@@ -47,7 +47,7 @@ class DispatchWebhookEvent
     /**
      * @param  array<string, mixed>  $payload
      */
-    protected function send(TeamWebhookEndpoint $endpoint, string $event, string $body, array $payload): void
+    protected function send(WebhookEndpoint $endpoint, string $event, string $body, array $payload): void
     {
         $signature = hash_hmac('sha256', $body, (string) $endpoint->secret);
         $startedAt = microtime(true);
@@ -65,7 +65,7 @@ class DispatchWebhookEvent
             $succeeded = $response->successful();
 
             $delivery = WebhookDelivery::create([
-                'team_webhook_endpoint_id' => $endpoint->id,
+                'webhook_endpoint_id' => $endpoint->id,
                 'event' => $event,
                 'payload' => $payload,
                 'response_status_code' => $response->status(),
@@ -92,7 +92,7 @@ class DispatchWebhookEvent
             $latencyMs = (int) round((microtime(true) - $startedAt) * 1000);
 
             $delivery = WebhookDelivery::create([
-                'team_webhook_endpoint_id' => $endpoint->id,
+                'webhook_endpoint_id' => $endpoint->id,
                 'event' => $event,
                 'payload' => $payload,
                 'response_status_code' => null,
@@ -117,7 +117,7 @@ class DispatchWebhookEvent
         }
     }
 
-    protected function recordFailure(TeamWebhookEndpoint $endpoint, int $statusCode): void
+    protected function recordFailure(WebhookEndpoint $endpoint, int $statusCode): void
     {
         $failures = $endpoint->failure_count + 1;
 

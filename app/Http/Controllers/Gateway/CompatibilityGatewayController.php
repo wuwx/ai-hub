@@ -5,8 +5,8 @@ namespace App\Http\Controllers\Gateway;
 use App\Actions\Gateway\GatewayRequestProcessor;
 use App\Http\Controllers\Controller;
 use App\Models\LlmModel;
-use App\Models\Team;
-use App\Models\TeamQuotaPolicy;
+use App\Models\QuotaPolicy;
+use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Str;
@@ -40,7 +40,7 @@ class CompatibilityGatewayController extends Controller
     }
 
     /**
-     * List models the authenticated team is entitled to use.
+     * List models the authenticated user is entitled to use.
      *
      * Implements the OpenAI-compatible `GET /v1/models` endpoint so that
      * SDKs and clients (Cursor, Continue, LangChain, etc.) can discover
@@ -48,11 +48,11 @@ class CompatibilityGatewayController extends Controller
      */
     public function listModels(Request $request): Response
     {
-        /** @var Team|null $team */
-        $team = $request->attributes->get('gateway.team');
+        /** @var User|null $user */
+        $user = $request->attributes->get('gateway.user');
         $traceId = (string) ($request->attributes->get('gateway.trace_id') ?: Str::uuid()->toString());
 
-        $models = $this->resolveModelsForTeam($team);
+        $models = $this->resolveModelsForUser($user);
 
         $data = $models->map(fn (LlmModel $model) => [
             'id' => $model->external_model_id,
@@ -70,18 +70,18 @@ class CompatibilityGatewayController extends Controller
     }
 
     /**
-     * Resolve models available to the team based on their current plan.
+     * Resolve models available to the user based on their current plan.
      *
      * @return Collection<int, LlmModel>
      */
-    protected function resolveModelsForTeam(?Team $team): Collection
+    protected function resolveModelsForUser(?User $user): Collection
     {
-        if (! $team) {
+        if (! $user) {
             return collect();
         }
 
-        $planCode = TeamQuotaPolicy::query()
-            ->where('team_id', $team->id)
+        $planCode = QuotaPolicy::query()
+            ->where('user_id', $user->id)
             ->where('is_active', true)
             ->orderByDesc('effective_from')
             ->value('plan_code');

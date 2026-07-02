@@ -62,8 +62,8 @@ return [
             'LLM_GATEWAY_API_KEY_RATE_LIMIT_DECAY_SECONDS',
             60,
         ),
-        'max_concurrent_per_team' => (int) env(
-            'LLM_GATEWAY_MAX_CONCURRENT_PER_TEAM',
+        'max_concurrent_per_user' => (int) env(
+            'LLM_GATEWAY_MAX_CONCURRENT_PER_USER',
             50,
         ),
         // Provider upstream secrets. Each entry is loaded from env() here (so it
@@ -110,7 +110,7 @@ return [
                     '8M monthly tokens',
                     'Priority routing',
                     'Email support',
-                    'Team collaboration',
+                    'Advanced collaboration',
                 ],
             ],
             'enterprise' => [

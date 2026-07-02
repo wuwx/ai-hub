@@ -16,7 +16,7 @@ it('returns prometheus-format metrics', function () {
         ->and($content)
         ->toContain('ai_hub_tokens_input_total')
         ->and($content)
-        ->toContain('ai_hub_teams')
+        ->toContain('ai_hub_users')
         ->and($content)
         ->toContain('ai_hub_api_keys')
         ->and($content)
@@ -31,7 +31,7 @@ it('includes TYPE declarations for counters and gauges', function () {
     expect($content)
         ->toContain('# TYPE ai_hub_requests_total counter')
         ->and($content)
-        ->toContain('# TYPE ai_hub_teams gauge');
+        ->toContain('# TYPE ai_hub_users gauge');
 });
 
 it('does not require authentication', function () {

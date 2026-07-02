@@ -2,9 +2,7 @@
 
 namespace App\Filament\Widgets;
 
-use App\Actions\Usage\GetTeamUsageSnapshot;
-use App\Enums\TeamPermission;
-use App\Models\User;
+use App\Actions\Usage\GetUsageSnapshot;
 use Filament\Widgets\StatsOverviewWidget;
 use Filament\Widgets\StatsOverviewWidget\Stat;
 use Illuminate\Support\Facades\Auth;
@@ -13,26 +11,18 @@ class UsageOverviewStats extends StatsOverviewWidget
 {
     public static function canView(): bool
     {
-        /** @var User|null $user */
-        $user = Auth::user();
-        $team = $user?->currentTeam;
-
-        if (! $user || ! $team) {
-            return false;
-        }
-
-        return $user->hasTeamPermission($team, TeamPermission::ViewUsage);
+        return Auth::check();
     }
 
     protected function getStats(): array
     {
-        $team = Auth::user()?->currentTeam;
+        $user = Auth::user();
 
-        if (! $team) {
+        if (! $user) {
             return [];
         }
 
-        $snapshot = app(GetTeamUsageSnapshot::class)->handle($team);
+        $snapshot = app(GetUsageSnapshot::class)->handle($user);
 
         $dailyLimitText = $snapshot['daily_limit'] !== null
             ? number_format($snapshot['daily_limit']).' limit'

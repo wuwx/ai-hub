@@ -4,7 +4,6 @@ use App\Http\Controllers\Billing\CashierWebhookController;
 use App\Http\Controllers\Billing\CheckoutReturnController;
 use App\Http\Controllers\Billing\StripePortalController;
 use App\Http\Controllers\DataExportController;
-use App\Http\Middleware\EnsureTeamMembership;
 use Illuminate\Support\Facades\Route;
 
 Route::view('/', 'welcome')->name('home');
@@ -29,8 +28,7 @@ Route::prefix(config('cashier.path', 'stripe'))
         )->name('payment');
     });
 
-Route::prefix('{current_team}')
-    ->middleware(['auth', 'verified', EnsureTeamMembership::class])
+Route::middleware(['auth', 'verified'])
     ->group(function () {
         Route::livewire('dashboard', 'pages::dashboard')->name('dashboard');
 
@@ -69,12 +67,5 @@ Route::prefix('{current_team}')
             'exportUsage',
         ])->name('usage.export');
     });
-
-Route::middleware(['auth'])->group(function () {
-    Route::livewire(
-        'invitations/{invitation}/accept',
-        'pages::teams.accept-invitation',
-    )->name('invitations.accept');
-});
 
 require __DIR__.'/settings.php';

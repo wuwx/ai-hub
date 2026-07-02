@@ -7,10 +7,9 @@ use App\Models\User;
 
 it('records an audit event via the action', function () {
     $user = User::factory()->create();
-    $team = $user->currentTeam;
 
     app(RecordAuditEvent::class)->handle(
-        team: $team,
+        user: $user,
         action: 'api_key.created',
         properties: ['name' => 'Test Key'],
         actor: $user,
@@ -18,7 +17,7 @@ it('records an audit event via the action', function () {
         userAgent: 'TestAgent/1.0',
     );
 
-    $log = AuditLog::query()->where('team_id', $team->id)->first();
+    $log = AuditLog::query()->where('user_id', $user->id)->first();
 
     expect($log)->not->toBeNull()
         ->and($log->action)->toBe('api_key.created')
@@ -30,10 +29,9 @@ it('records an audit event via the action', function () {
 
 it('records an audit event when an API key is created', function () {
     $user = User::factory()->create();
-    $team = $user->currentTeam;
 
     app(GenerateApiKey::class)->handle(
-        team: $team,
+        user: $user,
         name: 'Production Key',
         createdBy: $user->id,
     );
@@ -41,7 +39,7 @@ it('records an audit event when an API key is created', function () {
     // The Livewire page would call RecordAuditEvent after key creation.
     // Here we simulate that call directly.
     app(RecordAuditEvent::class)->handle(
-        team: $team,
+        user: $user,
         action: 'api_key.created',
         properties: ['name' => 'Production Key'],
         actor: $user,
@@ -52,10 +50,9 @@ it('records an audit event when an API key is created', function () {
 
 it('records an audit event when an API key is revoked', function () {
     $user = User::factory()->create();
-    $team = $user->currentTeam;
 
     $generated = app(GenerateApiKey::class)->handle(
-        team: $team,
+        user: $user,
         name: 'To Revoke',
         createdBy: $user->id,
     );
@@ -63,7 +60,7 @@ it('records an audit event when an API key is revoked', function () {
     $generated->apiKey->update(['revoked_at' => now()]);
 
     app(RecordAuditEvent::class)->handle(
-        team: $team,
+        user: $user,
         action: 'api_key.revoked',
         subject: $generated->apiKey,
         actor: $user,
@@ -76,38 +73,11 @@ it('records an audit event when an API key is revoked', function () {
         ->and($log->subject_id)->toBe($generated->apiKey->id);
 });
 
-it('records an audit event when a team member is invited', function () {
-    $user = User::factory()->create();
-    $team = $user->currentTeam;
-
-    $invitation = $team->invitations()->create([
-        'email' => 'invitee@example.com',
-        'role' => 'member',
-        'invited_by' => $user->id,
-        'expires_at' => now()->addDays(3),
-    ]);
-
-    app(RecordAuditEvent::class)->handle(
-        team: $team,
-        action: 'team.member.invited',
-        subject: $invitation,
-        properties: ['email' => 'invitee@example.com', 'role' => 'member'],
-        actor: $user,
-    );
-
-    $log = AuditLog::where('action', 'team.member.invited')->first();
-
-    expect($log)->not->toBeNull()
-        ->and($log->subject_type)->toBe('App\Models\TeamInvitation')
-        ->and($log->properties)->toBe(['email' => 'invitee@example.com', 'role' => 'member']);
-});
-
 it('allows null actor for system-generated events', function () {
     $user = User::factory()->create();
-    $team = $user->currentTeam;
 
     app(RecordAuditEvent::class)->handle(
-        team: $team,
+        user: $user,
         action: 'system.invoice.generated',
         properties: ['month' => '2026-06'],
     );
@@ -120,10 +90,9 @@ it('allows null actor for system-generated events', function () {
 
 it('stores properties as a JSON array', function () {
     $user = User::factory()->create();
-    $team = $user->currentTeam;
 
     app(RecordAuditEvent::class)->handle(
-        team: $team,
+        user: $user,
         action: 'test.complex',
         properties: [
             'nested' => ['key' => 'value'],

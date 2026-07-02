@@ -1,8 +1,6 @@
 <?php
 
-use App\Enums\TeamPermission;
 use App\Models\RequestLog;
-use App\Models\Team;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
 use Livewire\Attributes\Computed;
@@ -19,15 +17,7 @@ new #[Title('Request Logs')] class extends Component
 
     public function mount(): void
     {
-        $team = Auth::user()->currentTeam;
-
-        abort_unless($team && Auth::user()->hasTeamPermission($team, TeamPermission::ViewUsage), 403);
-    }
-
-    #[Computed]
-    public function team(): ?Team
-    {
-        return Auth::user()->currentTeam;
+        abort_unless(Auth::check(), 403);
     }
 
     /**
@@ -36,12 +26,8 @@ new #[Title('Request Logs')] class extends Component
     #[Computed]
     public function logs(): Collection
     {
-        if (! $this->team) {
-            return collect();
-        }
-
         $query = RequestLog::query()
-            ->where('team_id', $this->team->id)
+            ->where('user_id', Auth::id())
             ->leftJoin('llm_models', 'llm_models.id', '=', 'request_logs.llm_model_id')
             ->leftJoin('llm_providers', 'llm_providers.id', '=', 'request_logs.llm_provider_id')
             ->orderByDesc('request_logs.requested_at');
@@ -86,12 +72,8 @@ new #[Title('Request Logs')] class extends Component
     #[Computed]
     public function availableModels(): array
     {
-        if (! $this->team) {
-            return [];
-        }
-
         return RequestLog::query()
-            ->where('team_id', $this->team->id)
+            ->where('user_id', Auth::id())
             ->join('llm_models', 'llm_models.id', '=', 'request_logs.llm_model_id')
             ->distinct()
             ->pluck('llm_models.name')

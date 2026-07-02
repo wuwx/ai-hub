@@ -1,9 +1,7 @@
 <?php
 
-use App\Actions\Billing\SyncTeamQuotaFromSubscription;
-use App\Enums\TeamPermission;
-use App\Models\Team;
-use App\Models\TeamQuotaPolicy;
+use App\Actions\Billing\SyncQuotaFromSubscription;
+use App\Models\QuotaPolicy;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
 use Livewire\Attributes\Computed;
@@ -13,58 +11,30 @@ use Livewire\Component;
 new #[Title("Billing")] class extends Component {
     public function mount(): void
     {
-        $team = Auth::user()->currentTeam;
-
-        abort_unless(
-            $team &&
-                Auth::user()->hasTeamPermission(
-                    $team,
-                    TeamPermission::ViewBilling,
-                ),
-            403,
-        );
-    }
-
-    #[Computed]
-    public function team(): ?Team
-    {
-        return Auth::user()->currentTeam;
+        abort_unless(Auth::check(), 403);
     }
 
     #[Computed]
     public function canViewBilling(): bool
     {
-        if (!$this->team) {
-            return false;
-        }
-
-        return Auth::user()->hasTeamPermission(
-            $this->team,
-            TeamPermission::ViewBilling,
-        );
+        return Auth::check();
     }
 
     #[Computed]
     public function canManageBilling(): bool
     {
-        if (!$this->team) {
-            return false;
-        }
-
-        return Auth::user()->hasTeamPermission(
-            $this->team,
-            TeamPermission::ManageBilling,
-        );
+        return Auth::check();
     }
 
     #[Computed]
     public function currentSubscription(): ?\Laravel\Cashier\Subscription
     {
-        if (!$this->team) {
+        $user = Auth::user();
+        if (!$user) {
             return null;
         }
 
-        return $this->team->subscription();
+        return $user->subscription();
     }
 
     #[Computed]
@@ -129,13 +99,14 @@ new #[Title("Billing")] class extends Component {
     }
 
     #[Computed]
-    public function activeQuotaPolicy(): ?TeamQuotaPolicy
+    public function activeQuotaPolicy(): ?QuotaPolicy
     {
-        if (!$this->team) {
+        $user = Auth::user();
+        if (!$user) {
             return null;
         }
 
-        return TeamQuotaPolicy::where("team_id", $this->team->id)
+        return QuotaPolicy::where("user_id", $user->id)
             ->where("is_active", true)
             ->orderByDesc("effective_from")
             ->first();
@@ -175,7 +146,7 @@ new #[Title("Billing")] class extends Component {
     }
 
     /**
-     * Subscribe the team to a plan, or downgrade to the free plan.
+     * Subscribe the user to a plan, or downgrade to the free plan.
      *
      * Paid plans are billed as a real recurring Stripe subscription: new
      * subscribers go through Stripe Checkout, existing subscribers swap
@@ -185,8 +156,8 @@ new #[Title("Billing")] class extends Component {
     {
         abort_unless($this->canManageBilling, 403);
 
-        $team = $this->team;
-        abort_unless($team, 404);
+        $user = Auth::user();
+        abort_unless($user, 404);
 
         $planConfig = config("services.billing.plans.{$planCode}");
         abort_unless($planConfig, 404);
@@ -210,11 +181,11 @@ new #[Title("Billing")] class extends Component {
         }
 
         try {
-            if ($team->subscribed("default")) {
-                $team->subscription("default")->swap($stripePriceId);
+            if ($user->subscribed("default")) {
+                $user->subscription("default")->swap($stripePriceId);
 
-                app(SyncTeamQuotaFromSubscription::class)->handle(
-                    team: $team,
+                app(SyncQuotaFromSubscription::class)->handle(
+                    user: $user,
                     planCode: $planCode,
                     status: "active",
                 );
@@ -239,17 +210,17 @@ new #[Title("Billing")] class extends Component {
             $baseUrl = rtrim((string) config("app.url"), "/");
             $successUrl = (string) config(
                 "services.billing.checkout_success_url",
-                $baseUrl . "/" . $team->slug . "/billing/success",
+                $baseUrl . "/billing/success",
             );
             $cancelUrl = (string) config(
                 "services.billing.checkout_cancel_url",
-                $baseUrl . "/" . $team->slug . "/billing/cancel",
+                $baseUrl . "/billing/cancel",
             );
             $successUrl .=
                 (str_contains($successUrl, "?") ? "&" : "?") .
                 "session_id={CHECKOUT_SESSION_ID}";
 
-            $checkout = $team
+            $checkout = $user
                 ->newSubscription("default", $stripePriceId)
                 ->checkout([
                     "success_url" => $successUrl,
@@ -268,20 +239,20 @@ new #[Title("Billing")] class extends Component {
     }
 
     /**
-     * Cancel any active subscription immediately and drop the team back to
+     * Cancel any active subscription immediately and drop back to
      * the free plan's quota limits.
      */
     protected function switchToFreePlan(): void
     {
-        $team = $this->team;
-        abort_unless($team, 404);
+        $user = Auth::user();
+        abort_unless($user, 404);
 
-        if ($team->subscribed("default")) {
-            $team->subscription("default")->cancelNow();
+        if ($user->subscribed("default")) {
+            $user->subscription("default")->cancelNow();
         }
 
-        app(SyncTeamQuotaFromSubscription::class)->handle(
-            team: $team,
+        app(SyncQuotaFromSubscription::class)->handle(
+            user: $user,
             planCode: (string) config(
                 "services.billing.free_plan_code",
                 "free",
@@ -310,10 +281,10 @@ new #[Title("Billing")] class extends Component {
     {
         abort_unless($this->canManageBilling, 403);
 
-        $team = $this->team;
-        abort_unless($team, 404);
+        $user = Auth::user();
+        abort_unless($user, 404);
 
-        if (!$team->hasStripeId()) {
+        if (!$user->hasStripeId()) {
             \Flux\Flux::toast(
                 variant: "danger",
                 text: __("No billing account yet. Subscribe to a plan first."),
@@ -323,8 +294,8 @@ new #[Title("Billing")] class extends Component {
         }
 
         try {
-            $url = $team->billingPortalUrl(
-                route("billing.index", ["current_team" => $team->slug]),
+            $url = $user->billingPortalUrl(
+                route("billing.index"),
             );
 
             $this->redirect($url, navigate: false);
@@ -371,7 +342,7 @@ new #[Title("Billing")] class extends Component {
                     @endif
                 </div>
 
-                @if ($this->canManageBilling && $this->team?->hasStripeId())
+                @if ($this->canManageBilling && Auth::user()?->hasStripeId())
                     <flux:button variant="ghost" size="sm" class="mt-3" wire:click="openBillingPortal">
                         {{ __('Manage Subscription') }}
                     </flux:button>

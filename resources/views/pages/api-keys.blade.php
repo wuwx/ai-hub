@@ -4,7 +4,7 @@ use App\Actions\ApiKeys\GenerateApiKey;
 use App\Actions\ApiKeys\RotateApiKey;
 use App\Actions\Audit\RecordAuditEvent;
 use App\Models\ApiKey;
-use App\Models\Team;
+use App\Models\User;
 use Illuminate\Support\Facades\Auth;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\Title;
@@ -25,33 +25,16 @@ new #[Title('API Keys')] class extends Component
     public ?int $rotatedKeyId = null;
 
     #[Computed]
-    public function team(): ?Team
-    {
-        return Auth::user()->currentTeam;
-    }
-
-    #[Computed]
     public function canManage(): bool
     {
-        if (! $this->team) {
-            return false;
-        }
-
-        return Auth::user()->hasTeamPermission(
-            $this->team,
-            \App\Enums\TeamPermission::ManageApiKeys,
-        );
+        return Auth::check();
     }
 
     #[Computed]
     public function apiKeys(): array
     {
-        if (! $this->team) {
-            return [];
-        }
-
         return ApiKey::query()
-            ->where('team_id', $this->team->id)
+            ->where('user_id', Auth::id())
             ->orderByDesc('created_at')
             ->get()
             ->map(fn (ApiKey $key) => [
@@ -82,14 +65,14 @@ new #[Title('API Keys')] class extends Component
             : null;
 
         $generated = app(GenerateApiKey::class)->handle(
-            team: $this->team,
+            user: Auth::user(),
             name: $this->newKeyName,
             expiresAt: $expiresAt,
             createdBy: Auth::id(),
         );
 
         app(RecordAuditEvent::class)->handle(
-            team: $this->team,
+            user: Auth::user(),
             action: 'api_key.created',
             subject: $generated->apiKey,
             properties: [
@@ -115,7 +98,7 @@ new #[Title('API Keys')] class extends Component
         abort_unless($this->canManage, 403);
 
         $apiKey = ApiKey::where('id', $keyId)
-            ->where('team_id', $this->team->id)
+            ->where('user_id', Auth::id())
             ->first();
 
         abort_unless($apiKey, 404);
@@ -123,7 +106,7 @@ new #[Title('API Keys')] class extends Component
         $apiKey->update(['revoked_at' => now()]);
 
         app(RecordAuditEvent::class)->handle(
-            team: $this->team,
+            user: Auth::user(),
             action: 'api_key.revoked',
             subject: $apiKey,
             properties: [
@@ -145,7 +128,7 @@ new #[Title('API Keys')] class extends Component
         abort_unless($this->canManage, 403);
 
         $apiKey = ApiKey::where('id', $keyId)
-            ->where('team_id', $this->team->id)
+            ->where('user_id', Auth::id())
             ->first();
 
         abort_unless($apiKey, 404);
@@ -153,7 +136,7 @@ new #[Title('API Keys')] class extends Component
         $generated = app(RotateApiKey::class)->handle($apiKey);
 
         app(RecordAuditEvent::class)->handle(
-            team: $this->team,
+            user: Auth::user(),
             action: 'api_key.rotated',
             subject: $generated->apiKey,
             properties: [
@@ -300,7 +283,7 @@ new #[Title('API Keys')] class extends Component
                     <form wire:submit="createKey" class="space-y-4">
                         <div>
                             <flux:heading level="2">{{ __('Create API Key') }}</flux:heading>
-                            <flux:subheading>{{ __('Generate a new API key for your team.') }}</flux:subheading>
+                            <flux:subheading>{{ __('Generate a new API key for your account.') }}</flux:subheading>
                         </div>
 
                         <flux:input

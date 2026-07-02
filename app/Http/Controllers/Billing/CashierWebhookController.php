@@ -2,8 +2,8 @@
 
 namespace App\Http\Controllers\Billing;
 
-use App\Actions\Billing\SyncTeamQuotaFromSubscription;
-use App\Models\Team;
+use App\Actions\Billing\SyncQuotaFromSubscription;
+use App\Models\User;
 use Illuminate\Http\Request;
 use Laravel\Cashier\Events\WebhookHandled;
 use Laravel\Cashier\Http\Controllers\WebhookController as CashierBaseWebhookController;
@@ -12,7 +12,7 @@ use Symfony\Component\HttpFoundation\Response;
 class CashierWebhookController extends CashierBaseWebhookController
 {
     public function __construct(
-        private readonly SyncTeamQuotaFromSubscription $syncTeamQuotaFromSubscription,
+        private readonly SyncQuotaFromSubscription $syncQuotaFromSubscription,
     ) {
         parent::__construct();
     }
@@ -21,7 +21,7 @@ class CashierWebhookController extends CashierBaseWebhookController
      * Handle a Stripe webhook call.
      *
      * Extends Cashier's dispatcher so that subscription lifecycle events also
-     * sync the team's quota policy (plan tier + token limits) after Cashier
+     * sync the user's quota policy (plan tier + token limits) after Cashier
      * updates its own subscription record.
      */
     public function handleWebhook(Request $request): Response
@@ -71,9 +71,9 @@ class CashierWebhookController extends CashierBaseWebhookController
      */
     protected function syncQuotaFromStripeSubscription(array $dataObject): void
     {
-        $team = $this->resolveTeamFromPayload($dataObject);
+        $user = $this->resolveUserFromPayload($dataObject);
 
-        if (! $team) {
+        if (! $user) {
             return;
         }
 
@@ -87,8 +87,8 @@ class CashierWebhookController extends CashierBaseWebhookController
         );
         $planCode = $this->resolvePlanCodeFromPriceId($stripePriceId);
 
-        $this->syncTeamQuotaFromSubscription->handle(
-            team: $team,
+        $this->syncQuotaFromSubscription->handle(
+            user: $user,
             planCode: $planCode,
             status: $stripeStatus,
         );
@@ -121,30 +121,30 @@ class CashierWebhookController extends CashierBaseWebhookController
     /**
      * @param  array<string, mixed>  $dataObject
      */
-    protected function resolveTeamFromPayload(array $dataObject): ?Team
+    protected function resolveUserFromPayload(array $dataObject): ?User
     {
-        $teamId = (int) data_get($dataObject, 'metadata.team_id', 0);
+        $userId = (int) data_get($dataObject, 'metadata.user_id', 0);
 
-        if ($teamId > 0) {
-            return $this->resolveTeamById($teamId);
+        if ($userId > 0) {
+            return $this->resolveUserById($userId);
         }
 
-        // Fallback: resolve via the Stripe customer ID on the team record.
+        // Fallback: resolve via the Stripe customer ID on the user record.
         $customerId = (string) data_get($dataObject, 'customer', '');
 
         if ($customerId === '') {
             return null;
         }
 
-        return Team::query()->where('stripe_id', $customerId)->first();
+        return User::query()->where('stripe_id', $customerId)->first();
     }
 
-    protected function resolveTeamById(int $teamId): ?Team
+    protected function resolveUserById(int $userId): ?User
     {
-        if ($teamId <= 0) {
+        if ($userId <= 0) {
             return null;
         }
 
-        return Team::query()->find($teamId);
+        return User::query()->find($userId);
     }
 }

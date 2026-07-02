@@ -1,6 +1,6 @@
 <?php
 
-use App\Models\TeamQuotaPolicy;
+use App\Models\QuotaPolicy;
 use App\Models\User;
 use Illuminate\Testing\TestResponse;
 use Laravel\Cashier\Subscription as CashierSubscription;
@@ -61,7 +61,7 @@ it('rejects stripe webhook request with invalid signature', function () {
 });
 
 it(
-    'syncs team subscription and applies plan quota limits from stripe webhook',
+    'syncs user subscription and applies plan quota limits from stripe webhook',
     function () {
         config()->set('services.billing.free_plan_code', 'free');
         config()->set('services.billing.plans.pro', [
@@ -72,9 +72,8 @@ it(
         ]);
 
         $user = User::factory()->create();
-        $team = $user->currentTeam;
-        $team->stripe_id = 'cus_123';
-        $team->save();
+        $user->stripe_id = 'cus_123';
+        $user->save();
 
         $response = sendWebhook([
             'type' => 'customer.subscription.updated',
@@ -99,7 +98,7 @@ it(
                         ],
                     ],
                     'metadata' => [
-                        'team_id' => (string) $team->id,
+                        'user_id' => (string) $user->id,
                         'plan_code' => 'pro',
                     ],
                 ],
@@ -110,7 +109,7 @@ it(
 
         // Cashier should have created a subscription record.
         $subscription = CashierSubscription::query()
-            ->where('team_id', $team->id)
+            ->where('user_id', $user->id)
             ->first();
 
         expect($subscription)->not->toBeNull();
@@ -118,8 +117,8 @@ it(
         expect($subscription->stripe_status)->toBe('active');
         expect($subscription->stripe_price)->toBe('price_pro_test');
 
-        $activePolicy = TeamQuotaPolicy::query()
-            ->where('team_id', $team->id)
+        $activePolicy = QuotaPolicy::query()
+            ->where('user_id', $user->id)
             ->where('is_active', true)
             ->latest('id')
             ->first();
@@ -148,9 +147,8 @@ it(
         ]);
 
         $user = User::factory()->create();
-        $team = $user->currentTeam;
-        $team->stripe_id = 'cus_past_due_001';
-        $team->save();
+        $user->stripe_id = 'cus_past_due_001';
+        $user->save();
 
         $response = sendWebhook([
             'type' => 'customer.subscription.updated',
@@ -172,7 +170,7 @@ it(
                         ],
                     ],
                     'metadata' => [
-                        'team_id' => (string) $team->id,
+                        'user_id' => (string) $user->id,
                         'plan_code' => 'pro',
                     ],
                 ],
@@ -183,15 +181,15 @@ it(
 
         // Cashier should have created/updated the subscription record.
         $subscription = CashierSubscription::query()
-            ->where('team_id', $team->id)
+            ->where('user_id', $user->id)
             ->first();
 
         expect($subscription)->not->toBeNull();
         expect($subscription->stripe_id)->toBe('sub_past_due_001');
         expect($subscription->stripe_status)->toBe('past_due');
 
-        $activePolicy = TeamQuotaPolicy::query()
-            ->where('team_id', $team->id)
+        $activePolicy = QuotaPolicy::query()
+            ->where('user_id', $user->id)
             ->where('is_active', true)
             ->latest('id')
             ->first();
@@ -204,7 +202,7 @@ it(
 );
 
 it(
-    'resolves the team from the stripe customer id when metadata is missing',
+    'resolves the user from the stripe customer id when metadata is missing',
     function () {
         config()->set('services.billing.free_plan_code', 'free');
         config()->set('services.billing.plans.pro', [
@@ -215,9 +213,8 @@ it(
         ]);
 
         $user = User::factory()->create();
-        $team = $user->currentTeam;
-        $team->stripe_id = 'cus_no_metadata';
-        $team->save();
+        $user->stripe_id = 'cus_no_metadata';
+        $user->save();
 
         $response = sendWebhook([
             'type' => 'customer.subscription.created',
@@ -244,8 +241,8 @@ it(
 
         $response->assertSuccessful();
 
-        $activePolicy = TeamQuotaPolicy::query()
-            ->where('team_id', $team->id)
+        $activePolicy = QuotaPolicy::query()
+            ->where('user_id', $user->id)
             ->where('is_active', true)
             ->latest('id')
             ->first();

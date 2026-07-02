@@ -1,8 +1,6 @@
 <?php
 
-use App\Enums\TeamPermission;
 use App\Models\LlmModel;
-use App\Models\Team;
 use App\Models\UsageLedger;
 use Carbon\Carbon;
 use Illuminate\Support\Collection;
@@ -15,19 +13,9 @@ use Livewire\Component;
 new #[Title('Usage')] class extends Component
 {
     #[Computed]
-    public function team(): ?Team
-    {
-        return Auth::user()->currentTeam;
-    }
-
-    #[Computed]
     public function canView(): bool
     {
-        if (! $this->team) {
-            return false;
-        }
-
-        return Auth::user()->hasTeamPermission($this->team, TeamPermission::ViewUsage);
+        return Auth::check();
     }
 
     /**
@@ -36,13 +24,13 @@ new #[Title('Usage')] class extends Component
     #[Computed]
     public function billingCycle(): array
     {
-        if (! $this->team) {
+        if (! Auth::user()) {
             $now = now();
 
             return ['start' => $now->startOfMonth()->toDateString(), 'end' => $now->endOfMonth()->toDateString()];
         }
 
-        $subscription = $this->team->subscription();
+        $subscription = Auth::user()->subscription();
 
         if ($subscription && $subscription->valid() && $subscription->created_at) {
             $start = $subscription->created_at->startOfMonth();
@@ -65,7 +53,7 @@ new #[Title('Usage')] class extends Component
     #[Computed]
     public function modelUsage(): Collection
     {
-        if (! $this->team) {
+        if (! Auth::user()) {
             return collect();
         }
 
@@ -74,7 +62,7 @@ new #[Title('Usage')] class extends Component
         return UsageLedger::query()
             ->leftJoin('llm_models', 'llm_models.id', '=', 'usage_ledgers.llm_model_id')
             ->leftJoin('llm_providers', 'llm_providers.id', '=', 'usage_ledgers.llm_provider_id')
-            ->where('usage_ledgers.team_id', $this->team->id)
+            ->where('usage_ledgers.user_id', Auth::id())
             ->where('usage_ledgers.bucket_type', 'day')
             ->whereBetween('usage_ledgers.bucket_date', [Carbon::parse($cycle['start'])->startOfDay(), Carbon::parse($cycle['end'])->endOfDay()])
             ->whereNotNull('usage_ledgers.llm_model_id')
@@ -106,7 +94,7 @@ new #[Title('Usage')] class extends Component
     #[Computed]
     public function chartData(): array
     {
-        if (! $this->team) {
+        if (! Auth::user()) {
             return ['summary' => ['total_tokens' => 0, 'total_requests' => 0, 'total_errors' => 0, 'error_rate' => 0.0], 'daily' => []];
         }
 
@@ -116,7 +104,7 @@ new #[Title('Usage')] class extends Component
 
         /** @var Collection<string, int> $rows */
         $rows = DB::table('usage_ledgers')
-            ->where('team_id', $this->team->id)
+            ->where('user_id', Auth::id())
             ->where('bucket_type', 'day')
             ->whereBetween('bucket_date', [Carbon::parse($cycle['start'])->startOfDay(), Carbon::parse($cycle['end'])->endOfDay()])
             ->selectRaw('DATE(bucket_date) as bucket_date, SUM(token_total) as token_total, SUM(request_count) as request_count, SUM(error_count) as error_count')

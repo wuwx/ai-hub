@@ -2,11 +2,9 @@
 
 namespace App\Filament\Pages;
 
-use App\Actions\Usage\GetTeamUsageSnapshot;
-use App\Enums\TeamPermission;
+use App\Actions\Usage\GetUsageSnapshot;
 use App\Filament\Widgets\UsageOverviewStats;
 use App\Filament\Widgets\UsageRequestsChart;
-use App\Models\User;
 use BackedEnum;
 use Filament\Pages\Page;
 use Filament\Support\Icons\Heroicon;
@@ -25,15 +23,7 @@ class UsageOverview extends Page
 
     public static function canAccess(): bool
     {
-        /** @var User|null $user */
-        $user = Auth::user();
-        $team = $user?->currentTeam;
-
-        if (! $user || ! $team) {
-            return false;
-        }
-
-        return $user->hasTeamPermission($team, TeamPermission::ViewUsage);
+        return Auth::check();
     }
 
     protected function getHeaderWidgets(): array
@@ -49,13 +39,13 @@ class UsageOverview extends Page
      */
     protected function getViewData(): array
     {
-        $team = Auth::user()?->currentTeam;
+        $user = Auth::user();
 
-        if (! $team) {
+        if (! $user) {
             return ['topModels' => []];
         }
 
-        $snapshot = app(GetTeamUsageSnapshot::class)->handle($team);
+        $snapshot = app(GetUsageSnapshot::class)->handle($user);
 
         return [
             'topModels' => $snapshot['top_models'],

@@ -7,17 +7,16 @@ use Illuminate\Support\Carbon;
 
 it('generates a plaintext key and stores only its hash', function () {
     $user = User::factory()->create();
-    $team = $user->currentTeam;
 
     $result = app(GenerateApiKey::class)->handle(
-        team: $team,
+        user: $user,
         name: 'Primary Key',
         expiresAt: Carbon::now()->addMonth(),
         createdBy: $user->id,
     );
 
     expect($result->plainTextKey)->toStartWith('ahk_');
-    expect($result->apiKey->team_id)->toBe($team->id);
+    expect($result->apiKey->user_id)->toBe($user->id);
     expect($result->apiKey->created_by)->toBe($user->id);
     expect($result->apiKey->key_hash)->toBe(hash('sha256', $result->plainTextKey));
     expect($result->apiKey->last_four)->toBe(substr($result->plainTextKey, -4));
@@ -32,10 +31,9 @@ it('generates a plaintext key and stores only its hash', function () {
 
 it('rotates an api key and clears revoked status', function () {
     $user = User::factory()->create();
-    $team = $user->currentTeam;
 
     $generated = app(GenerateApiKey::class)->handle(
-        team: $team,
+        user: $user,
         name: 'Rotate Me',
         createdBy: $user->id,
     );

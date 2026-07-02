@@ -1,27 +1,26 @@
 <?php
 
-use App\Actions\Usage\EnforceTeamTokenQuota;
+use App\Actions\Usage\EnforceTokenQuota;
 use App\Exceptions\QuotaExceededException;
-use App\Models\TeamQuotaPolicy;
+use App\Models\QuotaPolicy;
 use App\Models\UsageLedger;
 use App\Models\User;
 
 it('allows requests when no active quota policy exists', function () {
     $user = User::factory()->create();
 
-    $action = app(EnforceTeamTokenQuota::class);
+    $action = app(EnforceTokenQuota::class);
 
-    $action->handle($user->currentTeam, 100);
+    $action->handle($user, 100);
 
     expect(true)->toBeTrue();
 });
 
 it('throws when daily quota would be exceeded', function () {
     $user = User::factory()->create();
-    $team = $user->currentTeam;
 
-    TeamQuotaPolicy::create([
-        'team_id' => $team->id,
+    QuotaPolicy::create([
+        'user_id' => $user->id,
         'daily_token_limit' => 100,
         'monthly_token_limit' => 1000,
         'effective_from' => now()->subDay(),
@@ -29,7 +28,7 @@ it('throws when daily quota would be exceeded', function () {
     ]);
 
     UsageLedger::create([
-        'team_id' => $team->id,
+        'user_id' => $user->id,
         'bucket_date' => now()->toDateString(),
         'bucket_type' => 'day',
         'token_total' => 95,
@@ -39,16 +38,15 @@ it('throws when daily quota would be exceeded', function () {
         'error_count' => 0,
     ]);
 
-    expect(fn () => app(EnforceTeamTokenQuota::class)->handle($team, 10))
+    expect(fn () => app(EnforceTokenQuota::class)->handle($user, 10))
         ->toThrow(QuotaExceededException::class);
 });
 
 it('throws when monthly quota would be exceeded', function () {
     $user = User::factory()->create();
-    $team = $user->currentTeam;
 
-    TeamQuotaPolicy::create([
-        'team_id' => $team->id,
+    QuotaPolicy::create([
+        'user_id' => $user->id,
         'daily_token_limit' => 1000,
         'monthly_token_limit' => 100,
         'effective_from' => now()->subDay(),
@@ -56,7 +54,7 @@ it('throws when monthly quota would be exceeded', function () {
     ]);
 
     UsageLedger::create([
-        'team_id' => $team->id,
+        'user_id' => $user->id,
         'bucket_date' => now()->startOfMonth()->toDateString(),
         'bucket_type' => 'month',
         'token_total' => 96,
@@ -66,16 +64,15 @@ it('throws when monthly quota would be exceeded', function () {
         'error_count' => 0,
     ]);
 
-    expect(fn () => app(EnforceTeamTokenQuota::class)->handle($team, 5))
+    expect(fn () => app(EnforceTokenQuota::class)->handle($user, 5))
         ->toThrow(QuotaExceededException::class);
 });
 
 it('throws when weekly quota would be exceeded', function () {
     $user = User::factory()->create();
-    $team = $user->currentTeam;
 
-    TeamQuotaPolicy::create([
-        'team_id' => $team->id,
+    QuotaPolicy::create([
+        'user_id' => $user->id,
         'daily_token_limit' => 1000,
         'weekly_token_limit' => 100,
         'monthly_token_limit' => 10000,
@@ -84,7 +81,7 @@ it('throws when weekly quota would be exceeded', function () {
     ]);
 
     UsageLedger::create([
-        'team_id' => $team->id,
+        'user_id' => $user->id,
         'bucket_date' => now()->startOfWeek()->toDateString(),
         'bucket_type' => 'day',
         'token_total' => 60,
@@ -95,7 +92,7 @@ it('throws when weekly quota would be exceeded', function () {
     ]);
 
     UsageLedger::create([
-        'team_id' => $team->id,
+        'user_id' => $user->id,
         'bucket_date' => now()->startOfWeek()->addDay()->toDateString(),
         'bucket_type' => 'day',
         'token_total' => 35,
@@ -105,16 +102,15 @@ it('throws when weekly quota would be exceeded', function () {
         'error_count' => 0,
     ]);
 
-    expect(fn () => app(EnforceTeamTokenQuota::class)->handle($team, 10))
+    expect(fn () => app(EnforceTokenQuota::class)->handle($user, 10))
         ->toThrow(QuotaExceededException::class);
 });
 
 it('throws when weekly quota would be exceeded from weekly ledger bucket', function () {
     $user = User::factory()->create();
-    $team = $user->currentTeam;
 
-    TeamQuotaPolicy::create([
-        'team_id' => $team->id,
+    QuotaPolicy::create([
+        'user_id' => $user->id,
         'daily_token_limit' => 1000,
         'weekly_token_limit' => 100,
         'monthly_token_limit' => 10000,
@@ -123,7 +119,7 @@ it('throws when weekly quota would be exceeded from weekly ledger bucket', funct
     ]);
 
     UsageLedger::create([
-        'team_id' => $team->id,
+        'user_id' => $user->id,
         'bucket_date' => now()->startOfWeek()->toDateString(),
         'bucket_type' => 'week',
         'token_total' => 95,
@@ -133,6 +129,6 @@ it('throws when weekly quota would be exceeded from weekly ledger bucket', funct
         'error_count' => 0,
     ]);
 
-    expect(fn () => app(EnforceTeamTokenQuota::class)->handle($team, 10))
+    expect(fn () => app(EnforceTokenQuota::class)->handle($user, 10))
         ->toThrow(QuotaExceededException::class);
 });

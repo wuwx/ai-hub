@@ -1,9 +1,7 @@
 <?php
 
-use App\Actions\Billing\SyncTeamQuotaFromSubscription;
-use App\Enums\TeamRole;
-use App\Models\Team;
-use App\Models\TeamQuotaPolicy;
+use App\Actions\Billing\SyncQuotaFromSubscription;
+use App\Models\QuotaPolicy;
 use App\Models\User;
 use Laravel\Cashier\Subscription as CashierSubscription;
 use Laravel\Cashier\SubscriptionItem as CashierSubscriptionItem;
@@ -141,65 +139,28 @@ function fakeStripeClientForSubscriptionSwap(
 }
 
 test('billing page requires authentication', function () {
-    $team = Team::factory()->create();
 
     $response = $this->get(
-        route('billing.index', ['current_team' => $team->slug]),
+        route('billing.index'),
     );
 
     $response->assertRedirect(route('login'));
 });
 
-test('owners can view billing page', function () {
+test('authenticated users can view billing page', function () {
     $user = User::factory()->create();
-    $team = Team::factory()->create();
-    $team->members()->attach($user, ['role' => TeamRole::Owner->value]);
-    $user->switchTeam($team);
-    $user->refresh();
 
     $response = $this->actingAs($user)->get(
-        route('billing.index', ['current_team' => $team->slug]),
+        route('billing.index'),
     );
 
     $response->assertOk();
-});
-
-test('admins can view billing page', function () {
-    $admin = User::factory()->create();
-    $team = Team::factory()->create();
-    $team->members()->attach($admin, ['role' => TeamRole::Admin->value]);
-    $admin->switchTeam($team);
-    $admin->refresh();
-
-    $response = $this->actingAs($admin)->get(
-        route('billing.index', ['current_team' => $team->slug]),
-    );
-
-    $response->assertOk();
-});
-
-test('members cannot view billing page', function () {
-    $member = User::factory()->create();
-    $team = Team::factory()->create();
-    $team->members()->attach($member, ['role' => TeamRole::Member->value]);
-    $member->switchTeam($team);
-    $member->refresh();
-
-    $response = $this->actingAs($member)->get(
-        route('billing.index', ['current_team' => $team->slug]),
-    );
-
-    $response->assertForbidden();
 });
 
 test(
     'billing page shows current plan as free when no subscription',
     function () {
         $user = User::factory()->create();
-        $team = Team::factory()->create();
-        $team->members()->attach($user, ['role' => TeamRole::Owner->value]);
-        $user->switchTeam($team);
-        $user->refresh();
 
         $this->actingAs($user);
 
@@ -211,15 +172,11 @@ test(
 
 test('billing page shows active subscription plan', function () {
     $user = User::factory()->create();
-    $team = Team::factory()->create();
-    $team->members()->attach($user, ['role' => TeamRole::Owner->value]);
-    $user->switchTeam($team);
-    $user->refresh();
 
     config()->set('services.billing.plans.pro.stripe_price_id', 'price_pro');
 
     CashierSubscription::create([
-        'team_id' => $team->id,
+        'user_id' => $user->id,
         'type' => 'default',
         'stripe_id' => 'sub_test123',
         'stripe_status' => 'active',
@@ -236,10 +193,6 @@ test('billing page shows active subscription plan', function () {
 
 test('billing page displays all available plans', function () {
     $user = User::factory()->create();
-    $team = Team::factory()->create();
-    $team->members()->attach($user, ['role' => TeamRole::Owner->value]);
-    $user->switchTeam($team);
-    $user->refresh();
 
     $this->actingAs($user);
 
@@ -251,10 +204,6 @@ test('billing page displays all available plans', function () {
 
 test('billing page shows subscribe button for free plan users', function () {
     $user = User::factory()->create();
-    $team = Team::factory()->create();
-    $team->members()->attach($user, ['role' => TeamRole::Owner->value]);
-    $user->switchTeam($team);
-    $user->refresh();
 
     $this->actingAs($user);
 
@@ -272,10 +221,6 @@ test(
         config()->set('services.billing.plans.pro.monthly_price_cents', 4900);
 
         $user = User::factory()->create();
-        $team = Team::factory()->create(['stripe_id' => 'cus_test_billing']);
-        $team->members()->attach($user, ['role' => TeamRole::Owner->value]);
-        $user->switchTeam($team);
-        $user->refresh();
 
         app()->bind(
             StripeClient::class,
@@ -312,16 +257,12 @@ test('switching to the free plan syncs quota back to free limits', function () {
     ]);
 
     $user = User::factory()->create();
-    $team = Team::factory()->create();
-    $team->members()->attach($user, ['role' => TeamRole::Owner->value]);
-    $user->switchTeam($team);
-    $user->refresh();
 
-    // Team is on the Pro plan's quota, but has no live Cashier subscription
+    // User is on the Pro plan's quota, but has no live Cashier subscription
     // record (e.g. it was provisioned manually) — downgrading should not
     // need to call Stripe at all.
-    app(SyncTeamQuotaFromSubscription::class)->handle(
-        team: $team,
+    app(SyncQuotaFromSubscription::class)->handle(
+        user: $user,
         planCode: 'pro',
         status: 'active',
     );
@@ -330,8 +271,8 @@ test('switching to the free plan syncs quota back to free limits', function () {
 
     Livewire::test('pages::billing')->call('subscribeToPlan', 'free');
 
-    $activePolicy = TeamQuotaPolicy::query()
-        ->where('team_id', $team->id)
+    $activePolicy = QuotaPolicy::query()
+        ->where('user_id', $user->id)
         ->where('is_active', true)
         ->first();
 
@@ -361,13 +302,9 @@ test(
         ]);
 
         $user = User::factory()->create();
-        $team = Team::factory()->create(['stripe_id' => 'cus_test_swap']);
-        $team->members()->attach($user, ['role' => TeamRole::Owner->value]);
-        $user->switchTeam($team);
-        $user->refresh();
 
         $subscription = CashierSubscription::create([
-            'team_id' => $team->id,
+            'user_id' => $user->id,
             'type' => 'default',
             'stripe_id' => 'sub_swap_test',
             'stripe_status' => 'active',
@@ -383,8 +320,8 @@ test(
             'quantity' => 1,
         ]);
 
-        app(SyncTeamQuotaFromSubscription::class)->handle(
-            team: $team,
+        app(SyncQuotaFromSubscription::class)->handle(
+            user: $user,
             planCode: 'pro',
             status: 'active',
         );
@@ -405,8 +342,8 @@ test(
         $subscription->refresh();
         expect($subscription->stripe_price)->toBe('price_enterprise');
 
-        $activePolicy = TeamQuotaPolicy::query()
-            ->where('team_id', $team->id)
+        $activePolicy = QuotaPolicy::query()
+            ->where('user_id', $user->id)
             ->where('is_active', true)
             ->first();
 

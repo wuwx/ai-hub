@@ -1,18 +1,17 @@
 <?php
 
 use App\Actions\Webhooks\DispatchWebhookEvent;
-use App\Models\TeamWebhookEndpoint;
 use App\Models\User;
 use App\Models\WebhookDelivery;
+use App\Models\WebhookEndpoint;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Support\Facades\Http;
 
 it('records a delivery log on successful webhook dispatch', function () {
     $user = User::factory()->create();
-    $team = $user->currentTeam;
 
-    $endpoint = TeamWebhookEndpoint::create([
-        'team_id' => $team->id,
+    $endpoint = WebhookEndpoint::create([
+        'user_id' => $user->id,
         'url' => 'https://customer.example.com/webhooks',
         'is_active' => true,
     ]);
@@ -21,9 +20,9 @@ it('records a delivery log on successful webhook dispatch', function () {
         'https://customer.example.com/webhooks' => Http::response(['ok' => true], 200),
     ]);
 
-    app(DispatchWebhookEvent::class)->handle($team, 'test.event', ['key' => 'value']);
+    app(DispatchWebhookEvent::class)->handle($user, 'test.event', ['key' => 'value']);
 
-    $delivery = WebhookDelivery::where('team_webhook_endpoint_id', $endpoint->id)->first();
+    $delivery = WebhookDelivery::where('webhook_endpoint_id', $endpoint->id)->first();
 
     expect($delivery)->not->toBeNull()
         ->and($delivery->event)->toBe('test.event')
@@ -36,10 +35,9 @@ it('records a delivery log on successful webhook dispatch', function () {
 
 it('records a delivery log on failed webhook dispatch', function () {
     $user = User::factory()->create();
-    $team = $user->currentTeam;
 
-    $endpoint = TeamWebhookEndpoint::create([
-        'team_id' => $team->id,
+    $endpoint = WebhookEndpoint::create([
+        'user_id' => $user->id,
         'url' => 'https://failing.example.com/webhooks',
         'is_active' => true,
     ]);
@@ -48,9 +46,9 @@ it('records a delivery log on failed webhook dispatch', function () {
         'https://failing.example.com/webhooks' => Http::response(['error' => 'bad'], 500),
     ]);
 
-    app(DispatchWebhookEvent::class)->handle($team, 'test.event');
+    app(DispatchWebhookEvent::class)->handle($user, 'test.event');
 
-    $delivery = WebhookDelivery::where('team_webhook_endpoint_id', $endpoint->id)->first();
+    $delivery = WebhookDelivery::where('webhook_endpoint_id', $endpoint->id)->first();
 
     expect($delivery)->not->toBeNull()
         ->and($delivery->succeeded)->toBeFalse()
@@ -59,10 +57,9 @@ it('records a delivery log on failed webhook dispatch', function () {
 
 it('records error message when webhook delivery throws', function () {
     $user = User::factory()->create();
-    $team = $user->currentTeam;
 
-    $endpoint = TeamWebhookEndpoint::create([
-        'team_id' => $team->id,
+    $endpoint = WebhookEndpoint::create([
+        'user_id' => $user->id,
         'url' => 'https://unreachable.example.com/webhooks',
         'is_active' => true,
     ]);
@@ -71,9 +68,9 @@ it('records error message when webhook delivery throws', function () {
         throw new ConnectionException('Could not resolve host');
     });
 
-    app(DispatchWebhookEvent::class)->handle($team, 'test.event');
+    app(DispatchWebhookEvent::class)->handle($user, 'test.event');
 
-    $delivery = WebhookDelivery::where('team_webhook_endpoint_id', $endpoint->id)->first();
+    $delivery = WebhookDelivery::where('webhook_endpoint_id', $endpoint->id)->first();
 
     expect($delivery)->not->toBeNull()
         ->and($delivery->succeeded)->toBeFalse()
@@ -83,10 +80,9 @@ it('records error message when webhook delivery throws', function () {
 
 it('stores the response body for debugging', function () {
     $user = User::factory()->create();
-    $team = $user->currentTeam;
 
-    $endpoint = TeamWebhookEndpoint::create([
-        'team_id' => $team->id,
+    $endpoint = WebhookEndpoint::create([
+        'user_id' => $user->id,
         'url' => 'https://verbose.example.com/webhooks',
         'is_active' => true,
     ]);
@@ -95,9 +91,9 @@ it('stores the response body for debugging', function () {
         'https://verbose.example.com/webhooks' => Http::response('Server error details here', 500),
     ]);
 
-    app(DispatchWebhookEvent::class)->handle($team, 'test.event');
+    app(DispatchWebhookEvent::class)->handle($user, 'test.event');
 
-    $delivery = WebhookDelivery::where('team_webhook_endpoint_id', $endpoint->id)->first();
+    $delivery = WebhookDelivery::where('webhook_endpoint_id', $endpoint->id)->first();
 
     expect($delivery->response_body)->toBe('Server error details here');
 });

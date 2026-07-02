@@ -2,7 +2,7 @@
 
 namespace App\Actions\Fortify;
 
-use App\Actions\Teams\CreateTeam;
+use App\Actions\Billing\SyncQuotaFromSubscription;
 use App\Concerns\PasswordValidationRules;
 use App\Concerns\ProfileValidationRules;
 use App\Models\User;
@@ -14,7 +14,7 @@ class CreateNewUser implements CreatesNewUsers
 {
     use PasswordValidationRules, ProfileValidationRules;
 
-    public function __construct(private CreateTeam $createTeam)
+    public function __construct(private SyncQuotaFromSubscription $syncQuota)
     {
         //
     }
@@ -38,10 +38,9 @@ class CreateNewUser implements CreatesNewUsers
                 'password' => $input['password'],
             ]);
 
-            $this->createTeam->handle(
+            $this->syncQuota->handle(
                 $user,
-                $user->name."'s Team",
-                isPersonal: true,
+                (string) config('services.billing.free_plan_code', 'free'),
             );
 
             return $user;

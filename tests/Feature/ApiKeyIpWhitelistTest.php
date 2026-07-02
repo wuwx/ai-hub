@@ -5,16 +5,15 @@ use App\Models\LlmModel;
 use App\Models\LlmProvider;
 use App\Models\PlanModelEntitlement;
 use App\Models\PlanProviderEntitlement;
-use App\Models\TeamQuotaPolicy;
+use App\Models\QuotaPolicy;
 use App\Models\User;
 use Illuminate\Support\Facades\Http;
 
 beforeEach(function () {
     $this->user = User::factory()->create();
-    $this->team = $this->user->currentTeam;
 
-    TeamQuotaPolicy::create([
-        'team_id' => $this->team->id,
+    QuotaPolicy::create([
+        'user_id' => $this->user->id,
         'plan_code' => 'free',
         'daily_token_limit' => 100000,
         'monthly_token_limit' => 1000000,
@@ -57,7 +56,7 @@ beforeEach(function () {
 
 it('allows requests from any IP when allowed_ips is empty', function () {
     $apiKey = app(GenerateApiKey::class)->handle(
-        team: $this->team,
+        user: $this->user,
         name: 'No IP Restriction',
         createdBy: $this->user->id,
     );
@@ -97,7 +96,7 @@ it('allows requests from any IP when allowed_ips is empty', function () {
 
 it('blocks requests from non-whitelisted IPs', function () {
     $apiKey = app(GenerateApiKey::class)->handle(
-        team: $this->team,
+        user: $this->user,
         name: 'IP Restricted',
         createdBy: $this->user->id,
     );
@@ -121,7 +120,7 @@ it('blocks requests from non-whitelisted IPs', function () {
 
 it('allows requests from whitelisted IPs', function () {
     $apiKey = app(GenerateApiKey::class)->handle(
-        team: $this->team,
+        user: $this->user,
         name: 'IP Restricted',
         createdBy: $this->user->id,
     );
@@ -164,7 +163,7 @@ it('allows requests from whitelisted IPs', function () {
 
 it('supports CIDR ranges in IP whitelist', function () {
     $apiKey = app(GenerateApiKey::class)->handle(
-        team: $this->team,
+        user: $this->user,
         name: 'CIDR Restricted',
         createdBy: $this->user->id,
     );
@@ -207,7 +206,7 @@ it('supports CIDR ranges in IP whitelist', function () {
 
 it('blocks requests when IP does not match CIDR range', function () {
     $apiKey = app(GenerateApiKey::class)->handle(
-        team: $this->team,
+        user: $this->user,
         name: 'CIDR Restricted',
         createdBy: $this->user->id,
     );
@@ -231,7 +230,7 @@ it('blocks requests when IP does not match CIDR range', function () {
 
 it('supports multiple IPs in the whitelist', function () {
     $apiKey = app(GenerateApiKey::class)->handle(
-        team: $this->team,
+        user: $this->user,
         name: 'Multi IP',
         createdBy: $this->user->id,
     );

@@ -181,7 +181,7 @@
                     <code class="text-sm">/v1/models</code>
                 </div>
                 <div class="p-6 space-y-4">
-                    <p class="text-zinc-300">Lists all models your team is entitled to use. OpenAI-compatible format.</p>
+                    <p class="text-zinc-300">Lists all models your account is entitled to use. OpenAI-compatible format.</p>
                     <div class="rounded-md bg-zinc-950 p-4 font-mono text-sm text-zinc-300 overflow-x-auto">
 <pre>curl {{ config('app.url') }}/api/v1/models \
   -H "Authorization: Bearer ahk_your_api_key"</pre>
@@ -223,7 +223,7 @@
                             <tr class="border-b border-zinc-800/50">
                                 <td class="px-6 py-3 pr-4 font-mono text-red-400">422</td>
                                 <td class="px-6 py-3 pr-4 font-mono text-emerald-400">model_unavailable</td>
-                                <td class="px-6 py-3">Model is not available for this team</td>
+                                <td class="px-6 py-3">Model is not available for this account</td>
                             </tr>
                             <tr class="border-b border-zinc-800/50">
                                 <td class="px-6 py-3 pr-4 font-mono text-red-400">429</td>

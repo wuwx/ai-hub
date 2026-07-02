@@ -2,7 +2,7 @@
 
 namespace App\Providers;
 
-use App\Models\Team;
+use App\Models\User;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Facades\DB;
@@ -52,11 +52,11 @@ class AppServiceProvider extends ServiceProvider
     }
 
     /**
-     * Configure Laravel Cashier for team-based billing.
+     * Configure Laravel Cashier for user-based billing.
      */
     protected function configureCashier(): void
     {
-        Cashier::useCustomerModel(Team::class);
+        Cashier::useCustomerModel(User::class);
         Cashier::ignoreRoutes();
     }
 }

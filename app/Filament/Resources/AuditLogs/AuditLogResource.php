@@ -2,12 +2,10 @@
 
 namespace App\Filament\Resources\AuditLogs;
 
-use App\Enums\TeamPermission;
 use App\Filament\Resources\AuditLogs\Pages\ListAuditLogs;
 use App\Filament\Resources\AuditLogs\Schemas\AuditLogForm;
 use App\Filament\Resources\AuditLogs\Tables\AuditLogsTable;
 use App\Models\AuditLog;
-use App\Models\User;
 use BackedEnum;
 use Filament\Resources\Resource;
 use Filament\Schemas\Schema;
@@ -27,7 +25,7 @@ class AuditLogResource extends Resource
 
     public static function canViewAny(): bool
     {
-        return static::canManageTeam();
+        return Auth::check();
     }
 
     public static function canCreate(): bool
@@ -71,24 +69,10 @@ class AuditLogResource extends Resource
 
     public static function getEloquentQuery(): Builder
     {
-        $teamId = Auth::user()?->current_team_id;
+        $userId = Auth::id();
 
         return parent::getEloquentQuery()
-            ->when($teamId, fn (Builder $query) => $query->where('team_id', $teamId))
-            ->when(! $teamId, fn (Builder $query) => $query->whereRaw('1 = 0'));
-    }
-
-    protected static function canManageTeam(): bool
-    {
-        /** @var User|null $user */
-        $user = Auth::user();
-        $team = $user?->currentTeam;
-
-        if (! $user || ! $team) {
-            return false;
-        }
-
-        return $user->hasTeamPermission($team, TeamPermission::ManageApiKeys)
-            || $user->hasTeamPermission($team, TeamPermission::ViewBilling);
+            ->when($userId, fn (Builder $query) => $query->where('user_id', $userId))
+            ->when(! $userId, fn (Builder $query) => $query->whereRaw('1 = 0'));
     }
 }

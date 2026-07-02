@@ -3,7 +3,6 @@
 namespace App\Actions\Audit;
 
 use App\Models\AuditLog;
-use App\Models\Team;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\Request;
@@ -11,12 +10,12 @@ use Illuminate\Http\Request;
 class RecordAuditEvent
 {
     /**
-     * Record an audit event for a team-scoped administrative action.
+     * Record an audit event for a user-scoped administrative action.
      *
      * @param  array<string, mixed>  $properties
      */
     public function handle(
-        Team $team,
+        User $user,
         string $action,
         ?Model $subject = null,
         array $properties = [],
@@ -25,7 +24,7 @@ class RecordAuditEvent
         ?string $userAgent = null,
     ): AuditLog {
         return AuditLog::create([
-            'team_id' => $team->id,
+            'user_id' => $user->id,
             'actor_id' => $actor?->id,
             'action' => $action,
             'subject_type' => $subject?->getMorphClass(),

@@ -4,18 +4,18 @@ namespace App\Actions\ApiKeys;
 
 use App\Data\GeneratedApiKey;
 use App\Models\ApiKey;
-use App\Models\Team;
+use App\Models\User;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Str;
 
 class GenerateApiKey
 {
-    public function handle(Team $team, string $name, ?Carbon $expiresAt = null, ?int $createdBy = null): GeneratedApiKey
+    public function handle(User $user, string $name, ?Carbon $expiresAt = null, ?int $createdBy = null): GeneratedApiKey
     {
         $plainTextKey = $this->makePlainTextKey();
 
         $apiKey = ApiKey::create([
-            'team_id' => $team->id,
+            'user_id' => $user->id,
             'name' => $name,
             'key_hash' => $this->hashKey($plainTextKey),
             'last_four' => Str::substr($plainTextKey, -4),

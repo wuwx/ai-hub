@@ -1,8 +1,6 @@
 <?php
 
-use App\Actions\Usage\GetTeamUsageSnapshot;
-use App\Enums\TeamPermission;
-use App\Models\Team;
+use App\Actions\Usage\GetUsageSnapshot;
 use Illuminate\Support\Facades\Auth;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\Title;
@@ -10,19 +8,14 @@ use Livewire\Component;
 
 new #[Title("Dashboard")] class extends Component {
     #[Computed]
-    public function team(): ?Team
-    {
-        return Auth::user()->currentTeam;
-    }
-
-    #[Computed]
     public function currentPlanCode(): string
     {
-        if (!$this->team) {
+        $user = Auth::user();
+        if (!$user) {
             return "free";
         }
 
-        $subscription = $this->team->subscription();
+        $subscription = $user->subscription();
 
         if ($subscription && $subscription->valid()) {
             $stripePriceId = $subscription->stripe_price ?? "";
@@ -47,7 +40,8 @@ new #[Title("Dashboard")] class extends Component {
     #[Computed]
     public function snapshot(): array
     {
-        if (!$this->team) {
+        $user = Auth::user();
+        if (!$user) {
             return [
                 "today_tokens" => 0,
                 "today_requests" => 0,
@@ -64,46 +58,25 @@ new #[Title("Dashboard")] class extends Component {
             ];
         }
 
-        return app(GetTeamUsageSnapshot::class)->handle($this->team);
+        return app(GetUsageSnapshot::class)->handle($user);
     }
 
     #[Computed]
     public function canViewUsage(): bool
     {
-        if (!$this->team) {
-            return false;
-        }
-
-        return Auth::user()->hasTeamPermission(
-            $this->team,
-            TeamPermission::ViewUsage,
-        );
+        return Auth::check();
     }
 
     #[Computed]
     public function canManageApiKeys(): bool
     {
-        if (!$this->team) {
-            return false;
-        }
-
-        return Auth::user()->hasTeamPermission(
-            $this->team,
-            TeamPermission::ManageApiKeys,
-        );
+        return Auth::check();
     }
 
     #[Computed]
     public function canViewBilling(): bool
     {
-        if (!$this->team) {
-            return false;
-        }
-
-        return Auth::user()->hasTeamPermission(
-            $this->team,
-            TeamPermission::ViewBilling,
-        );
+        return Auth::check();
     }
 
     public function render()
@@ -114,14 +87,12 @@ new #[Title("Dashboard")] class extends Component {
 ?>
 
 <section class="w-full p-6">
-    <livewire:pages::teams.pending-invitations-modal />
-
     <div class="flex h-full w-full flex-1 flex-col gap-6">
         {{-- Page Header --}}
         <div class="flex items-center justify-between">
             <div>
                 <flux:heading size="xl" level="1">{{ __('Dashboard') }}</flux:heading>
-                <flux:subheading>{{ __('Overview of your team\'s usage and activity') }}</flux:subheading>
+                <flux:subheading>{{ __('Overview of your usage and activity') }}</flux:subheading>
             </div>
             <flux:badge color="blue" size="lg">{{ ucfirst($this->currentPlanCode) }} {{ __('Plan') }}</flux:badge>
         </div>

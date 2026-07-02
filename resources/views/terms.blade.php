@@ -22,7 +22,7 @@
 
             <section>
                 <h2 class="text-xl font-semibold text-zinc-100">2. Description of Service</h2>
-                <p class="mt-2">The Service provides a unified API gateway that routes requests to large language model providers. We handle authentication, billing, usage tracking, and rate limiting on behalf of your team.</p>
+                <p class="mt-2">The Service provides a unified API gateway that routes requests to large language model providers. We handle authentication, billing, usage tracking, and rate limiting on your behalf.</p>
             </section>
 
             <section>

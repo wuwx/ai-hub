@@ -15,15 +15,15 @@ class EnforceConcurrentRequestLimit
     /**
      * Handle an incoming request.
      *
-     * Enforces a per-team concurrent in-flight request limit using an atomic
-     * cache counter. This prevents a single team from opening hundreds of
+     * Enforces a per-user concurrent in-flight request limit using an atomic
+     * cache counter. This prevents a single user from opening hundreds of
      * simultaneous streaming connections that consume upstream tokens.
      *
      * @param  Closure(Request): (Response)  $next
      */
     public function handle(Request $request, Closure $next): Response
     {
-        $maxConcurrent = (int) config('services.llm_gateway.max_concurrent_per_team', 50);
+        $maxConcurrent = (int) config('services.llm_gateway.max_concurrent_per_user', 50);
 
         if ($maxConcurrent <= 0) {
             return $next($request);
@@ -38,13 +38,13 @@ class EnforceConcurrentRequestLimit
             return $next($request);
         }
 
-        $team = $apiKey->team;
+        $user = $apiKey->user;
 
-        if (! $team) {
+        if (! $user) {
             return $next($request);
         }
 
-        $cacheKey = sprintf('gateway:concurrent:%d', $team->id);
+        $cacheKey = sprintf('gateway:concurrent:%d', $user->id);
         $current = (int) Cache::get($cacheKey, 0);
 
         if ($current >= $maxConcurrent) {

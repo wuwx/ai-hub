@@ -2,14 +2,12 @@
 
 namespace App\Filament\Resources\LlmModels;
 
-use App\Enums\TeamPermission;
 use App\Filament\Resources\LlmModels\Pages\CreateLlmModel;
 use App\Filament\Resources\LlmModels\Pages\EditLlmModel;
 use App\Filament\Resources\LlmModels\Pages\ListLlmModels;
 use App\Filament\Resources\LlmModels\Schemas\LlmModelForm;
 use App\Filament\Resources\LlmModels\Tables\LlmModelsTable;
 use App\Models\LlmModel;
-use App\Models\User;
 use BackedEnum;
 use Filament\Resources\Resource;
 use Filament\Schemas\Schema;
@@ -74,14 +72,6 @@ class LlmModelResource extends Resource
 
     protected static function canManageGatewayConfiguration(): bool
     {
-        /** @var User|null $user */
-        $user = Auth::user();
-        $team = $user?->currentTeam;
-
-        if (! $user || ! $team) {
-            return false;
-        }
-
-        return $user->hasTeamPermission($team, TeamPermission::ManageGatewayConfig);
+        return Auth::check();
     }
 }

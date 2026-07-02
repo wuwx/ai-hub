@@ -7,7 +7,6 @@ use App\Models\User;
 
 beforeEach(function () {
     $this->user = User::factory()->create();
-    $this->team = $this->user->currentTeam;
 
     // Create usage data
     $provider = LlmProvider::create([
@@ -28,7 +27,7 @@ beforeEach(function () {
     ]);
 
     UsageLedger::create([
-        'team_id' => $this->team->id,
+        'user_id' => $this->user->id,
         'llm_provider_id' => $provider->id,
         'llm_model_id' => $model->id,
         'bucket_date' => now()->toDateString(),
@@ -43,7 +42,7 @@ beforeEach(function () {
 
 it('exports usage data as CSV', function () {
     $response = $this->actingAs($this->user)->get(
-        "/{$this->team->slug}/usage/export",
+        '/usage/export',
     );
 
     $response->assertOk();
@@ -66,13 +65,13 @@ it('exports usage data as CSV', function () {
 });
 
 it('requires authentication to export data', function () {
-    $this->get("/{$this->team->slug}/usage/export")->assertRedirect('/login');
+    $this->get('/usage/export')->assertRedirect('/login');
 });
 
-it('requires team membership to export', function () {
+it('requires authentication to export', function () {
     $otherUser = User::factory()->create();
 
     $this->actingAs($otherUser)
-        ->get("/{$this->team->slug}/usage/export")
-        ->assertForbidden();
+        ->get('/usage/export')
+        ->assertOk();
 });

@@ -22,17 +22,16 @@ class CreateApiKey extends CreateRecord
     protected function handleRecordCreation(array $data): Model
     {
         $user = auth()->user();
-        $team = $user?->currentTeam;
 
-        if (! $team || ! $user) {
+        if (! $user) {
             throw ValidationException::withMessages([
-                'name' => __('A current team is required before creating API keys.'),
+                'name' => __('You must be authenticated to create API keys.'),
             ]);
         }
 
         /** @var GeneratedApiKey $result */
         $result = app(GenerateApiKey::class)->handle(
-            team: $team,
+            user: $user,
             name: (string) $data['name'],
             expiresAt: $data['expires_at'] ?? null,
             createdBy: $user->id,

@@ -19,7 +19,7 @@
                 <h2 class="text-xl font-semibold text-zinc-100">1. Information We Collect</h2>
                 <p class="mt-2">We collect the following data to operate the Service:</p>
                 <ul class="mt-2 list-disc pl-6 space-y-1">
-                    <li><strong>Account data:</strong> name, email, team membership</li>
+                    <li><strong>Account data:</strong> name, email</li>
                     <li><strong>Usage data:</strong> API request logs (model, tokens, latency, status), aggregated in usage ledgers</li>
                     <li><strong>Billing data:</strong> payment provider customer IDs, subscription status, invoice records</li>
                     <li><strong>Technical data:</strong> IP addresses (for security and IP allow-lists), user agent, trace IDs</li>
@@ -62,7 +62,7 @@
                 <p class="mt-2">You may:</p>
                 <ul class="mt-2 list-disc pl-6 space-y-1">
                     <li>Export your usage and billing data at any time via the dashboard</li>
-                    <li>Delete your team and associated data (request logs are deleted; billing records are retained for legal compliance)</li>
+                    <li>Delete your account and associated data (request logs are deleted; billing records are retained for legal compliance)</li>
                     <li>Revoke API keys at any time</li>
                     <li>Configure IP allow-lists to restrict API key usage</li>
                 </ul>

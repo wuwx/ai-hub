@@ -4,15 +4,15 @@ use App\Actions\ApiKeys\GenerateApiKey;
 use App\Models\ApiKey;
 use App\Models\LlmModel;
 use App\Models\LlmProvider;
+use App\Models\QuotaPolicy;
 use App\Models\RequestLog;
-use App\Models\TeamQuotaPolicy;
 use App\Models\User;
-use App\Notifications\Teams\AnomalousUsageDetected;
+use App\Notifications\AnomalousUsageDetected;
 use Carbon\CarbonInterface;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Notification;
 
-function seedRequestLogForApiKey(ApiKey $apiKey, int $teamId, int $statusCode, ?string $errorCode, ?CarbonInterface $at = null): void
+function seedRequestLogForApiKey(ApiKey $apiKey, int $userId, int $statusCode, ?string $errorCode, ?CarbonInterface $at = null): void
 {
     $at ??= now();
 
@@ -35,7 +35,7 @@ function seedRequestLogForApiKey(ApiKey $apiKey, int $teamId, int $statusCode, ?
     ]);
 
     RequestLog::create([
-        'team_id' => $teamId,
+        'user_id' => $userId,
         'api_key_id' => $apiKey->id,
         'llm_provider_id' => $provider->id,
         'llm_model_id' => $model->id,
@@ -58,10 +58,9 @@ it('skips keys whose request count is below the minimum threshold', function () 
     Cache::flush();
 
     $user = User::factory()->create();
-    $team = $user->currentTeam;
 
-    TeamQuotaPolicy::create([
-        'team_id' => $team->id,
+    QuotaPolicy::create([
+        'user_id' => $user->id,
         'daily_token_limit' => 100000,
         'monthly_token_limit' => 1000000,
         'effective_from' => now()->subDay(),
@@ -69,14 +68,14 @@ it('skips keys whose request count is below the minimum threshold', function () 
     ]);
 
     $apiKey = app(GenerateApiKey::class)->handle(
-        team: $team,
+        user: $user,
         name: 'Low Volume Key',
         createdBy: $user->id,
     )->apiKey;
 
     // Only 5 requests, below the default --min-requests=50.
     for ($i = 0; $i < 5; $i++) {
-        seedRequestLogForApiKey($apiKey, $team->id, 500, 'upstream_error');
+        seedRequestLogForApiKey($apiKey, $user->id, 500, 'upstream_error');
     }
 
     $this->artisan('gateway:detect-anomalous-usage', ['--min-requests' => 50])
@@ -86,15 +85,14 @@ it('skips keys whose request count is below the minimum threshold', function () 
     Notification::assertNothingSent();
 });
 
-it('flags high error rate keys and notifies the team owner', function () {
+it('flags high error rate keys and notifies the user', function () {
     Notification::fake();
     Cache::flush();
 
     $user = User::factory()->create();
-    $team = $user->currentTeam;
 
-    TeamQuotaPolicy::create([
-        'team_id' => $team->id,
+    QuotaPolicy::create([
+        'user_id' => $user->id,
         'daily_token_limit' => 100000,
         'monthly_token_limit' => 1000000,
         'effective_from' => now()->subDay(),
@@ -102,14 +100,14 @@ it('flags high error rate keys and notifies the team owner', function () {
     ]);
 
     $apiKey = app(GenerateApiKey::class)->handle(
-        team: $team,
+        user: $user,
         name: 'Failing Key',
         createdBy: $user->id,
     )->apiKey;
 
     // 60 requests, all 500s -> 100% error rate.
     for ($i = 0; $i < 60; $i++) {
-        seedRequestLogForApiKey($apiKey, $team->id, 500, 'upstream_error');
+        seedRequestLogForApiKey($apiKey, $user->id, 500, 'upstream_error');
     }
 
     $this->artisan('gateway:detect-anomalous-usage', [
@@ -119,7 +117,7 @@ it('flags high error rate keys and notifies the team owner', function () {
         ->assertSuccessful()
         ->expectsOutputToContain('Anomaly scan complete: 1 API key(s) flagged, 0 duplicate(s) suppressed.');
 
-    Notification::assertSentTo($team->owner(), AnomalousUsageDetected::class);
+    Notification::assertSentTo($user, AnomalousUsageDetected::class);
 });
 
 it('suppresses duplicate alerts for the same key within the dedupe window', function () {
@@ -127,10 +125,9 @@ it('suppresses duplicate alerts for the same key within the dedupe window', func
     Cache::flush();
 
     $user = User::factory()->create();
-    $team = $user->currentTeam;
 
-    TeamQuotaPolicy::create([
-        'team_id' => $team->id,
+    QuotaPolicy::create([
+        'user_id' => $user->id,
         'daily_token_limit' => 100000,
         'monthly_token_limit' => 1000000,
         'effective_from' => now()->subDay(),
@@ -138,13 +135,13 @@ it('suppresses duplicate alerts for the same key within the dedupe window', func
     ]);
 
     $apiKey = app(GenerateApiKey::class)->handle(
-        team: $team,
+        user: $user,
         name: 'Repeat Key',
         createdBy: $user->id,
     )->apiKey;
 
     for ($i = 0; $i < 60; $i++) {
-        seedRequestLogForApiKey($apiKey, $team->id, 500, 'upstream_error');
+        seedRequestLogForApiKey($apiKey, $user->id, 500, 'upstream_error');
     }
 
     $this->artisan('gateway:detect-anomalous-usage', ['--min-requests' => 50, '--error-rate' => 50])
@@ -165,10 +162,9 @@ it('ignores keys whose error rate is below the threshold', function () {
     Cache::flush();
 
     $user = User::factory()->create();
-    $team = $user->currentTeam;
 
-    TeamQuotaPolicy::create([
-        'team_id' => $team->id,
+    QuotaPolicy::create([
+        'user_id' => $user->id,
         'daily_token_limit' => 100000,
         'monthly_token_limit' => 1000000,
         'effective_from' => now()->subDay(),
@@ -176,14 +172,14 @@ it('ignores keys whose error rate is below the threshold', function () {
     ]);
 
     $apiKey = app(GenerateApiKey::class)->handle(
-        team: $team,
+        user: $user,
         name: 'Healthy Key',
         createdBy: $user->id,
     )->apiKey;
 
     // 60 successful requests — 0% error rate.
     for ($i = 0; $i < 60; $i++) {
-        seedRequestLogForApiKey($apiKey, $team->id, 200, null);
+        seedRequestLogForApiKey($apiKey, $user->id, 200, null);
     }
 
     $this->artisan('gateway:detect-anomalous-usage', ['--min-requests' => 50, '--error-rate' => 50])
@@ -197,7 +193,7 @@ it('renders the anomaly notification mail and array payloads', function () {
     $user = User::factory()->create();
 
     $notification = new AnomalousUsageDetected(
-        teamName: 'Acme Team',
+        userName: 'Acme User',
         apiKeyName: 'prod-key',
         requestCount: 120,
         errorCount: 90,
@@ -208,12 +204,12 @@ it('renders the anomaly notification mail and array payloads', function () {
     $mail = $notification->toMail($user);
     $rendered = (string) $mail->render();
 
-    expect($mail->subject)->toBe('Anomalous usage detected for Acme Team');
+    expect($mail->subject)->toBe('Anomalous usage detected for Acme User');
     expect($rendered)->toContain('prod-key')
         ->toContain('Errors: 90 / 120');
 
     expect($notification->toArray($user))->toBe([
-        'team_name' => 'Acme Team',
+        'user_name' => 'Acme User',
         'api_key_name' => 'prod-key',
         'request_count' => 120,
         'error_count' => 90,

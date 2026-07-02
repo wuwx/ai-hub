@@ -16,8 +16,8 @@ class RequestLogForm
         return $schema
             ->components([
                 TextInput::make('trace_id'),
-                Select::make('team_id')
-                    ->relationship('team', 'name')
+                Select::make('user_id')
+                    ->relationship('user', 'name')
                     ->required(),
                 Select::make('api_key_id')
                     ->relationship('apiKey', 'name'),

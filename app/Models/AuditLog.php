@@ -8,7 +8,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\MorphTo;
 
 #[Fillable([
-    'team_id',
+    'user_id',
     'actor_id',
     'action',
     'subject_type',
@@ -20,11 +20,11 @@ use Illuminate\Database\Eloquent\Relations\MorphTo;
 class AuditLog extends Model
 {
     /**
-     * @return BelongsTo<Team, $this>
+     * @return BelongsTo<User, $this>
      */
-    public function team(): BelongsTo
+    public function user(): BelongsTo
     {
-        return $this->belongsTo(Team::class);
+        return $this->belongsTo(User::class);
     }
 
     /**

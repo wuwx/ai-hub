@@ -4,10 +4,9 @@ use App\Models\User;
 
 it('displays the playground page for authenticated users', function () {
     $user = User::factory()->create();
-    $team = $user->currentTeam;
 
     $response = $this->actingAs($user)
-        ->get("/{$team->slug}/playground");
+        ->get('/playground');
 
     $response->assertOk();
     $response->assertSee('Playground');
@@ -15,29 +14,14 @@ it('displays the playground page for authenticated users', function () {
 });
 
 it('requires authentication', function () {
-    $user = User::factory()->create();
-    $team = $user->currentTeam;
-
-    $this->get("/{$team->slug}/playground")->assertRedirect('/login');
+    $this->get('/playground')->assertRedirect('/login');
 });
 
-it('requires team membership', function () {
-    $owner = User::factory()->create();
-    $team = $owner->currentTeam;
-
-    $otherUser = User::factory()->create();
-
-    $this->actingAs($otherUser)
-        ->get("/{$team->slug}/playground")
-        ->assertForbidden();
-});
-
-it('shows available models for the team', function () {
+it('shows available models for the user', function () {
     $user = User::factory()->create();
-    $team = $user->currentTeam;
 
     $response = $this->actingAs($user)
-        ->get("/{$team->slug}/playground");
+        ->get('/playground');
 
     $response->assertOk();
     // The page should contain the model select dropdown

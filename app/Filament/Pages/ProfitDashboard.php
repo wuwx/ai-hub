@@ -4,8 +4,8 @@ namespace App\Filament\Pages;
 
 use App\Actions\Billing\ResolveModelPricing;
 use App\Models\LlmModel;
+use App\Models\QuotaPolicy;
 use App\Models\RequestLog;
-use App\Models\TeamQuotaPolicy;
 use BackedEnum;
 use Carbon\CarbonInterface;
 use Filament\Pages\Page;
@@ -28,12 +28,12 @@ class ProfitDashboard extends Page
     public static function canAccess(): bool
     {
         // Only admin panel users (Filament admin) can view the profit dashboard.
-        // This is separate from team-level permissions — it shows cross-team financials.
+        // This is the admin panel — it shows cross-user financials.
         return true;
     }
 
     /**
-     * @return array{totals: array<string, mixed>, byModel: array<int, array<string, mixed>>, byTeam: array<int, array<string, mixed>>}
+     * @return array{totals: array<string, mixed>, byModel: array<int, array<string, mixed>>, byUser: array<int, array<string, mixed>>}
      */
     protected function getViewData(): array
     {
@@ -43,14 +43,14 @@ class ProfitDashboard extends Page
         return [
             'totals' => $this->getTotals($monthStart, $monthEnd),
             'byModel' => $this->getByModel($monthStart, $monthEnd),
-            'byTeam' => $this->getByTeam($monthStart, $monthEnd),
+            'byUser' => $this->getByUser($monthStart, $monthEnd),
         ];
     }
 
     /**
-     * Revenue is the flat monthly subscription fee for each team's active
+     * Revenue is the flat monthly subscription fee for each user's active
      * plan (real MRR, driven by Stripe subscriptions synced into
-     * TeamQuotaPolicy). Cost is the upstream LLM spend incurred this month.
+     * QuotaPolicy). Cost is the upstream LLM spend incurred this month.
      * There is no more per-request metered billing, so profit here reflects
      * subscription income against infrastructure cost, not per-token margin.
      *
@@ -77,21 +77,21 @@ class ProfitDashboard extends Page
             'cost_cents' => $costCents,
             'profit_cents' => $profitCents,
             'margin_pct' => $marginPct,
-            'active_paid_teams' => (int) $planCounts->except($freeCode)->sum(),
-            'free_teams' => (int) $planCounts->get($freeCode, 0),
+            'active_paid_users' => (int) $planCounts->except($freeCode)->sum(),
+            'free_users' => (int) $planCounts->get($freeCode, 0),
         ];
     }
 
     /**
-     * @return Collection<string, int> team count keyed by plan code
+     * @return Collection<string, int> user count keyed by plan code
      */
     protected function activePlanCounts(): Collection
     {
-        return TeamQuotaPolicy::query()
+        return QuotaPolicy::query()
             ->where('is_active', true)
-            ->selectRaw('plan_code, COUNT(*) as team_count')
+            ->selectRaw('plan_code, COUNT(*) as user_count')
             ->groupBy('plan_code')
-            ->pluck('team_count', 'plan_code');
+            ->pluck('user_count', 'plan_code');
     }
 
     /**
@@ -102,10 +102,10 @@ class ProfitDashboard extends Page
         $plans = (array) config('services.billing.plans', []);
         $revenueCents = 0;
 
-        foreach ($planCounts as $planCode => $teamCount) {
+        foreach ($planCounts as $planCode => $userCount) {
             $revenueCents +=
                 (int) ($plans[$planCode]['monthly_price_cents'] ?? 0) *
-                $teamCount;
+                $userCount;
         }
 
         return $revenueCents;
@@ -166,9 +166,9 @@ class ProfitDashboard extends Page
     }
 
     /**
-     * @return array<int, array{team_name: string, plan_code: string, request_count: int, revenue_cents: int, cost_cents: int, profit_cents: int}>
+     * @return array<int, array{user_name: string, plan_code: string, request_count: int, revenue_cents: int, cost_cents: int, profit_cents: int}>
      */
-    protected function getByTeam(
+    protected function getByUser(
         CarbonInterface $monthStart,
         CarbonInterface $monthEnd,
     ): array {
@@ -176,27 +176,27 @@ class ProfitDashboard extends Page
         $freeCode = (string) config('services.billing.free_plan_code', 'free');
         $resolver = app(ResolveModelPricing::class);
 
-        $policies = TeamQuotaPolicy::query()
+        $policies = QuotaPolicy::query()
             ->where('is_active', true)
-            ->with('team')
+            ->with('user')
             ->get()
-            ->keyBy('team_id');
+            ->keyBy('user_id');
 
         $usageRows = RequestLog::query()
             ->whereBetween('requested_at', [$monthStart, $monthEnd])
             ->selectRaw(
-                'team_id, llm_model_id, SUM(token_input) as token_input, SUM(token_output) as token_output, COUNT(*) as request_count',
+                'user_id, llm_model_id, SUM(token_input) as token_input, SUM(token_output) as token_output, COUNT(*) as request_count',
             )
-            ->groupBy('team_id', 'llm_model_id')
+            ->groupBy('user_id', 'llm_model_id')
             ->get()
-            ->groupBy('team_id');
+            ->groupBy('user_id');
 
         $models = LlmModel::query()->get()->keyBy('id');
 
-        $byTeam = [];
+        $byUser = [];
 
-        foreach ($usageRows as $teamId => $rows) {
-            $policy = $policies->get($teamId);
+        foreach ($usageRows as $userId => $rows) {
+            $policy = $policies->get($userId);
             $planCode = $policy->plan_code ?? $freeCode;
 
             $costCents = 0;
@@ -219,8 +219,8 @@ class ProfitDashboard extends Page
             $revenueCents =
                 (int) ($plans[$planCode]['monthly_price_cents'] ?? 0);
 
-            $byTeam[] = [
-                'team_name' => $policy?->team?->name ?? "Team #{$teamId}",
+            $byUser[] = [
+                'user_name' => $policy?->user?->name ?? "User #{$userId}",
                 'plan_code' => $planCode,
                 'request_count' => $requestCount,
                 'revenue_cents' => $revenueCents,
@@ -229,7 +229,7 @@ class ProfitDashboard extends Page
             ];
         }
 
-        return collect($byTeam)
+        return collect($byUser)
             ->sortByDesc('profit_cents')
             ->values()
             ->toArray();

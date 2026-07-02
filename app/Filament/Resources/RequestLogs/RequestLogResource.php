@@ -2,12 +2,10 @@
 
 namespace App\Filament\Resources\RequestLogs;
 
-use App\Enums\TeamPermission;
 use App\Filament\Resources\RequestLogs\Pages\ListRequestLogs;
 use App\Filament\Resources\RequestLogs\Schemas\RequestLogForm;
 use App\Filament\Resources\RequestLogs\Tables\RequestLogsTable;
 use App\Models\RequestLog;
-use App\Models\User;
 use BackedEnum;
 use Filament\Resources\Resource;
 use Filament\Schemas\Schema;
@@ -27,7 +25,7 @@ class RequestLogResource extends Resource
 
     public static function canViewAny(): bool
     {
-        return static::canViewUsage();
+        return Auth::check();
     }
 
     public static function canCreate(): bool
@@ -71,23 +69,10 @@ class RequestLogResource extends Resource
 
     public static function getEloquentQuery(): Builder
     {
-        $teamId = Auth::user()?->current_team_id;
+        $userId = Auth::id();
 
         return parent::getEloquentQuery()
-            ->when($teamId, fn (Builder $query) => $query->where('team_id', $teamId))
-            ->when(! $teamId, fn (Builder $query) => $query->whereRaw('1 = 0'));
-    }
-
-    protected static function canViewUsage(): bool
-    {
-        /** @var User|null $user */
-        $user = Auth::user();
-        $team = $user?->currentTeam;
-
-        if (! $user || ! $team) {
-            return false;
-        }
-
-        return $user->hasTeamPermission($team, TeamPermission::ViewUsage);
+            ->when($userId, fn (Builder $query) => $query->where('user_id', $userId))
+            ->when(! $userId, fn (Builder $query) => $query->whereRaw('1 = 0'));
     }
 }

@@ -1,10 +1,10 @@
 <?php
 
 use App\Actions\Usage\CheckQuotaThresholds;
-use App\Models\TeamQuotaPolicy;
+use App\Models\QuotaPolicy;
 use App\Models\UsageLedger;
 use App\Models\User;
-use App\Notifications\Teams\QuotaThresholdExceeded;
+use App\Notifications\QuotaThresholdExceeded;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Notification;
 
@@ -13,10 +13,9 @@ it('sends a notification when daily usage crosses the alert threshold', function
     Cache::flush();
 
     $user = User::factory()->create();
-    $team = $user->currentTeam;
 
-    TeamQuotaPolicy::create([
-        'team_id' => $team->id,
+    QuotaPolicy::create([
+        'user_id' => $user->id,
         'daily_token_limit' => 1000,
         'daily_alert_threshold' => 80,
         'monthly_token_limit' => 10000,
@@ -26,7 +25,7 @@ it('sends a notification when daily usage crosses the alert threshold', function
     ]);
 
     UsageLedger::create([
-        'team_id' => $team->id,
+        'user_id' => $user->id,
         'bucket_date' => now()->toDateString(),
         'bucket_type' => 'day',
         'token_total' => 850,
@@ -36,7 +35,7 @@ it('sends a notification when daily usage crosses the alert threshold', function
         'error_count' => 0,
     ]);
 
-    app(CheckQuotaThresholds::class)->handle($team);
+    app(CheckQuotaThresholds::class)->handle($user);
 
     Notification::assertSentTo($user, QuotaThresholdExceeded::class);
 });
@@ -46,10 +45,9 @@ it('does not send a notification when usage is below the threshold', function ()
     Cache::flush();
 
     $user = User::factory()->create();
-    $team = $user->currentTeam;
 
-    TeamQuotaPolicy::create([
-        'team_id' => $team->id,
+    QuotaPolicy::create([
+        'user_id' => $user->id,
         'daily_token_limit' => 1000,
         'daily_alert_threshold' => 80,
         'monthly_token_limit' => 10000,
@@ -59,7 +57,7 @@ it('does not send a notification when usage is below the threshold', function ()
     ]);
 
     UsageLedger::create([
-        'team_id' => $team->id,
+        'user_id' => $user->id,
         'bucket_date' => now()->toDateString(),
         'bucket_type' => 'day',
         'token_total' => 500,
@@ -69,7 +67,7 @@ it('does not send a notification when usage is below the threshold', function ()
         'error_count' => 0,
     ]);
 
-    app(CheckQuotaThresholds::class)->handle($team);
+    app(CheckQuotaThresholds::class)->handle($user);
 
     Notification::assertNothingSent();
 });
@@ -79,10 +77,9 @@ it('does not send duplicate notifications within the same period', function () {
     Cache::flush();
 
     $user = User::factory()->create();
-    $team = $user->currentTeam;
 
-    TeamQuotaPolicy::create([
-        'team_id' => $team->id,
+    QuotaPolicy::create([
+        'user_id' => $user->id,
         'daily_token_limit' => 1000,
         'daily_alert_threshold' => 80,
         'monthly_token_limit' => 10000,
@@ -92,7 +89,7 @@ it('does not send duplicate notifications within the same period', function () {
     ]);
 
     UsageLedger::create([
-        'team_id' => $team->id,
+        'user_id' => $user->id,
         'bucket_date' => now()->toDateString(),
         'bucket_type' => 'day',
         'token_total' => 900,
@@ -102,8 +99,8 @@ it('does not send duplicate notifications within the same period', function () {
         'error_count' => 0,
     ]);
 
-    app(CheckQuotaThresholds::class)->handle($team);
-    app(CheckQuotaThresholds::class)->handle($team);
+    app(CheckQuotaThresholds::class)->handle($user);
+    app(CheckQuotaThresholds::class)->handle($user);
 
     Notification::assertSentTo($user, QuotaThresholdExceeded::class, 1);
 });
@@ -113,10 +110,9 @@ it('sends a monthly threshold notification independently from the daily one', fu
     Cache::flush();
 
     $user = User::factory()->create();
-    $team = $user->currentTeam;
 
-    TeamQuotaPolicy::create([
-        'team_id' => $team->id,
+    QuotaPolicy::create([
+        'user_id' => $user->id,
         'daily_token_limit' => 10000,
         'daily_alert_threshold' => 90,
         'monthly_token_limit' => 1000,
@@ -126,7 +122,7 @@ it('sends a monthly threshold notification independently from the daily one', fu
     ]);
 
     UsageLedger::create([
-        'team_id' => $team->id,
+        'user_id' => $user->id,
         'bucket_date' => now()->startOfMonth()->toDateString(),
         'bucket_type' => 'month',
         'token_total' => 850,
@@ -136,7 +132,7 @@ it('sends a monthly threshold notification independently from the daily one', fu
         'error_count' => 0,
     ]);
 
-    app(CheckQuotaThresholds::class)->handle($team);
+    app(CheckQuotaThresholds::class)->handle($user);
 
     Notification::assertSentTo($user, QuotaThresholdExceeded::class, function (QuotaThresholdExceeded $notification) {
         return $notification->period === 'monthly';
@@ -149,7 +145,7 @@ it('does nothing when no active quota policy exists', function () {
 
     $user = User::factory()->create();
 
-    app(CheckQuotaThresholds::class)->handle($user->currentTeam);
+    app(CheckQuotaThresholds::class)->handle($user);
 
     Notification::assertNothingSent();
 });

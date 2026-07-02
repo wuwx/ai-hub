@@ -6,17 +6,16 @@ use App\Models\LlmModel;
 use App\Models\LlmProvider;
 use App\Models\PlanModelEntitlement;
 use App\Models\PlanProviderEntitlement;
-use App\Models\TeamQuotaPolicy;
+use App\Models\QuotaPolicy;
 use App\Models\User;
 use Illuminate\Support\Facades\Http;
 
-function provisionScopedKeyForTeam(array $allowedModels = []): array
+function provisionScopedKey(array $allowedModels = []): array
 {
     $user = User::factory()->create();
-    $team = $user->currentTeam;
 
-    TeamQuotaPolicy::create([
-        'team_id' => $team->id,
+    QuotaPolicy::create([
+        'user_id' => $user->id,
         'plan_code' => 'free',
         'daily_token_limit' => 100000,
         'monthly_token_limit' => 1000000,
@@ -68,7 +67,7 @@ function provisionScopedKeyForTeam(array $allowedModels = []): array
     }
 
     $apiKeyResult = app(GenerateApiKey::class)->handle(
-        team: $team,
+        user: $user,
         name: 'Scoped Key',
         createdBy: $user->id,
     );
@@ -83,7 +82,7 @@ function provisionScopedKeyForTeam(array $allowedModels = []): array
 }
 
 it('allows requests to models in the key allow-list', function () {
-    [$plainTextKey, $allowedModel] = provisionScopedKeyForTeam(['gpt-a']);
+    [$plainTextKey, $allowedModel] = provisionScopedKey(['gpt-a']);
 
     Http::fake([
         'https://openai.mock/v1/chat/completions' => Http::response([
@@ -103,7 +102,7 @@ it('allows requests to models in the key allow-list', function () {
 });
 
 it('rejects requests to models outside the key allow-list', function () {
-    [$plainTextKey] = provisionScopedKeyForTeam(['gpt-a']);
+    [$plainTextKey] = provisionScopedKey(['gpt-a']);
 
     Http::fake();
 
@@ -118,7 +117,7 @@ it('rejects requests to models outside the key allow-list', function () {
 });
 
 it('allows all entitled models when the allow-list is empty', function () {
-    [$plainTextKey, , $modelB] = provisionScopedKeyForTeam([]);
+    [$plainTextKey, , $modelB] = provisionScopedKey([]);
 
     Http::fake([
         'https://openai.mock/v1/chat/completions' => Http::response([

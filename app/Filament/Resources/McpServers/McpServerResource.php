@@ -2,14 +2,12 @@
 
 namespace App\Filament\Resources\McpServers;
 
-use App\Enums\TeamPermission;
 use App\Filament\Resources\McpServers\Pages\CreateMcpServer;
 use App\Filament\Resources\McpServers\Pages\EditMcpServer;
 use App\Filament\Resources\McpServers\Pages\ListMcpServers;
 use App\Filament\Resources\McpServers\Schemas\McpServerForm;
 use App\Filament\Resources\McpServers\Tables\McpServersTable;
 use App\Models\McpServer;
-use App\Models\User;
 use BackedEnum;
 use Filament\Resources\Resource;
 use Filament\Schemas\Schema;
@@ -74,14 +72,6 @@ class McpServerResource extends Resource
 
     protected static function canManageGatewayConfiguration(): bool
     {
-        /** @var User|null $user */
-        $user = Auth::user();
-        $team = $user?->currentTeam;
-
-        if (! $user || ! $team) {
-            return false;
-        }
-
-        return $user->hasTeamPermission($team, TeamPermission::ManageGatewayConfig);
+        return Auth::check();
     }
 }

@@ -7,7 +7,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 #[Fillable([
-    'team_webhook_endpoint_id',
+    'webhook_endpoint_id',
     'event',
     'payload',
     'response_status_code',
@@ -21,11 +21,11 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 class WebhookDelivery extends Model
 {
     /**
-     * @return BelongsTo<TeamWebhookEndpoint, $this>
+     * @return BelongsTo<WebhookEndpoint, $this>
      */
     public function endpoint(): BelongsTo
     {
-        return $this->belongsTo(TeamWebhookEndpoint::class, 'team_webhook_endpoint_id');
+        return $this->belongsTo(WebhookEndpoint::class, 'webhook_endpoint_id');
     }
 
     /**

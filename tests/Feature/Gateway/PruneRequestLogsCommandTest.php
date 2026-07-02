@@ -5,11 +5,10 @@ use App\Models\User;
 
 it('deletes request logs older than the specified retention window', function () {
     $user = User::factory()->create();
-    $team = $user->currentTeam;
 
     $oldLog = RequestLog::create([
         'trace_id' => 'trace_old',
-        'team_id' => $team->id,
+        'user_id' => $user->id,
         'protocol' => 'openai',
         'endpoint' => '/v1/chat/completions',
         'http_method' => 'POST',
@@ -25,7 +24,7 @@ it('deletes request logs older than the specified retention window', function ()
 
     $recentLog = RequestLog::create([
         'trace_id' => 'trace_recent',
-        'team_id' => $team->id,
+        'user_id' => $user->id,
         'protocol' => 'openai',
         'endpoint' => '/v1/chat/completions',
         'http_method' => 'POST',
@@ -49,11 +48,10 @@ it('deletes request logs older than the specified retention window', function ()
 
 it('supports a custom retention window via the days option', function () {
     $user = User::factory()->create();
-    $team = $user->currentTeam;
 
     $tenDayOldLog = RequestLog::create([
         'trace_id' => 'trace_10',
-        'team_id' => $team->id,
+        'user_id' => $user->id,
         'protocol' => 'openai',
         'endpoint' => '/v1/chat/completions',
         'http_method' => 'POST',
@@ -69,7 +67,7 @@ it('supports a custom retention window via the days option', function () {
 
     $threeDayOldLog = RequestLog::create([
         'trace_id' => 'trace_3',
-        'team_id' => $team->id,
+        'user_id' => $user->id,
         'protocol' => 'openai',
         'endpoint' => '/v1/chat/completions',
         'http_method' => 'POST',
@@ -92,11 +90,10 @@ it('supports a custom retention window via the days option', function () {
 
 it('does not delete anything in dry-run mode', function () {
     $user = User::factory()->create();
-    $team = $user->currentTeam;
 
     $oldLog = RequestLog::create([
         'trace_id' => 'trace_old',
-        'team_id' => $team->id,
+        'user_id' => $user->id,
         'protocol' => 'openai',
         'endpoint' => '/v1/chat/completions',
         'http_method' => 'POST',

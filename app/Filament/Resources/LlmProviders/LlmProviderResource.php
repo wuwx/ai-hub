@@ -2,14 +2,12 @@
 
 namespace App\Filament\Resources\LlmProviders;
 
-use App\Enums\TeamPermission;
 use App\Filament\Resources\LlmProviders\Pages\CreateLlmProvider;
 use App\Filament\Resources\LlmProviders\Pages\EditLlmProvider;
 use App\Filament\Resources\LlmProviders\Pages\ListLlmProviders;
 use App\Filament\Resources\LlmProviders\Schemas\LlmProviderForm;
 use App\Filament\Resources\LlmProviders\Tables\LlmProvidersTable;
 use App\Models\LlmProvider;
-use App\Models\User;
 use BackedEnum;
 use Filament\Resources\Resource;
 use Filament\Schemas\Schema;
@@ -74,14 +72,6 @@ class LlmProviderResource extends Resource
 
     protected static function canManageGatewayConfiguration(): bool
     {
-        /** @var User|null $user */
-        $user = Auth::user();
-        $team = $user?->currentTeam;
-
-        if (! $user || ! $team) {
-            return false;
-        }
-
-        return $user->hasTeamPermission($team, TeamPermission::ManageGatewayConfig);
+        return Auth::check();
     }
 }

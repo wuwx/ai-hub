@@ -1,17 +1,16 @@
 <?php
 
 use App\Actions\Webhooks\DispatchWebhookEvent;
-use App\Models\TeamWebhookEndpoint;
 use App\Models\User;
+use App\Models\WebhookEndpoint;
 use Illuminate\Http\Client\Request as HttpRequest;
 use Illuminate\Support\Facades\Http;
 
-it('dispatches a webhook event to all active endpoints for a team', function () {
+it('dispatches a webhook event to all active endpoints for a user', function () {
     $user = User::factory()->create();
-    $team = $user->currentTeam;
 
-    TeamWebhookEndpoint::create([
-        'team_id' => $team->id,
+    WebhookEndpoint::create([
+        'user_id' => $user->id,
         'url' => 'https://customer.example.com/webhooks',
         'is_active' => true,
     ]);
@@ -20,7 +19,7 @@ it('dispatches a webhook event to all active endpoints for a team', function () 
         'https://customer.example.com/webhooks' => Http::response([], 200),
     ]);
 
-    app(DispatchWebhookEvent::class)->handle($team, 'quota.threshold_exceeded', [
+    app(DispatchWebhookEvent::class)->handle($user, 'quota.threshold_exceeded', [
         'period' => 'daily',
         'used' => 8000,
         'limit' => 10000,
@@ -38,10 +37,9 @@ it('dispatches a webhook event to all active endpoints for a team', function () 
 
 it('includes an HMAC signature in the webhook header', function () {
     $user = User::factory()->create();
-    $team = $user->currentTeam;
 
-    $endpoint = TeamWebhookEndpoint::create([
-        'team_id' => $team->id,
+    $endpoint = WebhookEndpoint::create([
+        'user_id' => $user->id,
         'url' => 'https://customer.example.com/webhooks',
         'secret' => 'test-secret',
         'is_active' => true,
@@ -51,7 +49,7 @@ it('includes an HMAC signature in the webhook header', function () {
         'https://customer.example.com/webhooks' => Http::response([], 200),
     ]);
 
-    app(DispatchWebhookEvent::class)->handle($team, 'test.event', ['foo' => 'bar']);
+    app(DispatchWebhookEvent::class)->handle($user, 'test.event', ['foo' => 'bar']);
 
     Http::assertSent(function (HttpRequest $request) {
         $expectedSignature = 'sha256='.hash_hmac('sha256', $request->body(), 'test-secret');
@@ -62,34 +60,32 @@ it('includes an HMAC signature in the webhook header', function () {
 
 it('does not send webhooks to inactive endpoints', function () {
     $user = User::factory()->create();
-    $team = $user->currentTeam;
 
-    TeamWebhookEndpoint::create([
-        'team_id' => $team->id,
+    WebhookEndpoint::create([
+        'user_id' => $user->id,
         'url' => 'https://inactive.example.com/webhooks',
         'is_active' => false,
     ]);
 
     Http::fake();
 
-    app(DispatchWebhookEvent::class)->handle($team, 'test.event');
+    app(DispatchWebhookEvent::class)->handle($user, 'test.event');
 
     Http::assertNothingSent();
 });
 
 it('respects event subscriptions when filtering endpoints', function () {
     $user = User::factory()->create();
-    $team = $user->currentTeam;
 
-    $matchingEndpoint = TeamWebhookEndpoint::create([
-        'team_id' => $team->id,
+    $matchingEndpoint = WebhookEndpoint::create([
+        'user_id' => $user->id,
         'url' => 'https://matching.example.com/webhooks',
         'events' => ['invoice.overdue'],
         'is_active' => true,
     ]);
 
-    $nonMatchingEndpoint = TeamWebhookEndpoint::create([
-        'team_id' => $team->id,
+    $nonMatchingEndpoint = WebhookEndpoint::create([
+        'user_id' => $user->id,
         'url' => 'https://non-matching.example.com/webhooks',
         'events' => ['wallet.balance_low'],
         'is_active' => true,
@@ -100,7 +96,7 @@ it('respects event subscriptions when filtering endpoints', function () {
         'https://non-matching.example.com/webhooks' => Http::response([], 200),
     ]);
 
-    app(DispatchWebhookEvent::class)->handle($team, 'invoice.overdue', [
+    app(DispatchWebhookEvent::class)->handle($user, 'invoice.overdue', [
         'invoice_number' => 'INV-001',
     ]);
 
@@ -115,10 +111,9 @@ it('respects event subscriptions when filtering endpoints', function () {
 
 it('sends to all events when events list is empty', function () {
     $user = User::factory()->create();
-    $team = $user->currentTeam;
 
-    TeamWebhookEndpoint::create([
-        'team_id' => $team->id,
+    WebhookEndpoint::create([
+        'user_id' => $user->id,
         'url' => 'https://all-events.example.com/webhooks',
         'events' => null,
         'is_active' => true,
@@ -128,7 +123,7 @@ it('sends to all events when events list is empty', function () {
         'https://all-events.example.com/webhooks' => Http::response([], 200),
     ]);
 
-    app(DispatchWebhookEvent::class)->handle($team, 'any.event', ['key' => 'value']);
+    app(DispatchWebhookEvent::class)->handle($user, 'any.event', ['key' => 'value']);
 
     Http::assertSent(function (HttpRequest $request) {
         return $request->url() === 'https://all-events.example.com/webhooks';
@@ -137,10 +132,9 @@ it('sends to all events when events list is empty', function () {
 
 it('resets failure count on successful delivery', function () {
     $user = User::factory()->create();
-    $team = $user->currentTeam;
 
-    $endpoint = TeamWebhookEndpoint::create([
-        'team_id' => $team->id,
+    $endpoint = WebhookEndpoint::create([
+        'user_id' => $user->id,
         'url' => 'https://recovery.example.com/webhooks',
         'is_active' => true,
         'failure_count' => 5,
@@ -150,17 +144,16 @@ it('resets failure count on successful delivery', function () {
         'https://recovery.example.com/webhooks' => Http::response([], 200),
     ]);
 
-    app(DispatchWebhookEvent::class)->handle($team, 'test.event');
+    app(DispatchWebhookEvent::class)->handle($user, 'test.event');
 
     expect($endpoint->fresh()->failure_count)->toBe(0);
 });
 
 it('increments failure count and auto-disables after 10 failures', function () {
     $user = User::factory()->create();
-    $team = $user->currentTeam;
 
-    $endpoint = TeamWebhookEndpoint::create([
-        'team_id' => $team->id,
+    $endpoint = WebhookEndpoint::create([
+        'user_id' => $user->id,
         'url' => 'https://failing.example.com/webhooks',
         'is_active' => true,
         'failure_count' => 9,
@@ -170,7 +163,7 @@ it('increments failure count and auto-disables after 10 failures', function () {
         'https://failing.example.com/webhooks' => Http::response([], 500),
     ]);
 
-    app(DispatchWebhookEvent::class)->handle($team, 'test.event');
+    app(DispatchWebhookEvent::class)->handle($user, 'test.event');
 
     $endpoint->refresh();
 
@@ -180,10 +173,9 @@ it('increments failure count and auto-disables after 10 failures', function () {
 
 it('auto-generates a secret when not provided', function () {
     $user = User::factory()->create();
-    $team = $user->currentTeam;
 
-    $endpoint = TeamWebhookEndpoint::create([
-        'team_id' => $team->id,
+    $endpoint = WebhookEndpoint::create([
+        'user_id' => $user->id,
         'url' => 'https://auto-secret.example.com/webhooks',
         'is_active' => true,
     ]);

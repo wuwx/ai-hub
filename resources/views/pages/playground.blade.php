@@ -1,8 +1,7 @@
 <?php
 
 use App\Models\LlmModel;
-use App\Models\Team;
-use App\Models\TeamQuotaPolicy;
+use App\Models\QuotaPolicy;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Http;
 use Livewire\Attributes\Computed;
@@ -34,23 +33,15 @@ new #[Title('Playground')] class extends Component
     public ?array $usage = null;
 
     #[Computed]
-    public function team(): ?Team
-    {
-        return Auth::user()?->currentTeam;
-    }
-
-    /**
-     * @return array<int, array{value: string, label: string}>
-     */
-    #[Computed]
     public function availableModels(): array
     {
-        if (! $this->team) {
+        $user = Auth::user();
+        if (! $user) {
             return [];
         }
 
-        $planCode = TeamQuotaPolicy::query()
-            ->where('team_id', $this->team->id)
+        $planCode = QuotaPolicy::query()
+            ->where('user_id', $user->id)
             ->where('is_active', true)
             ->orderByDesc('effective_from')
             ->value('plan_code');
@@ -97,7 +88,7 @@ new #[Title('Playground')] class extends Component
         $this->latencyMs = null;
         $this->usage = null;
 
-        $apiKey = $this->team?->apiKeys()
+        $apiKey = Auth::user()?->apiKeys()
             ->whereNull('revoked_at')
             ->where(function ($query) {
                 $query->whereNull('expires_at')->orWhere('expires_at', '>', now());

@@ -5,14 +5,14 @@ use App\Models\LlmModel;
 use App\Models\LlmProvider;
 use App\Models\PlanModelEntitlement;
 use App\Models\PlanProviderEntitlement;
-use App\Models\TeamQuotaPolicy;
+use App\Models\QuotaPolicy;
 use App\Models\User;
 use Illuminate\Http\Client\Request as HttpRequest;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 
 it('converts openai request/response when upstream provider is anthropic compatible', function () {
-    [$plainTextKey, $modelExternalId] = provisionGatewayTargetForTeam('anthropic_compatible', 'claude-3-7-sonnet');
+    [$plainTextKey, $modelExternalId] = provisionGatewayTarget('anthropic_compatible', 'claude-3-7-sonnet');
 
     Http::fake([
         'https://anthropic.mock/v1/messages' => function (HttpRequest $request) {
@@ -49,7 +49,7 @@ it('converts openai request/response when upstream provider is anthropic compati
 });
 
 it('converts anthropic request/response when upstream provider is openai compatible', function () {
-    [$plainTextKey, $modelExternalId] = provisionGatewayTargetForTeam('openai_compatible', 'gpt-4.1');
+    [$plainTextKey, $modelExternalId] = provisionGatewayTarget('openai_compatible', 'gpt-4.1');
 
     Http::fake([
         'https://openai.mock/v1/chat/completions' => function (HttpRequest $request) {
@@ -95,7 +95,7 @@ it('converts anthropic request/response when upstream provider is openai compati
 });
 
 it('replays cached idempotent responses without hitting upstream again', function () {
-    [$plainTextKey, $modelExternalId] = provisionGatewayTargetForTeam('openai_compatible', 'gpt-4.1');
+    [$plainTextKey, $modelExternalId] = provisionGatewayTarget('openai_compatible', 'gpt-4.1');
 
     $upstreamCalls = 0;
 
@@ -147,7 +147,7 @@ it('replays cached idempotent responses without hitting upstream again', functio
 });
 
 it('returns conflict when idempotency key is reused with a different payload', function () {
-    [$plainTextKey, $modelExternalId] = provisionGatewayTargetForTeam('openai_compatible', 'gpt-4.1');
+    [$plainTextKey, $modelExternalId] = provisionGatewayTarget('openai_compatible', 'gpt-4.1');
 
     Http::fake([
         'https://openai.mock/v1/chat/completions' => Http::response([
@@ -201,7 +201,7 @@ it('opens circuit breaker after repeated provider failures', function () {
     config()->set('services.llm_gateway.circuit_failure_threshold', 2);
     config()->set('services.llm_gateway.circuit_cooldown_seconds', 120);
 
-    [$plainTextKey, $modelExternalId] = provisionGatewayTargetForTeam('openai_compatible', 'gpt-4.1');
+    [$plainTextKey, $modelExternalId] = provisionGatewayTarget('openai_compatible', 'gpt-4.1');
 
     $upstreamCalls = 0;
 
@@ -237,7 +237,7 @@ it('opens circuit breaker after repeated provider failures', function () {
 });
 
 it('lists entitled models via GET /v1/models in OpenAI-compatible format', function () {
-    [$plainTextKey, $modelExternalId] = provisionGatewayTargetForTeam('openai_compatible', 'gpt-4.1');
+    [$plainTextKey, $modelExternalId] = provisionGatewayTarget('openai_compatible', 'gpt-4.1');
 
     $response = $this->withToken($plainTextKey)->getJson('/api/v1/models');
 
@@ -256,7 +256,7 @@ it('lists entitled models via GET /v1/models in OpenAI-compatible format', funct
 });
 
 it('excludes models the team is not entitled to use from GET /v1/models', function () {
-    [$plainTextKey] = provisionGatewayTargetForTeam('openai_compatible', 'gpt-4.1');
+    [$plainTextKey] = provisionGatewayTarget('openai_compatible', 'gpt-4.1');
 
     // Create a second provider+model that the team has NO entitlement to.
     $otherProvider = LlmProvider::create([
@@ -287,13 +287,12 @@ it('rejects GET /v1/models without a valid API key', function () {
     $this->getJson('/api/v1/models')->assertUnauthorized();
 });
 
-function provisionGatewayTargetForTeam(string $adapterType, string $externalModelId): array
+function provisionGatewayTarget(string $adapterType, string $externalModelId): array
 {
     $user = User::factory()->create();
-    $team = $user->currentTeam;
 
-    TeamQuotaPolicy::create([
-        'team_id' => $team->id,
+    QuotaPolicy::create([
+        'user_id' => $user->id,
         'plan_code' => 'free',
         'daily_token_limit' => 100000,
         'monthly_token_limit' => 1000000,
@@ -342,7 +341,7 @@ function provisionGatewayTargetForTeam(string $adapterType, string $externalMode
     ]);
 
     $apiKey = app(GenerateApiKey::class)->handle(
-        team: $team,
+        user: $user,
         name: 'Gateway Access Key',
         createdBy: $user->id,
     );

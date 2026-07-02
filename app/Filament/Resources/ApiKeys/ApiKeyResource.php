@@ -2,14 +2,12 @@
 
 namespace App\Filament\Resources\ApiKeys;
 
-use App\Enums\TeamPermission;
 use App\Filament\Resources\ApiKeys\Pages\CreateApiKey;
 use App\Filament\Resources\ApiKeys\Pages\EditApiKey;
 use App\Filament\Resources\ApiKeys\Pages\ListApiKeys;
 use App\Filament\Resources\ApiKeys\Schemas\ApiKeyForm;
 use App\Filament\Resources\ApiKeys\Tables\ApiKeysTable;
 use App\Models\ApiKey;
-use App\Models\User;
 use BackedEnum;
 use Filament\Resources\Resource;
 use Filament\Schemas\Schema;
@@ -29,27 +27,27 @@ class ApiKeyResource extends Resource
 
     public static function canViewAny(): bool
     {
-        return static::hasCurrentTeam();
+        return Auth::check();
     }
 
     public static function canCreate(): bool
     {
-        return static::canManageApiKeys();
+        return Auth::check();
     }
 
     public static function canEdit($record): bool
     {
-        return static::canManageApiKeys();
+        return Auth::check();
     }
 
     public static function canDelete($record): bool
     {
-        return static::canManageApiKeys();
+        return Auth::check();
     }
 
     public static function canAccess(array $parameters = []): bool
     {
-        return static::hasCurrentTeam();
+        return Auth::check();
     }
 
     public static function form(Schema $schema): Schema
@@ -80,28 +78,10 @@ class ApiKeyResource extends Resource
 
     public static function getEloquentQuery(): Builder
     {
-        $teamId = Auth::user()?->current_team_id;
+        $userId = Auth::id();
 
         return parent::getEloquentQuery()
-            ->when($teamId, fn (Builder $query) => $query->where('team_id', $teamId))
-            ->when(! $teamId, fn (Builder $query) => $query->whereRaw('1 = 0'));
-    }
-
-    protected static function hasCurrentTeam(): bool
-    {
-        return Auth::user()?->currentTeam !== null;
-    }
-
-    protected static function canManageApiKeys(): bool
-    {
-        /** @var User|null $user */
-        $user = Auth::user();
-        $team = $user?->currentTeam;
-
-        if (! $user || ! $team) {
-            return false;
-        }
-
-        return $user->hasTeamPermission($team, TeamPermission::ManageApiKeys);
+            ->when($userId, fn (Builder $query) => $query->where('user_id', $userId))
+            ->when(! $userId, fn (Builder $query) => $query->whereRaw('1 = 0'));
     }
 }

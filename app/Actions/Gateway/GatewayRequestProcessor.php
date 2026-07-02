@@ -2,14 +2,14 @@
 
 namespace App\Actions\Gateway;
 
-use App\Actions\Usage\EnforceTeamTokenQuota;
+use App\Actions\Usage\EnforceTokenQuota;
 use App\Actions\Usage\RecordApiRequestUsage;
 use App\Exceptions\QuotaExceededException;
 use App\Models\ApiKey;
 use App\Models\LlmModel;
 use App\Models\LlmProvider;
-use App\Models\Team;
-use App\Models\TeamQuotaPolicy;
+use App\Models\QuotaPolicy;
+use App\Models\User;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\Client\Response as HttpResponse;
 use Illuminate\Http\Request;
@@ -24,7 +24,7 @@ class GatewayRequestProcessor
     public function __construct(
         private readonly ProtocolTransformer $protocolTransformer,
         private readonly ResolveProviderSecret $resolveProviderSecret,
-        private readonly EnforceTeamTokenQuota $enforceTeamTokenQuota,
+        private readonly EnforceTokenQuota $enforceTokenQuota,
         private readonly RecordApiRequestUsage $recordApiRequestUsage,
         private readonly ContentFilter $contentFilter,
     ) {
@@ -41,8 +41,8 @@ class GatewayRequestProcessor
      */
     public function handleEmbeddings(Request $request): Response
     {
-        /** @var Team|null $team */
-        $team = $request->attributes->get('gateway.team');
+        /** @var User|null $user */
+        $user = $request->attributes->get('gateway.user');
         /** @var ApiKey|null $apiKey */
         $apiKey = $request->attributes->get('gateway.api_key');
 
@@ -51,7 +51,7 @@ class GatewayRequestProcessor
             Str::uuid()->toString());
         $request->attributes->set('gateway.trace_id', $traceId);
 
-        if (! $team || ! $apiKey) {
+        if (! $user || ! $apiKey) {
             return $this->jsonWithTrace(
                 $this->protocolTransformer->errorPayload(
                     'openai',
@@ -95,13 +95,13 @@ class GatewayRequestProcessor
             );
         }
 
-        $model = $this->resolveModelForTeam($team, $requestedModel);
+        $model = $this->resolveModelForUser($user, $requestedModel);
 
         if (! $model) {
             return $this->jsonWithTrace(
                 $this->protocolTransformer->errorPayload(
                     'openai',
-                    'Model is unavailable for this team.',
+                    'Model is unavailable for this user.',
                     'model_unavailable',
                 ),
                 422,
@@ -137,7 +137,7 @@ class GatewayRequestProcessor
         );
 
         try {
-            $this->enforceTeamTokenQuota->handle($team, $tokenInputEstimate);
+            $this->enforceTokenQuota->handle($user, $tokenInputEstimate);
         } catch (QuotaExceededException $exception) {
             return $this->jsonWithTrace(
                 $this->protocolTransformer->errorPayload(
@@ -203,7 +203,7 @@ class GatewayRequestProcessor
             ]);
 
             $this->recordApiRequestUsage->handle(
-                team: $team,
+                user: $user,
                 protocol: 'openai',
                 endpoint: '/v1/embeddings',
                 tokenInput: $tokenInputEstimate,
@@ -248,7 +248,7 @@ class GatewayRequestProcessor
         $finalInput = $usageInput > 0 ? $usageInput : $tokenInputEstimate;
 
         $this->recordApiRequestUsage->handle(
-            team: $team,
+            user: $user,
             protocol: 'openai',
             endpoint: '/v1/embeddings',
             tokenInput: $finalInput,
@@ -277,8 +277,8 @@ class GatewayRequestProcessor
         string $incomingProtocol,
         string $incomingEndpoint,
     ): Response {
-        /** @var Team|null $team */
-        $team = $request->attributes->get('gateway.team');
+        /** @var User|null $user */
+        $user = $request->attributes->get('gateway.user');
         /** @var ApiKey|null $apiKey */
         $apiKey = $request->attributes->get('gateway.api_key');
 
@@ -287,7 +287,7 @@ class GatewayRequestProcessor
             Str::uuid()->toString());
         $request->attributes->set('gateway.trace_id', $traceId);
 
-        if (! $team || ! $apiKey) {
+        if (! $user || ! $apiKey) {
             return $this->jsonWithTrace(
                 $this->protocolTransformer->errorPayload(
                     $incomingProtocol,
@@ -317,13 +317,13 @@ class GatewayRequestProcessor
             );
         }
 
-        $model = $this->resolveModelForTeam($team, $requestedModel);
+        $model = $this->resolveModelForUser($user, $requestedModel);
 
         if (! $model) {
             return $this->jsonWithTrace(
                 $this->protocolTransformer->errorPayload(
                     $incomingProtocol,
-                    'Model is unavailable for this team.',
+                    'Model is unavailable for this user.',
                     'model_unavailable',
                 ),
                 422,
@@ -395,7 +395,7 @@ class GatewayRequestProcessor
 
         if (! $isStreaming && $idempotencyKey !== '') {
             $idempotencyCacheKey = $this->idempotencyCacheKey(
-                $team,
+                $user,
                 $apiKey,
                 $incomingEndpoint,
                 $idempotencyKey,
@@ -428,7 +428,7 @@ class GatewayRequestProcessor
         }
 
         try {
-            $this->enforceTeamTokenQuota->handle($team, $tokenInputEstimate);
+            $this->enforceTokenQuota->handle($user, $tokenInputEstimate);
         } catch (QuotaExceededException $exception) {
             return $this->jsonWithTrace(
                 $this->protocolTransformer->errorPayload(
@@ -443,8 +443,8 @@ class GatewayRequestProcessor
         }
 
         if ($this->isProviderCircuitOpen($provider)) {
-            // Try fallback model if configured and available for this team.
-            $fallbackModel = $this->resolveFallbackModel($team, $model);
+            // Try fallback model if configured and available for this user.
+            $fallbackModel = $this->resolveFallbackModel($user, $model);
 
             if ($fallbackModel) {
                 Log::info('gateway.fallback.activated', [
@@ -488,7 +488,7 @@ class GatewayRequestProcessor
 
         if ($isStreaming) {
             return $this->streamToClient(
-                team: $team,
+                user: $user,
                 apiKey: $apiKey,
                 provider: $provider,
                 model: $model,
@@ -504,7 +504,7 @@ class GatewayRequestProcessor
         }
 
         return $this->forwardAsJson(
-            team: $team,
+            user: $user,
             apiKey: $apiKey,
             provider: $provider,
             model: $model,
@@ -521,12 +521,12 @@ class GatewayRequestProcessor
         );
     }
 
-    protected function resolveModelForTeam(
-        Team $team,
+    protected function resolveModelForUser(
+        User $user,
         string $externalModelId,
     ): ?LlmModel {
-        $planCode = TeamQuotaPolicy::query()
-            ->where('team_id', $team->id)
+        $planCode = QuotaPolicy::query()
+            ->where('user_id', $user->id)
             ->where('is_active', true)
             ->orderByDesc('effective_from')
             ->value('plan_code');
@@ -563,7 +563,7 @@ class GatewayRequestProcessor
      * @param  array<string, mixed>  $providerPayload
      */
     protected function forwardAsJson(
-        Team $team,
+        User $user,
         ApiKey $apiKey,
         LlmProvider $provider,
         LlmModel $model,
@@ -599,7 +599,7 @@ class GatewayRequestProcessor
             ]);
 
             $this->recordApiRequestUsage->handle(
-                team: $team,
+                user: $user,
                 protocol: $incomingProtocol,
                 endpoint: $endpoint,
                 tokenInput: $inputEstimate,
@@ -660,7 +660,7 @@ class GatewayRequestProcessor
         );
 
         $this->recordApiRequestUsage->handle(
-            team: $team,
+            user: $user,
             protocol: $incomingProtocol,
             endpoint: $endpoint,
             tokenInput: $usage['input'] > 0 ? $usage['input'] : $inputEstimate,
@@ -707,7 +707,7 @@ class GatewayRequestProcessor
      * @param  array<string, mixed>  $providerPayload
      */
     protected function streamToClient(
-        Team $team,
+        User $user,
         ApiKey $apiKey,
         LlmProvider $provider,
         LlmModel $model,
@@ -742,7 +742,7 @@ class GatewayRequestProcessor
             ]);
 
             $this->recordApiRequestUsage->handle(
-                team: $team,
+                user: $user,
                 protocol: $protocol,
                 endpoint: $endpoint,
                 tokenInput: $inputEstimate,
@@ -792,7 +792,7 @@ class GatewayRequestProcessor
                 $protocol,
                 $providerProtocol,
                 $model,
-                $team,
+                $user,
                 $apiKey,
                 $provider,
                 $endpoint,
@@ -876,7 +876,7 @@ class GatewayRequestProcessor
                             );
 
                     $this->recordApiRequestUsage->handle(
-                        team: $team,
+                        user: $user,
                         protocol: $protocol,
                         endpoint: $endpoint,
                         tokenInput: $finalInput,
@@ -1059,14 +1059,14 @@ class GatewayRequestProcessor
     }
 
     protected function idempotencyCacheKey(
-        Team $team,
+        User $user,
         ApiKey $apiKey,
         string $endpoint,
         string $idempotencyKey,
     ): string {
         return sprintf(
             'gateway:idempotency:%d:%d:%s:%s',
-            $team->id,
+            $user->id,
             $apiKey->id,
             md5($endpoint),
             sha1($idempotencyKey),
@@ -1145,12 +1145,12 @@ class GatewayRequestProcessor
     }
 
     /**
-     * Resolve a fallback model for the team when the primary provider is down.
-     * The fallback model must be active, entitled to the team, and its provider
+     * Resolve a fallback model for the user when the primary provider is down.
+     * The fallback model must be active, entitled to the user, and its provider
      * must not also have its circuit open.
      */
     protected function resolveFallbackModel(
-        Team $team,
+        User $user,
         LlmModel $primaryModel,
     ): ?LlmModel {
         $fallbackId = $primaryModel->fallback_model_id;
@@ -1159,8 +1159,8 @@ class GatewayRequestProcessor
             return null;
         }
 
-        $planCode = TeamQuotaPolicy::query()
-            ->where('team_id', $team->id)
+        $planCode = QuotaPolicy::query()
+            ->where('user_id', $user->id)
             ->where('is_active', true)
             ->orderByDesc('effective_from')
             ->value('plan_code');

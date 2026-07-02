@@ -33,14 +33,13 @@ it('returns a json payload when login response is requested via api', function (
         ->and($response->getData(true))->toBe(['two_factor' => false]);
 });
 
-it('redirects html login response to the current team dashboard', function () {
+it('redirects html login response to the dashboard', function () {
     $user = User::factory()->create();
-    $team = $user->personalTeam();
 
     $response = (new LoginResponse)->toResponse(makeHtmlRequestForUser($user));
 
     expect($response->isRedirect())->toBeTrue()
-        ->and($response->getTargetUrl())->toEndWith("/{$team->slug}/dashboard");
+        ->and($response->getTargetUrl())->toEndWith('/dashboard');
 });
 
 it('returns a json payload when two factor login response is requested via api', function () {
@@ -52,14 +51,13 @@ it('returns a json payload when two factor login response is requested via api',
         ->and($response->getData(true))->toBe(['two_factor' => false]);
 });
 
-it('redirects html two factor login response to the current team dashboard', function () {
+it('redirects html two factor login response to the dashboard', function () {
     $user = User::factory()->create();
-    $team = $user->personalTeam();
 
     $response = (new TwoFactorLoginResponse)->toResponse(makeHtmlRequestForUser($user));
 
     expect($response->isRedirect())->toBeTrue()
-        ->and($response->getTargetUrl())->toEndWith("/{$team->slug}/dashboard");
+        ->and($response->getTargetUrl())->toEndWith('/dashboard');
 });
 
 it('returns a 201 json payload when register response is requested via api', function () {
@@ -71,14 +69,13 @@ it('returns a 201 json payload when register response is requested via api', fun
         ->and($response->getData(true))->toBe(['two_factor' => false]);
 });
 
-it('redirects html register response to the current team dashboard', function () {
+it('redirects html register response to the dashboard', function () {
     $user = User::factory()->create();
-    $team = $user->personalTeam();
 
     $response = (new RegisterResponse)->toResponse(makeHtmlRequestForUser($user));
 
     expect($response->isRedirect())->toBeTrue()
-        ->and($response->getTargetUrl())->toEndWith("/{$team->slug}/dashboard");
+        ->and($response->getTargetUrl())->toEndWith('/dashboard');
 });
 
 it('returns a 204 json payload when verify email response is requested via api', function () {
@@ -89,13 +86,12 @@ it('returns a 204 json payload when verify email response is requested via api',
     expect($response->getStatusCode())->toBe(204);
 });
 
-it('redirects html verify email response to the current team dashboard with verified flag', function () {
+it('redirects html verify email response to the dashboard with verified flag', function () {
     $user = User::factory()->create();
-    $team = $user->personalTeam();
 
     $response = (new VerifyEmailResponse)->toResponse(makeHtmlRequestForUser($user));
 
     expect($response->isRedirect())->toBeTrue()
-        ->and($response->getTargetUrl())->toContain("/{$team->slug}/dashboard")
+        ->and($response->getTargetUrl())->toContain('/dashboard')
         ->and($response->getTargetUrl())->toContain('?verified=1');
 });

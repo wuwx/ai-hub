@@ -3,10 +3,10 @@
 namespace App\Actions\Usage;
 
 use App\Actions\Webhooks\DispatchWebhookEvent;
-use App\Models\Team;
-use App\Models\TeamQuotaPolicy;
+use App\Models\QuotaPolicy;
 use App\Models\UsageLedger;
-use App\Notifications\Teams\QuotaThresholdExceeded;
+use App\Models\User;
+use App\Notifications\QuotaThresholdExceeded;
 use Carbon\CarbonInterface;
 use Illuminate\Support\Facades\Cache;
 
@@ -19,18 +19,18 @@ class CheckQuotaThresholds
     }
 
     /**
-     * Inspect the team's current usage against its active quota policy and
-     * notify the team owner when a configured alert threshold is crossed.
+     * Inspect the user's current usage against their active quota policy and
+     * notify them when a configured alert threshold is crossed.
      *
      * Each threshold fires at most once per billing period via a cache lock,
      * so repeat requests within the same day/month won't spam the inbox.
      */
-    public function handle(Team $team, ?CarbonInterface $at = null): void
+    public function handle(User $user, ?CarbonInterface $at = null): void
     {
         $at ??= now();
 
-        $policy = TeamQuotaPolicy::query()
-            ->where('team_id', $team->id)
+        $policy = QuotaPolicy::query()
+            ->where('user_id', $user->id)
             ->where('is_active', true)
             ->where('effective_from', '<=', $at)
             ->where(function ($query) use ($at) {
@@ -43,13 +43,13 @@ class CheckQuotaThresholds
             return;
         }
 
-        $this->checkPeriod($team, $policy, 'daily', $policy->daily_token_limit, $policy->daily_alert_threshold, $at);
-        $this->checkPeriod($team, $policy, 'monthly', $policy->monthly_token_limit, $policy->monthly_alert_threshold, $at);
+        $this->checkPeriod($user, $policy, 'daily', $policy->daily_token_limit, $policy->daily_alert_threshold, $at);
+        $this->checkPeriod($user, $policy, 'monthly', $policy->monthly_token_limit, $policy->monthly_alert_threshold, $at);
     }
 
     protected function checkPeriod(
-        Team $team,
-        TeamQuotaPolicy $policy,
+        User $user,
+        QuotaPolicy $policy,
         string $period,
         ?int $limit,
         ?int $threshold,
@@ -65,7 +65,7 @@ class CheckQuotaThresholds
             : $at->copy()->startOfMonth()->toDateString();
 
         $used = (int) UsageLedger::query()
-            ->where('team_id', $team->id)
+            ->where('user_id', $user->id)
             ->where('bucket_type', $bucketType)
             ->whereDate('bucket_date', $bucketDate)
             ->sum('token_total');
@@ -78,7 +78,7 @@ class CheckQuotaThresholds
 
         // Dedupe: alert once per threshold per period. The cache entry lives
         // until the end of the current period so it resets naturally.
-        $cacheKey = sprintf('gateway:quota-alert:%d:%s:%d', $team->id, $period, $threshold);
+        $cacheKey = sprintf('gateway:quota-alert:%d:%s:%d', $user->id, $period, $threshold);
         $ttl = $period === 'daily'
             ? $at->copy()->endOfDay()
             : $at->copy()->endOfMonth();
@@ -87,19 +87,15 @@ class CheckQuotaThresholds
             return;
         }
 
-        $owner = $team->owner();
+        $user->notify(new QuotaThresholdExceeded(
+            period: $period,
+            used: $used,
+            limit: $limit,
+            percentage: $percentage,
+            userName: $user->name,
+        ));
 
-        if ($owner) {
-            $owner->notify(new QuotaThresholdExceeded(
-                period: $period,
-                used: $used,
-                limit: $limit,
-                percentage: $percentage,
-                teamName: $team->name,
-            ));
-        }
-
-        $this->dispatchWebhookEvent->handle($team, 'quota.threshold_exceeded', [
+        $this->dispatchWebhookEvent->handle($user, 'quota.threshold_exceeded', [
             'period' => $period,
             'used' => $used,
             'limit' => $limit,

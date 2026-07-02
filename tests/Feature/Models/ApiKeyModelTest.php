@@ -10,10 +10,9 @@ use Carbon\CarbonInterface;
 
 it('casts fields correctly', function () {
     $user = User::factory()->create();
-    $team = $user->currentTeam;
 
     $key = ApiKey::create([
-        'team_id' => $team->id,
+        'user_id' => $user->id,
         'name' => 'prod-key',
         'key_hash' => 'hashed',
         'last_four' => 'abcd',
@@ -38,10 +37,9 @@ it('casts fields correctly', function () {
 
 it('determines active status based on revoked and expired flags', function () {
     $user = User::factory()->create();
-    $team = $user->currentTeam;
 
     $activeKey = ApiKey::create([
-        'team_id' => $team->id,
+        'user_id' => $user->id,
         'name' => 'active',
         'key_hash' => 'h1',
         'last_four' => 'aaaa',
@@ -49,7 +47,7 @@ it('determines active status based on revoked and expired flags', function () {
     ]);
 
     $revokedKey = ApiKey::create([
-        'team_id' => $team->id,
+        'user_id' => $user->id,
         'name' => 'revoked',
         'key_hash' => 'h2',
         'last_four' => 'bbbb',
@@ -58,7 +56,7 @@ it('determines active status based on revoked and expired flags', function () {
     ]);
 
     $expiredKey = ApiKey::create([
-        'team_id' => $team->id,
+        'user_id' => $user->id,
         'name' => 'expired',
         'key_hash' => 'h3',
         'last_four' => 'cccc',
@@ -77,10 +75,9 @@ it('determines active status based on revoked and expired flags', function () {
 
 it('allows all models when allowed_models is empty', function () {
     $user = User::factory()->create();
-    $team = $user->currentTeam;
 
     $key = ApiKey::create([
-        'team_id' => $team->id,
+        'user_id' => $user->id,
         'name' => 'open',
         'key_hash' => 'h',
         'last_four' => 'aaaa',
@@ -94,10 +91,9 @@ it('allows all models when allowed_models is empty', function () {
 
 it('restricts models to the configured whitelist', function () {
     $user = User::factory()->create();
-    $team = $user->currentTeam;
 
     $key = ApiKey::create([
-        'team_id' => $team->id,
+        'user_id' => $user->id,
         'name' => 'restricted',
         'key_hash' => 'h',
         'last_four' => 'aaaa',
@@ -119,12 +115,11 @@ it('hashes plain text keys via the generate action', function () {
         ->and($hash)->toBe(ApiKey::hashPlainTextKey($plain));
 });
 
-it('relates to team creator request logs and usage ledgers', function () {
+it('relates to user, request logs and usage ledgers', function () {
     $user = User::factory()->create();
-    $team = $user->currentTeam;
 
     $key = ApiKey::create([
-        'team_id' => $team->id,
+        'user_id' => $user->id,
         'name' => 'relational',
         'key_hash' => 'h',
         'last_four' => 'aaaa',
@@ -148,7 +143,7 @@ it('relates to team creator request logs and usage ledgers', function () {
     ]);
 
     RequestLog::create([
-        'team_id' => $team->id,
+        'user_id' => $user->id,
         'api_key_id' => $key->id,
         'llm_provider_id' => $provider->id,
         'llm_model_id' => $model->id,
@@ -165,7 +160,7 @@ it('relates to team creator request logs and usage ledgers', function () {
     ]);
 
     UsageLedger::create([
-        'team_id' => $team->id,
+        'user_id' => $user->id,
         'api_key_id' => $key->id,
         'llm_provider_id' => $provider->id,
         'llm_model_id' => $model->id,
@@ -178,7 +173,7 @@ it('relates to team creator request logs and usage ledgers', function () {
         'error_count' => 0,
     ]);
 
-    expect($key->team->is($team))->toBeTrue()
+    expect($key->user->is($user))->toBeTrue()
         ->and($key->creator->is($user))->toBeTrue()
         ->and($key->requestLogs)->toHaveCount(1)
         ->and($key->usageLedgers)->toHaveCount(1);

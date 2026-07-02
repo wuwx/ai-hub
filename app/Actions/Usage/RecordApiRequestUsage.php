@@ -6,22 +6,22 @@ use App\Models\ApiKey;
 use App\Models\LlmModel;
 use App\Models\LlmProvider;
 use App\Models\RequestLog;
-use App\Models\Team;
 use App\Models\UsageLedger;
+use App\Models\User;
 use Carbon\CarbonInterface;
 use Illuminate\Support\Facades\DB;
 
 class RecordApiRequestUsage
 {
     public function __construct(
-        private readonly EnforceTeamTokenQuota $enforceTeamTokenQuota,
+        private readonly EnforceTokenQuota $enforceTokenQuota,
         private readonly CheckQuotaThresholds $checkQuotaThresholds,
     ) {
         //
     }
 
     public function handle(
-        Team $team,
+        User $user,
         string $protocol,
         string $endpoint,
         string $httpMethod = 'POST',
@@ -47,7 +47,7 @@ class RecordApiRequestUsage
         $tokenTotal = $tokenInput + $tokenOutput;
 
         $requestLog = DB::transaction(function () use (
-            $team,
+            $user,
             $protocol,
             $endpoint,
             $httpMethod,
@@ -68,8 +68,8 @@ class RecordApiRequestUsage
             $enforceQuota,
         ) {
             if ($enforceQuota && $tokenTotal > 0) {
-                $this->enforceTeamTokenQuota->handle(
-                    $team,
+                $this->enforceTokenQuota->handle(
+                    $user,
                     $tokenTotal,
                     $requestedAt,
                 );
@@ -77,7 +77,7 @@ class RecordApiRequestUsage
 
             $requestLog = RequestLog::create([
                 'trace_id' => $traceId,
-                'team_id' => $team->id,
+                'user_id' => $user->id,
                 'api_key_id' => $apiKey?->id,
                 'llm_provider_id' => $provider?->id,
                 'llm_model_id' => $llmModel?->id,
@@ -101,7 +101,7 @@ class RecordApiRequestUsage
                 ! empty($errorCode);
 
             $this->incrementLedger(
-                team: $team,
+                user: $user,
                 apiKey: $apiKey,
                 provider: $provider,
                 llmModel: $llmModel,
@@ -114,7 +114,7 @@ class RecordApiRequestUsage
             );
 
             $this->incrementLedger(
-                team: $team,
+                user: $user,
                 apiKey: $apiKey,
                 provider: $provider,
                 llmModel: $llmModel,
@@ -127,7 +127,7 @@ class RecordApiRequestUsage
             );
 
             $this->incrementLedger(
-                team: $team,
+                user: $user,
                 apiKey: $apiKey,
                 provider: $provider,
                 llmModel: $llmModel,
@@ -148,14 +148,14 @@ class RecordApiRequestUsage
         // Threshold alerts run after the transaction commits so the latest
         // ledger totals are visible. Only meaningful when tokens were consumed.
         if ($tokenTotal > 0) {
-            $this->checkQuotaThresholds->handle($team, $requestedAt);
+            $this->checkQuotaThresholds->handle($user, $requestedAt);
         }
 
         return $requestLog;
     }
 
     protected function incrementLedger(
-        Team $team,
+        User $user,
         ?ApiKey $apiKey,
         ?LlmProvider $provider,
         ?LlmModel $llmModel,
@@ -167,7 +167,7 @@ class RecordApiRequestUsage
         bool $isError,
     ): void {
         $query = UsageLedger::query()
-            ->where('team_id', $team->id)
+            ->where('user_id', $user->id)
             ->where('api_key_id', $apiKey?->id)
             ->where('llm_provider_id', $provider?->id)
             ->where('llm_model_id', $llmModel?->id)
@@ -179,7 +179,7 @@ class RecordApiRequestUsage
 
         if (! $ledger) {
             UsageLedger::create([
-                'team_id' => $team->id,
+                'user_id' => $user->id,
                 'api_key_id' => $apiKey?->id,
                 'llm_provider_id' => $provider?->id,
                 'llm_model_id' => $llmModel?->id,

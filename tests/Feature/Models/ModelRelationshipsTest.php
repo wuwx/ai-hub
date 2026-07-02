@@ -1,9 +1,7 @@
 <?php
 
-use App\Enums\TeamRole;
 use App\Models\LlmModel;
 use App\Models\LlmProvider;
-use App\Models\Membership;
 use App\Models\PlanModelEntitlement;
 use App\Models\PlanProviderEntitlement;
 use App\Models\RequestLog;
@@ -11,22 +9,6 @@ use App\Models\UsageLedger;
 use App\Models\User;
 use Carbon\CarbonInterface;
 use Illuminate\Database\Eloquent\Collection;
-
-it('relates membership to team and user with role cast', function () {
-    $owner = User::factory()->create();
-    $team = $owner->currentTeam;
-    $member = User::factory()->create();
-
-    $membership = Membership::create([
-        'team_id' => $team->id,
-        'user_id' => $member->id,
-        'role' => TeamRole::Admin->value,
-    ]);
-
-    expect($membership->team->is($team))->toBeTrue()
-        ->and($membership->user->is($member))->toBeTrue()
-        ->and($membership->role)->toBe(TeamRole::Admin);
-});
 
 it('relates plan model entitlements to plan code and model with boolean cast', function () {
     $provider = LlmProvider::create([
@@ -74,9 +56,8 @@ it('relates plan provider entitlements to plan code and provider with boolean ca
         ->and($entitlement->is_enabled)->toBeTrue();
 });
 
-it('relates usage ledger to team api key provider and model with casts', function () {
+it('relates usage ledger to user api key provider and model with casts', function () {
     $owner = User::factory()->create();
-    $team = $owner->currentTeam;
 
     $provider = LlmProvider::create([
         'name' => 'Provider L',
@@ -92,7 +73,7 @@ it('relates usage ledger to team api key provider and model with casts', functio
         'external_model_id' => 'model-l',
         'is_active' => true,
     ]);
-    $apiKey = $team->apiKeys()->create([
+    $apiKey = $owner->apiKeys()->create([
         'name' => 'k',
         'key_hash' => 'h',
         'last_four' => 'aaaa',
@@ -100,7 +81,7 @@ it('relates usage ledger to team api key provider and model with casts', functio
     ]);
 
     $ledger = UsageLedger::create([
-        'team_id' => $team->id,
+        'user_id' => $owner->id,
         'api_key_id' => $apiKey->id,
         'llm_provider_id' => $provider->id,
         'llm_model_id' => $model->id,
@@ -115,7 +96,7 @@ it('relates usage ledger to team api key provider and model with casts', functio
 
     $fresh = $ledger->fresh();
 
-    expect($fresh->team->is($team))->toBeTrue()
+    expect($fresh->user->is($owner))->toBeTrue()
         ->and($fresh->apiKey->is($apiKey))->toBeTrue()
         ->and($fresh->provider->is($provider))->toBeTrue()
         ->and($fresh->llmModel->is($model))->toBeTrue()
@@ -125,9 +106,8 @@ it('relates usage ledger to team api key provider and model with casts', functio
         ->and($fresh->error_count)->toBe(1);
 });
 
-it('relates request log to team api key provider and model with casts', function () {
+it('relates request log to user api key provider and model with casts', function () {
     $owner = User::factory()->create();
-    $team = $owner->currentTeam;
 
     $provider = LlmProvider::create([
         'name' => 'Provider P',
@@ -143,7 +123,7 @@ it('relates request log to team api key provider and model with casts', function
         'external_model_id' => 'model-p',
         'is_active' => true,
     ]);
-    $apiKey = $team->apiKeys()->create([
+    $apiKey = $owner->apiKeys()->create([
         'name' => 'k',
         'key_hash' => 'h',
         'last_four' => 'aaaa',
@@ -152,7 +132,7 @@ it('relates request log to team api key provider and model with casts', function
 
     $log = RequestLog::create([
         'trace_id' => 'trace-1',
-        'team_id' => $team->id,
+        'user_id' => $owner->id,
         'api_key_id' => $apiKey->id,
         'llm_provider_id' => $provider->id,
         'llm_model_id' => $model->id,
@@ -173,7 +153,7 @@ it('relates request log to team api key provider and model with casts', function
 
     $fresh = $log->fresh();
 
-    expect($fresh->team->is($team))->toBeTrue()
+    expect($fresh->user->is($owner))->toBeTrue()
         ->and($fresh->apiKey->is($apiKey))->toBeTrue()
         ->and($fresh->provider->is($provider))->toBeTrue()
         ->and($fresh->llmModel->is($model))->toBeTrue()
@@ -228,13 +208,16 @@ it('relates llm provider to models entitlements request logs and usage ledgers',
         ->and($fresh->usageLedgers)->toBeInstanceOf(Collection::class);
 });
 
-it('returns owner via team owner relation', function () {
+it('returns user api keys', function () {
     $owner = User::factory()->create();
-    $team = $owner->currentTeam;
 
-    $teamOwner = $team->owner();
+    $apiKey = $owner->apiKeys()->create([
+        'name' => 'k',
+        'key_hash' => 'h',
+        'last_four' => 'aaaa',
+        'created_by' => $owner->id,
+    ]);
 
-    expect($teamOwner)->not->toBeNull()
-        ->and($teamOwner->is($owner))->toBeTrue()
-        ->and($team->members)->toHaveCount(1);
+    expect($owner->apiKeys)->toHaveCount(1)
+        ->and($owner->apiKeys->first()->id)->toBe($apiKey->id);
 });

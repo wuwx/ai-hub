@@ -5,7 +5,7 @@ use App\Models\LlmModel;
 use App\Models\LlmProvider;
 use App\Models\PlanModelEntitlement;
 use App\Models\PlanProviderEntitlement;
-use App\Models\TeamQuotaPolicy;
+use App\Models\QuotaPolicy;
 use App\Models\User;
 use Illuminate\Http\Client\Request as HttpRequest;
 use Illuminate\Support\Facades\Http;
@@ -13,7 +13,7 @@ use Illuminate\Support\Facades\Http;
 it(
     'forwards embeddings requests to the upstream provider and returns the response',
     function () {
-        [$plainTextKey, $modelExternalId] = provisionEmbeddingsTargetForTeam();
+        [$plainTextKey, $modelExternalId] = provisionEmbeddingsTarget();
 
         Http::fake([
             'https://openai.mock/v1/embeddings' => function (
@@ -61,7 +61,7 @@ it(
 );
 
 it('accepts an array of inputs for batch embeddings', function () {
-    [$plainTextKey, $modelExternalId] = provisionEmbeddingsTargetForTeam();
+    [$plainTextKey, $modelExternalId] = provisionEmbeddingsTarget();
 
     Http::fake([
         'https://openai.mock/v1/embeddings' => function (HttpRequest $request) {
@@ -104,7 +104,7 @@ it('accepts an array of inputs for batch embeddings', function () {
 });
 
 it('rejects embeddings without a model field', function () {
-    [$plainTextKey] = provisionEmbeddingsTargetForTeam();
+    [$plainTextKey] = provisionEmbeddingsTarget();
 
     $response = $this->withToken($plainTextKey)->postJson(
         '/api/v1/embeddings',
@@ -118,7 +118,7 @@ it('rejects embeddings without a model field', function () {
 });
 
 it('rejects embeddings without an input field', function () {
-    [$plainTextKey, $modelExternalId] = provisionEmbeddingsTargetForTeam();
+    [$plainTextKey, $modelExternalId] = provisionEmbeddingsTarget();
 
     $response = $this->withToken($plainTextKey)->postJson(
         '/api/v1/embeddings',
@@ -144,8 +144,8 @@ it(
         [
             $plainTextKey,
             $modelExternalId,
-            $team,
-        ] = provisionEmbeddingsTargetForTeam();
+            $user,
+        ] = provisionEmbeddingsTarget();
 
         Http::fake([
             'https://openai.mock/v1/embeddings' => Http::response(
@@ -173,7 +173,7 @@ it(
             ->assertOk();
 
         $this->assertDatabaseHas('request_logs', [
-            'team_id' => $team->id,
+            'user_id' => $user->id,
             'protocol' => 'openai',
             'endpoint' => '/v1/embeddings',
             'status_code' => 200,
@@ -181,13 +181,12 @@ it(
     },
 );
 
-function provisionEmbeddingsTargetForTeam(): array
+function provisionEmbeddingsTarget(): array
 {
     $user = User::factory()->create();
-    $team = $user->currentTeam;
 
-    TeamQuotaPolicy::create([
-        'team_id' => $team->id,
+    QuotaPolicy::create([
+        'user_id' => $user->id,
         'plan_code' => 'free',
         'daily_token_limit' => 100000,
         'monthly_token_limit' => 1000000,
@@ -232,10 +231,10 @@ function provisionEmbeddingsTargetForTeam(): array
     ]);
 
     $apiKey = app(GenerateApiKey::class)->handle(
-        team: $team,
+        user: $user,
         name: 'Embeddings Access Key',
         createdBy: $user->id,
     );
 
-    return [$apiKey->plainTextKey, $model->external_model_id, $team];
+    return [$apiKey->plainTextKey, $model->external_model_id, $user];
 }

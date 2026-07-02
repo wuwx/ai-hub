@@ -2,9 +2,8 @@
 
 namespace App\Http\Controllers;
 
-use App\Enums\TeamPermission;
-use App\Models\Team;
 use App\Models\UsageLedger;
+use App\Models\User;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
@@ -12,11 +11,12 @@ use Illuminate\Support\Facades\Auth;
 
 class DataExportController extends Controller
 {
-    public function exportUsage(Request $request, Team $current_team): Response
+    public function exportUsage(Request $request): Response
     {
-        $this->authorizeExport($current_team, TeamPermission::ViewUsage);
+        $user = Auth::user();
+        abort_if(! $user, 403);
 
-        $cycle = $this->billingCycle($current_team);
+        $cycle = $this->billingCycle($user);
         $startDate = Carbon::parse($cycle['start'])->startOfDay();
         $endDate = Carbon::parse($cycle['end'])->endOfDay();
 
@@ -33,7 +33,7 @@ class DataExportController extends Controller
                 '=',
                 'usage_ledgers.llm_provider_id',
             )
-            ->where('usage_ledgers.team_id', $current_team->id)
+            ->where('usage_ledgers.user_id', $user->id)
             ->where('usage_ledgers.bucket_type', 'day')
             ->whereBetween('usage_ledgers.bucket_date', [$startDate, $endDate])
             ->groupBy(
@@ -89,22 +89,12 @@ class DataExportController extends Controller
         );
     }
 
-    protected function authorizeExport(
-        Team $team,
-        TeamPermission $permission,
-    ): void {
-        $user = Auth::user();
-
-        abort_if(! $user || ! $user->belongsToTeam($team), 403);
-        abort_if(! $user->hasTeamPermission($team, $permission), 403);
-    }
-
     /**
      * @return array{start: string, end: string}
      */
-    protected function billingCycle(Team $team): array
+    protected function billingCycle(User $user): array
     {
-        $subscription = $team->subscription();
+        $subscription = $user->subscription();
 
         if (
             $subscription &&

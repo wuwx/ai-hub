@@ -37,7 +37,7 @@ test('passkey login response redirects to the current team dashboard', function 
 
     $jsonResponse = app(PasskeyLoginResponse::class)->toResponse($request);
 
-    expect($jsonResponse->getData()->redirect)->toBe(route('dashboard', ['current_team' => $user->personalTeam()->slug]));
+    expect($jsonResponse->getData()->redirect)->toBe(route('dashboard'));
 });
 
 test('users can not authenticate with invalid password', function () {

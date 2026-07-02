@@ -2,8 +2,8 @@
 
 namespace App\Http\Controllers\Billing;
 
-use App\Actions\Billing\SyncTeamQuotaFromSubscription;
-use App\Models\Team;
+use App\Actions\Billing\SyncQuotaFromSubscription;
+use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
 
@@ -18,18 +18,19 @@ use Illuminate\Support\Facades\Log;
 class CheckoutReturnController
 {
     public function __construct(
-        private readonly SyncTeamQuotaFromSubscription $syncTeamQuotaFromSubscription,
+        private readonly SyncQuotaFromSubscription $syncQuotaFromSubscription,
     ) {}
 
     /**
      * Confirm a subscription checkout session.
      */
-    public function subscription(Request $request, Team $current_team)
+    public function subscription(Request $request)
     {
+        $user = $request->user();
         $sessionId = $request->query('session_id');
 
-        if ($sessionId) {
-            $this->confirmSubscriptionSession($current_team, $sessionId);
+        if ($sessionId && $user) {
+            $this->confirmSubscriptionSession($user, $sessionId);
         }
 
         return to_route('billing.index');
@@ -40,11 +41,11 @@ class CheckoutReturnController
      * team's quota policy immediately, ahead of the webhook.
      */
     protected function confirmSubscriptionSession(
-        Team $team,
+        User $user,
         string $sessionId,
     ): void {
         try {
-            $session = $team
+            $session = $user
                 ->stripe()
                 ->checkout->sessions->retrieve($sessionId, [
                     'expand' => ['subscription'],
@@ -71,8 +72,8 @@ class CheckoutReturnController
         );
         $planCode = $this->resolvePlanCodeFromPriceId($stripePriceId);
 
-        $this->syncTeamQuotaFromSubscription->handle(
-            team: $team,
+        $this->syncQuotaFromSubscription->handle(
+            user: $user,
             planCode: $planCode,
             status: (string) ($subscription->status ?? 'active'),
         );

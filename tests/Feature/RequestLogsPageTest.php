@@ -1,55 +1,30 @@
 <?php
 
-use App\Enums\TeamRole;
 use App\Models\LlmModel;
 use App\Models\LlmProvider;
 use App\Models\RequestLog;
-use App\Models\Team;
 use App\Models\User;
 use Livewire\Livewire;
 
 test('request logs page requires authentication', function () {
-    $team = Team::factory()->create();
 
-    $response = $this->get(route('request-logs.index', ['current_team' => $team->slug]));
+    $response = $this->get(route('request-logs.index'));
 
     $response->assertRedirect(route('login'));
 });
 
-test('owners can view request logs page', function () {
+test('authenticated users can view request logs page', function () {
     $user = User::factory()->create();
-    $team = Team::factory()->create();
-    $team->members()->attach($user, ['role' => TeamRole::Owner->value]);
-    $user->switchTeam($team);
-    $user->refresh();
 
     $response = $this
         ->actingAs($user)
-        ->get(route('request-logs.index', ['current_team' => $team->slug]));
+        ->get(route('request-logs.index'));
 
     $response->assertOk();
 });
 
-test('members cannot view request logs page', function () {
-    $member = User::factory()->create();
-    $team = Team::factory()->create();
-    $team->members()->attach($member, ['role' => TeamRole::Member->value]);
-    $member->switchTeam($team);
-    $member->refresh();
-
-    $response = $this
-        ->actingAs($member)
-        ->get(route('request-logs.index', ['current_team' => $team->slug]));
-
-    $response->assertForbidden();
-});
-
 test('request logs page shows empty state when no logs', function () {
     $user = User::factory()->create();
-    $team = Team::factory()->create();
-    $team->members()->attach($user, ['role' => TeamRole::Owner->value]);
-    $user->switchTeam($team);
-    $user->refresh();
 
     $this->actingAs($user);
 
@@ -59,10 +34,6 @@ test('request logs page shows empty state when no logs', function () {
 
 test('request logs page displays log entries', function () {
     $user = User::factory()->create();
-    $team = Team::factory()->create();
-    $team->members()->attach($user, ['role' => TeamRole::Owner->value]);
-    $user->switchTeam($team);
-    $user->refresh();
 
     $provider = LlmProvider::create([
         'name' => 'OpenAI',
@@ -79,7 +50,7 @@ test('request logs page displays log entries', function () {
     ]);
 
     RequestLog::create([
-        'team_id' => $team->id,
+        'user_id' => $user->id,
         'llm_provider_id' => $provider->id,
         'llm_model_id' => $model->id,
         'http_method' => 'POST',
@@ -104,10 +75,6 @@ test('request logs page displays log entries', function () {
 
 test('request logs page filters by status code', function () {
     $user = User::factory()->create();
-    $team = Team::factory()->create();
-    $team->members()->attach($user, ['role' => TeamRole::Owner->value]);
-    $user->switchTeam($team);
-    $user->refresh();
 
     $provider = LlmProvider::create([
         'name' => 'OpenAI',
@@ -117,7 +84,7 @@ test('request logs page filters by status code', function () {
     ]);
 
     RequestLog::create([
-        'team_id' => $team->id,
+        'user_id' => $user->id,
         'llm_provider_id' => $provider->id,
         'http_method' => 'POST',
         'endpoint' => '/v1/chat/completions',
@@ -132,7 +99,7 @@ test('request logs page filters by status code', function () {
     ]);
 
     RequestLog::create([
-        'team_id' => $team->id,
+        'user_id' => $user->id,
         'llm_provider_id' => $provider->id,
         'http_method' => 'POST',
         'endpoint' => '/v1/chat/completions',

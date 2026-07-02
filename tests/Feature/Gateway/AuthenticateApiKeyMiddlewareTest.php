@@ -28,10 +28,9 @@ it('rejects gateway requests with invalid api key', function () {
 
 it('accepts authenticated requests and reaches gateway model validation', function () {
     $user = User::factory()->create();
-    $team = $user->currentTeam;
 
     $generated = app(GenerateApiKey::class)->handle(
-        team: $team,
+        user: $user,
         name: 'Gateway Key',
         createdBy: $user->id,
     );
@@ -47,10 +46,9 @@ it('accepts authenticated requests and reaches gateway model validation', functi
 
 it('accepts x-api-key header for authentication', function () {
     $user = User::factory()->create();
-    $team = $user->currentTeam;
 
     $generated = app(GenerateApiKey::class)->handle(
-        team: $team,
+        user: $user,
         name: 'Gateway Key Header',
         createdBy: $user->id,
     );
@@ -70,10 +68,9 @@ it('throttles requests per api key when rate limit is exceeded', function () {
     config()->set('services.llm_gateway.api_key_rate_limit_decay_seconds', 60);
 
     $user = User::factory()->create();
-    $team = $user->currentTeam;
 
     $generated = app(GenerateApiKey::class)->handle(
-        team: $team,
+        user: $user,
         name: 'Gateway Key Limited',
         createdBy: $user->id,
     );
@@ -101,16 +98,15 @@ it('applies throttling independently for different api keys', function () {
     config()->set('services.llm_gateway.api_key_rate_limit_decay_seconds', 60);
 
     $user = User::factory()->create();
-    $team = $user->currentTeam;
 
     $firstKey = app(GenerateApiKey::class)->handle(
-        team: $team,
+        user: $user,
         name: 'Gateway Key A',
         createdBy: $user->id,
     );
 
     $secondKey = app(GenerateApiKey::class)->handle(
-        team: $team,
+        user: $user,
         name: 'Gateway Key B',
         createdBy: $user->id,
     );

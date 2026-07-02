@@ -8,7 +8,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 #[Fillable([
     'trace_id',
-    'team_id',
+    'user_id',
     'api_key_id',
     'llm_provider_id',
     'llm_model_id',
@@ -29,11 +29,11 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 class RequestLog extends Model
 {
     /**
-     * @return BelongsTo<Team, $this>
+     * @return BelongsTo<User, $this>
      */
-    public function team(): BelongsTo
+    public function user(): BelongsTo
     {
-        return $this->belongsTo(Team::class);
+        return $this->belongsTo(User::class);
     }
 
     /**

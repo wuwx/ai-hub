@@ -1,79 +1,34 @@
 <?php
 
-use App\Enums\TeamRole;
 use App\Models\LlmModel;
 use App\Models\LlmProvider;
-use App\Models\Team;
 use App\Models\UsageLedger;
 use App\Models\User;
 use Laravel\Cashier\Subscription as CashierSubscription;
 use Livewire\Livewire;
 
 test('usage page requires authentication', function () {
-    $team = Team::factory()->create();
 
-    $response = $this->get(route('usage.index', ['current_team' => $team->slug]));
+    $response = $this->get(route('usage.index'));
 
     $response->assertRedirect(route('login'));
 });
 
-test('usage page can be rendered by owners', function () {
+test('usage page can be rendered by authenticated users', function () {
     $user = User::factory()->create();
-    $team = Team::factory()->create();
-    $team->members()->attach($user, ['role' => TeamRole::Owner->value]);
-    $user->switchTeam($team);
-    $user->refresh();
 
     $response = $this
         ->actingAs($user)
-        ->get(route('usage.index', ['current_team' => $team->slug]));
+        ->get(route('usage.index'));
 
     $response->assertOk();
-});
-
-test('usage page can be rendered by admins', function () {
-    $owner = User::factory()->create();
-    $admin = User::factory()->create();
-    $team = Team::factory()->create();
-
-    $team->members()->attach($owner, ['role' => TeamRole::Owner->value]);
-    $team->members()->attach($admin, ['role' => TeamRole::Admin->value]);
-    $admin->switchTeam($team);
-    $admin->refresh();
-
-    $response = $this
-        ->actingAs($admin)
-        ->get(route('usage.index', ['current_team' => $team->slug]));
-
-    $response->assertOk();
-});
-
-test('members cannot view usage data', function () {
-    $owner = User::factory()->create();
-    $member = User::factory()->create();
-    $team = Team::factory()->create();
-
-    $team->members()->attach($owner, ['role' => TeamRole::Owner->value]);
-    $team->members()->attach($member, ['role' => TeamRole::Member->value]);
-    $member->switchTeam($team);
-    $member->refresh();
-
-    $this->actingAs($member);
-
-    $component = Livewire::test('pages::usage');
-
-    expect($component->instance()->canView)->toBeFalse();
 });
 
 test('usage page shows billing cycle from subscription', function () {
     $user = User::factory()->create();
-    $team = Team::factory()->create();
-    $team->members()->attach($user, ['role' => TeamRole::Owner->value]);
-    $user->switchTeam($team);
-    $user->refresh();
 
     $subscription = CashierSubscription::create([
-        'team_id' => $team->id,
+        'user_id' => $user->id,
         'type' => 'default',
         'stripe_id' => 'sub_test123',
         'stripe_status' => 'active',
@@ -94,10 +49,6 @@ test('usage page shows billing cycle from subscription', function () {
 
 test('usage page defaults to current month when no subscription', function () {
     $user = User::factory()->create();
-    $team = Team::factory()->create();
-    $team->members()->attach($user, ['role' => TeamRole::Owner->value]);
-    $user->switchTeam($team);
-    $user->refresh();
 
     $this->actingAs($user);
 
@@ -109,10 +60,6 @@ test('usage page defaults to current month when no subscription', function () {
 
 test('usage page shows per-model usage table', function () {
     $user = User::factory()->create();
-    $team = Team::factory()->create();
-    $team->members()->attach($user, ['role' => TeamRole::Owner->value]);
-    $user->switchTeam($team);
-    $user->refresh();
 
     $provider = LlmProvider::create([
         'name' => 'TestProvider',
@@ -129,7 +76,7 @@ test('usage page shows per-model usage table', function () {
     ]);
 
     UsageLedger::create([
-        'team_id' => $team->id,
+        'user_id' => $user->id,
         'llm_provider_id' => $provider->id,
         'llm_model_id' => $model->id,
         'bucket_date' => now()->toDateString(),
@@ -158,10 +105,6 @@ test('usage page shows per-model usage table', function () {
 
 test('usage page shows daily chart data', function () {
     $user = User::factory()->create();
-    $team = Team::factory()->create();
-    $team->members()->attach($user, ['role' => TeamRole::Owner->value]);
-    $user->switchTeam($team);
-    $user->refresh();
 
     $provider = LlmProvider::create([
         'name' => 'TestProvider',
@@ -171,7 +114,7 @@ test('usage page shows daily chart data', function () {
     ]);
 
     UsageLedger::create([
-        'team_id' => $team->id,
+        'user_id' => $user->id,
         'llm_provider_id' => $provider->id,
         'bucket_date' => now()->toDateString(),
         'bucket_type' => 'day',
@@ -191,13 +134,9 @@ test('usage page shows daily chart data', function () {
     expect($chartData['summary']['total_requests'])->toBe(5);
 });
 
-test('usage page only shows data for current team', function () {
+test('usage page only shows data for current user', function () {
     $user = User::factory()->create();
-    $teamA = Team::factory()->create();
-    $teamB = Team::factory()->create();
-    $teamA->members()->attach($user, ['role' => TeamRole::Owner->value]);
-    $user->switchTeam($teamA);
-    $user->refresh();
+    $otherUser = User::factory()->create();
 
     $provider = LlmProvider::create([
         'name' => 'TestProvider',
@@ -208,20 +147,20 @@ test('usage page only shows data for current team', function () {
 
     $modelA = LlmModel::create([
         'llm_provider_id' => $provider->id,
-        'name' => 'Team A Model',
+        'name' => 'User A Model',
         'external_model_id' => 'team-a-model',
         'is_active' => true,
     ]);
 
     $modelB = LlmModel::create([
         'llm_provider_id' => $provider->id,
-        'name' => 'Team B Model',
+        'name' => 'User B Model',
         'external_model_id' => 'team-b-model',
         'is_active' => true,
     ]);
 
     UsageLedger::create([
-        'team_id' => $teamA->id,
+        'user_id' => $user->id,
         'llm_provider_id' => $provider->id,
         'llm_model_id' => $modelA->id,
         'bucket_date' => now()->toDateString(),
@@ -234,7 +173,7 @@ test('usage page only shows data for current team', function () {
     ]);
 
     UsageLedger::create([
-        'team_id' => $teamB->id,
+        'user_id' => $otherUser->id,
         'llm_provider_id' => $provider->id,
         'llm_model_id' => $modelB->id,
         'bucket_date' => now()->toDateString(),
@@ -252,8 +191,8 @@ test('usage page only shows data for current team', function () {
     $modelUsage = $component->instance()->modelUsage;
 
     expect($modelUsage)->toHaveCount(1);
-    expect($modelUsage->first()['model_name'])->toBe('Team A Model');
+    expect($modelUsage->first()['model_name'])->toBe('User A Model');
 
-    $component->assertSee('Team A Model', false)
-        ->assertDontSee('Team B Model', false);
+    $component->assertSee('User A Model', false)
+        ->assertDontSee('User B Model', false);
 });
