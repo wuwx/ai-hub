@@ -13,7 +13,8 @@ class PlanProviderEntitlementsTable
     {
         return $table
             ->columns([
-                TextColumn::make('plan_code')
+                TextColumn::make('plan.name')
+                    ->label('Plan')
                     ->searchable()
                     ->sortable(),
                 TextColumn::make('provider.name')

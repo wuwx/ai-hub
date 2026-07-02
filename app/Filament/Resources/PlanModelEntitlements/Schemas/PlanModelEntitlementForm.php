@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources\PlanModelEntitlements\Schemas;
 
+use App\Models\Plan;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\Toggle;
 use Filament\Schemas\Schema;
@@ -13,15 +14,17 @@ class PlanModelEntitlementForm
         return $schema
             ->components([
                 Select::make('plan_code')
-                    ->options([
-                        'free' => 'Free',
-                        'pro' => 'Pro',
-                        'enterprise' => 'Enterprise',
-                    ])
-                    ->required(),
+                    ->options(fn (): array => Plan::query()
+                        ->active()
+                        ->orderBy('sort_order')
+                        ->pluck('name', 'code')
+                        ->all())
+                    ->required()
+                    ->searchable(),
                 Select::make('llm_model_id')
                     ->relationship('llmModel', 'name')
-                    ->required(),
+                    ->required()
+                    ->searchable(),
                 Toggle::make('is_enabled')
                     ->required(),
             ]);
