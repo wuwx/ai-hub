@@ -5,8 +5,9 @@ use App\Actions\Billing\DebitTeamWallet;
 use App\Exceptions\InsufficientWalletBalanceException;
 use App\Models\LlmModel;
 use App\Models\LlmProvider;
-use App\Models\TeamModelEntitlement;
-use App\Models\TeamProviderEntitlement;
+use App\Models\PlanModelEntitlement;
+use App\Models\PlanProviderEntitlement;
+use App\Models\TeamQuotaPolicy;
 use App\Models\TeamWallet;
 use App\Models\User;
 use Illuminate\Support\Facades\Http;
@@ -99,6 +100,15 @@ it('gateway rejects post-paid requests when credit limit is exceeded', function 
     $team = $user->currentTeam;
 
     // Set up provider/model/entitlements
+    TeamQuotaPolicy::create([
+        'team_id' => $team->id,
+        'plan_code' => 'free',
+        'daily_token_limit' => 1000000,
+        'monthly_token_limit' => 10000000,
+        'effective_from' => now()->subMinute(),
+        'is_active' => true,
+    ]);
+
     $provider = LlmProvider::create([
         'name' => 'OpenAI Mock',
         'slug' => 'credit-test-'.uniqid(),
@@ -119,14 +129,14 @@ it('gateway rejects post-paid requests when credit limit is exceeded', function 
         'is_active' => true,
     ]);
 
-    TeamProviderEntitlement::create([
-        'team_id' => $team->id,
+    PlanProviderEntitlement::create([
+        'plan_code' => 'free',
         'llm_provider_id' => $provider->id,
         'is_enabled' => true,
     ]);
 
-    TeamModelEntitlement::create([
-        'team_id' => $team->id,
+    PlanModelEntitlement::create([
+        'plan_code' => 'free',
         'llm_model_id' => $model->id,
         'is_enabled' => true,
     ]);

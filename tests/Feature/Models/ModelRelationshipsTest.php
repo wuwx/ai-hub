@@ -4,10 +4,10 @@ use App\Enums\TeamRole;
 use App\Models\LlmModel;
 use App\Models\LlmProvider;
 use App\Models\Membership;
+use App\Models\PlanModelEntitlement;
+use App\Models\PlanProviderEntitlement;
 use App\Models\RequestLog;
 use App\Models\Team;
-use App\Models\TeamModelEntitlement;
-use App\Models\TeamProviderEntitlement;
 use App\Models\TeamWallet;
 use App\Models\TeamWalletTransaction;
 use App\Models\UsageLedger;
@@ -31,9 +31,7 @@ it('relates membership to team and user with role cast', function () {
         ->and($membership->role)->toBe(TeamRole::Admin);
 });
 
-it('relates team model entitlements to team and model with boolean cast', function () {
-    $owner = User::factory()->create();
-    $team = $owner->currentTeam;
+it('relates plan model entitlements to plan code and model with boolean cast', function () {
     $provider = LlmProvider::create([
         'name' => 'Provider A',
         'slug' => 'provider-a',
@@ -49,20 +47,17 @@ it('relates team model entitlements to team and model with boolean cast', functi
         'is_active' => true,
     ]);
 
-    $entitlement = TeamModelEntitlement::create([
-        'team_id' => $team->id,
+    $entitlement = PlanModelEntitlement::create([
+        'plan_code' => 'free',
         'llm_model_id' => $model->id,
         'is_enabled' => 1,
     ]);
 
-    expect($entitlement->team->is($team))->toBeTrue()
-        ->and($entitlement->llmModel->is($model))->toBeTrue()
+    expect($entitlement->llmModel->is($model))->toBeTrue()
         ->and($entitlement->is_enabled)->toBeTrue();
 });
 
-it('relates team provider entitlements to team and provider with boolean cast', function () {
-    $owner = User::factory()->create();
-    $team = $owner->currentTeam;
+it('relates plan provider entitlements to plan code and provider with boolean cast', function () {
     $provider = LlmProvider::create([
         'name' => 'Provider B',
         'slug' => 'provider-b',
@@ -72,14 +67,13 @@ it('relates team provider entitlements to team and provider with boolean cast', 
         'is_active' => true,
     ]);
 
-    $entitlement = TeamProviderEntitlement::create([
-        'team_id' => $team->id,
+    $entitlement = PlanProviderEntitlement::create([
+        'plan_code' => 'free',
         'llm_provider_id' => $provider->id,
         'is_enabled' => true,
     ]);
 
-    expect($entitlement->team->is($team))->toBeTrue()
-        ->and($entitlement->provider->is($provider))->toBeTrue()
+    expect($entitlement->provider->is($provider))->toBeTrue()
         ->and($entitlement->is_enabled)->toBeTrue();
 });
 
@@ -245,7 +239,7 @@ it('relates llm model to provider entitlements request logs usage ledgers and in
     ]);
 
     expect($model->provider->is($provider))->toBeTrue()
-        ->and($model->entitlements)->toBeInstanceOf(Collection::class)
+        ->and($model->planEntitlements)->toBeInstanceOf(Collection::class)
         ->and($model->requestLogs)->toBeInstanceOf(Collection::class)
         ->and($model->usageLedgers)->toBeInstanceOf(Collection::class)
         ->and($model->billingInvoiceItems)->toBeInstanceOf(Collection::class);
@@ -267,7 +261,7 @@ it('relates llm provider to models entitlements request logs and usage ledgers',
     expect($fresh->options)->toBe(['timeout' => 30])
         ->and($fresh->is_active)->toBeTrue()
         ->and($fresh->models)->toBeInstanceOf(Collection::class)
-        ->and($fresh->entitlements)->toBeInstanceOf(Collection::class)
+        ->and($fresh->planEntitlements)->toBeInstanceOf(Collection::class)
         ->and($fresh->requestLogs)->toBeInstanceOf(Collection::class)
         ->and($fresh->usageLedgers)->toBeInstanceOf(Collection::class);
 });

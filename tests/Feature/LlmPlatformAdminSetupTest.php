@@ -8,8 +8,8 @@ it('creates llm platform tables with key columns', function () {
     expect(Schema::hasTable('llm_providers'))->toBeTrue();
     expect(Schema::hasTable('llm_models'))->toBeTrue();
     expect(Schema::hasTable('mcp_servers'))->toBeTrue();
-    expect(Schema::hasTable('team_provider_entitlements'))->toBeTrue();
-    expect(Schema::hasTable('team_model_entitlements'))->toBeTrue();
+    expect(Schema::hasTable('plan_provider_entitlements'))->toBeTrue();
+    expect(Schema::hasTable('plan_model_entitlements'))->toBeTrue();
     expect(Schema::hasTable('team_quota_policies'))->toBeTrue();
     expect(Schema::hasTable('api_keys'))->toBeTrue();
     expect(Schema::hasTable('usage_ledgers'))->toBeTrue();

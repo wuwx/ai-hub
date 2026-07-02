@@ -6,17 +6,9 @@ use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
-#[Fillable(['team_id', 'llm_provider_id', 'is_enabled'])]
-class TeamProviderEntitlement extends Model
+#[Fillable(['plan_code', 'llm_provider_id', 'is_enabled'])]
+class PlanProviderEntitlement extends Model
 {
-    /**
-     * @return BelongsTo<Team, $this>
-     */
-    public function team(): BelongsTo
-    {
-        return $this->belongsTo(Team::class);
-    }
-
     /**
      * @return BelongsTo<LlmProvider, $this>
      */

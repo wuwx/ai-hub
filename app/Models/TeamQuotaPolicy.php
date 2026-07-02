@@ -8,6 +8,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 #[Fillable([
     'team_id',
+    'plan_code',
     'daily_token_limit',
     'weekly_token_limit',
     'monthly_token_limit',

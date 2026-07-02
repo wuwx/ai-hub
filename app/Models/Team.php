@@ -108,26 +108,6 @@ class Team extends Model
     }
 
     /**
-     * Get all provider entitlements for this team.
-     *
-     * @return HasMany<TeamProviderEntitlement, $this>
-     */
-    public function providerEntitlements(): HasMany
-    {
-        return $this->hasMany(TeamProviderEntitlement::class);
-    }
-
-    /**
-     * Get all model entitlements for this team.
-     *
-     * @return HasMany<TeamModelEntitlement, $this>
-     */
-    public function modelEntitlements(): HasMany
-    {
-        return $this->hasMany(TeamModelEntitlement::class);
-    }
-
-    /**
      * Get quota policy versions for this team.
      *
      * @return HasMany<TeamQuotaPolicy, $this>

@@ -2,6 +2,7 @@
 
 namespace App\Actions\Teams;
 
+use App\Actions\Billing\SyncTeamQuotaFromSubscription;
 use App\Enums\TeamRole;
 use App\Models\Team;
 use App\Models\User;
@@ -9,6 +10,13 @@ use Illuminate\Support\Facades\DB;
 
 class CreateTeam
 {
+    /**
+     * Create a new team and add the user as owner.
+     */
+    public function __construct(
+        private readonly SyncTeamQuotaFromSubscription $syncTeamQuota,
+    ) {}
+
     /**
      * Create a new team and add the user as owner.
      */
@@ -26,6 +34,11 @@ class CreateTeam
             ]);
 
             $user->switchTeam($team);
+
+            // Provision free-plan quota policy and wallet
+            // so the team can immediately use the gateway.
+            $freePlan = (string) config('services.billing.free_plan_code', 'free');
+            $this->syncTeamQuota->handle(team: $team, planCode: $freePlan, status: 'active');
 
             return $team;
         });

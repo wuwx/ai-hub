@@ -5,8 +5,8 @@ use App\Actions\Billing\RechargeTeamWallet;
 use App\Actions\Billing\ResolveModelPricing;
 use App\Models\LlmModel;
 use App\Models\LlmProvider;
-use App\Models\TeamModelEntitlement;
-use App\Models\TeamProviderEntitlement;
+use App\Models\PlanModelEntitlement;
+use App\Models\PlanProviderEntitlement;
 use App\Models\TeamQuotaPolicy;
 use App\Models\User;
 use Illuminate\Support\Facades\Http;
@@ -17,6 +17,7 @@ it('rejects requests with HTTP 402 when wallet is empty', function () {
 
     TeamQuotaPolicy::create([
         'team_id' => $team->id,
+        'plan_code' => 'free',
         'daily_token_limit' => 100000,
         'monthly_token_limit' => 1000000,
         'effective_from' => now()->subMinute(),
@@ -43,8 +44,8 @@ it('rejects requests with HTTP 402 when wallet is empty', function () {
         'is_active' => true,
     ]);
 
-    TeamProviderEntitlement::create(['team_id' => $team->id, 'llm_provider_id' => $provider->id, 'is_enabled' => true]);
-    TeamModelEntitlement::create(['team_id' => $team->id, 'llm_model_id' => $model->id, 'is_enabled' => true]);
+    PlanProviderEntitlement::create(['plan_code' => 'free', 'llm_provider_id' => $provider->id, 'is_enabled' => true]);
+    PlanModelEntitlement::create(['plan_code' => 'free', 'llm_model_id' => $model->id, 'is_enabled' => true]);
 
     // No wallet recharge — balance is 0
     $apiKey = app(GenerateApiKey::class)->handle($team, 'K', createdBy: $user->id);
@@ -67,6 +68,7 @@ it('forwards the request when wallet has enough balance', function () {
 
     TeamQuotaPolicy::create([
         'team_id' => $team->id,
+        'plan_code' => 'free',
         'daily_token_limit' => 100000,
         'monthly_token_limit' => 1000000,
         'effective_from' => now()->subMinute(),
@@ -93,8 +95,8 @@ it('forwards the request when wallet has enough balance', function () {
         'is_active' => true,
     ]);
 
-    TeamProviderEntitlement::create(['team_id' => $team->id, 'llm_provider_id' => $provider->id, 'is_enabled' => true]);
-    TeamModelEntitlement::create(['team_id' => $team->id, 'llm_model_id' => $model->id, 'is_enabled' => true]);
+    PlanProviderEntitlement::create(['plan_code' => 'free', 'llm_provider_id' => $provider->id, 'is_enabled' => true]);
+    PlanModelEntitlement::create(['plan_code' => 'free', 'llm_model_id' => $model->id, 'is_enabled' => true]);
 
     app(RechargeTeamWallet::class)->handle($team, 100_00, 'Seed');
 
@@ -123,6 +125,7 @@ it('deducts the wallet in real-time after a successful request', function () {
 
     TeamQuotaPolicy::create([
         'team_id' => $team->id,
+        'plan_code' => 'free',
         'daily_token_limit' => 100000,
         'monthly_token_limit' => 1000000,
         'effective_from' => now()->subMinute(),
@@ -149,8 +152,8 @@ it('deducts the wallet in real-time after a successful request', function () {
         'is_active' => true,
     ]);
 
-    TeamProviderEntitlement::create(['team_id' => $team->id, 'llm_provider_id' => $provider->id, 'is_enabled' => true]);
-    TeamModelEntitlement::create(['team_id' => $team->id, 'llm_model_id' => $model->id, 'is_enabled' => true]);
+    PlanProviderEntitlement::create(['plan_code' => 'free', 'llm_provider_id' => $provider->id, 'is_enabled' => true]);
+    PlanModelEntitlement::create(['plan_code' => 'free', 'llm_model_id' => $model->id, 'is_enabled' => true]);
 
     app(RechargeTeamWallet::class)->handle($team, 100_00, 'Seed');
 

@@ -4,8 +4,8 @@ use App\Actions\ApiKeys\GenerateApiKey;
 use App\Actions\Billing\RechargeTeamWallet;
 use App\Models\LlmModel;
 use App\Models\LlmProvider;
-use App\Models\TeamModelEntitlement;
-use App\Models\TeamProviderEntitlement;
+use App\Models\PlanModelEntitlement;
+use App\Models\PlanProviderEntitlement;
 use App\Models\TeamQuotaPolicy;
 use App\Models\User;
 use Illuminate\Support\Facades\Http;
@@ -17,6 +17,7 @@ beforeEach(function () {
     // Set a high token limit but a low spend limit
     $this->quotaPolicy = TeamQuotaPolicy::create([
         'team_id' => $this->team->id,
+        'plan_code' => 'free',
         'daily_token_limit' => 1000000,
         'monthly_token_limit' => 10000000,
         'daily_spend_limit_cents' => 100, // $1.00 max per day
@@ -44,14 +45,14 @@ beforeEach(function () {
         'is_active' => true,
     ]);
 
-    TeamProviderEntitlement::create([
-        'team_id' => $this->team->id,
+    PlanProviderEntitlement::create([
+        'plan_code' => 'free',
         'llm_provider_id' => $this->provider->id,
         'is_enabled' => true,
     ]);
 
-    TeamModelEntitlement::create([
-        'team_id' => $this->team->id,
+    PlanModelEntitlement::create([
+        'plan_code' => 'free',
         'llm_model_id' => $this->model->id,
         'is_enabled' => true,
     ]);

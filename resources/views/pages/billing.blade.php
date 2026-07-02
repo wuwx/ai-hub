@@ -69,6 +69,33 @@ new #[Title('Billing')] class extends Component
             return $this->resolvePlanCodeFromPriceId($subscription->stripe_price ?? '');
         }
 
+        // Fallback: check the active quota policy to determine the plan.
+        $policy = $this->activeQuotaPolicy;
+        if ($policy) {
+            return $this->resolvePlanCodeFromLimits(
+                $policy->daily_token_limit,
+                $policy->weekly_token_limit,
+                $policy->monthly_token_limit,
+            );
+        }
+
+        return (string) config('services.billing.free_plan_code', 'free');
+    }
+
+    protected function resolvePlanCodeFromLimits(?int $daily, ?int $weekly, ?int $monthly): string
+    {
+        $plans = (array) config('services.billing.plans', []);
+
+        foreach ($plans as $code => $plan) {
+            if (
+                ($plan['daily_token_limit'] ?? null) === $daily
+                && ($plan['weekly_token_limit'] ?? null) === $weekly
+                && ($plan['monthly_token_limit'] ?? null) === $monthly
+            ) {
+                return (string) $code;
+            }
+        }
+
         return (string) config('services.billing.free_plan_code', 'free');
     }
 
@@ -211,6 +238,7 @@ new #[Title('Billing')] class extends Component
             'total_cents' => (int) ($planConfig['monthly_price_cents'] ?? 0),
             'issued_at' => now(),
             'due_at' => now()->addDays((int) config('services.billing.invoice_due_days', 7)),
+            'notes' => json_encode(['plan_code' => $planCode]),
         ]);
 
         try {

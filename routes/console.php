@@ -13,6 +13,11 @@ Schedule::command('billing:mark-overdue-invoices')
     ->withoutOverlapping()
     ->description('Mark issued invoices as overdue after due date');
 
+Schedule::command('billing:sync-unpaid-invoices')
+    ->everyFifteenMinutes()
+    ->withoutOverlapping()
+    ->description('Poll Stripe for payment status of unpaid invoices');
+
 Schedule::command('billing:check-wallet-balances --threshold=500')
     ->hourly()
     ->withoutOverlapping()

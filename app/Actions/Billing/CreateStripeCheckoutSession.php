@@ -24,6 +24,20 @@ class CreateStripeCheckoutSession
         $successUrl = (string) config('services.billing.checkout_success_url', $baseUrl.'/'.$team->slug.'/billing/success');
         $cancelUrl = (string) config('services.billing.checkout_cancel_url', $baseUrl.'/'.$team->slug.'/billing/cancel');
 
+        $metadata = [
+            'invoice_number' => $invoice->invoice_number,
+            'team_id' => (string) $invoice->team_id,
+        ];
+
+        // If the invoice has a plan_code in notes, include it in metadata
+        // so the webhook/return handler can activate the quota policy.
+        if ($invoice->notes) {
+            $notes = json_decode($invoice->notes, true);
+            if (is_array($notes) && isset($notes['plan_code'])) {
+                $metadata['plan_code'] = $notes['plan_code'];
+            }
+        }
+
         try {
             $checkout = $team->checkoutCharge(
                 amount: $invoice->total_cents,
@@ -31,10 +45,7 @@ class CreateStripeCheckoutSession
                 sessionOptions: [
                     'success_url' => $successUrl,
                     'cancel_url' => $cancelUrl,
-                    'metadata' => [
-                        'invoice_number' => $invoice->invoice_number,
-                        'team_id' => (string) $invoice->team_id,
-                    ],
+                    'metadata' => $metadata,
                 ],
             );
         } catch (\Exception $exception) {

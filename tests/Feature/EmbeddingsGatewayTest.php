@@ -4,8 +4,8 @@ use App\Actions\ApiKeys\GenerateApiKey;
 use App\Actions\Billing\RechargeTeamWallet;
 use App\Models\LlmModel;
 use App\Models\LlmProvider;
-use App\Models\TeamModelEntitlement;
-use App\Models\TeamProviderEntitlement;
+use App\Models\PlanModelEntitlement;
+use App\Models\PlanProviderEntitlement;
 use App\Models\TeamQuotaPolicy;
 use App\Models\User;
 use Illuminate\Http\Client\Request as HttpRequest;
@@ -140,6 +140,7 @@ function provisionEmbeddingsTargetForTeam(): array
 
     TeamQuotaPolicy::create([
         'team_id' => $team->id,
+        'plan_code' => 'free',
         'daily_token_limit' => 100000,
         'monthly_token_limit' => 1000000,
         'effective_from' => now()->subMinute(),
@@ -170,14 +171,14 @@ function provisionEmbeddingsTargetForTeam(): array
         'is_active' => true,
     ]);
 
-    TeamProviderEntitlement::create([
-        'team_id' => $team->id,
+    PlanProviderEntitlement::create([
+        'plan_code' => 'free',
         'llm_provider_id' => $provider->id,
         'is_enabled' => true,
     ]);
 
-    TeamModelEntitlement::create([
-        'team_id' => $team->id,
+    PlanModelEntitlement::create([
+        'plan_code' => 'free',
         'llm_model_id' => $model->id,
         'is_enabled' => true,
     ]);

@@ -42,11 +42,11 @@ class LlmModel extends Model
     }
 
     /**
-     * @return HasMany<TeamModelEntitlement, $this>
+     * @return HasMany<PlanModelEntitlement, $this>
      */
-    public function entitlements(): HasMany
+    public function planEntitlements(): HasMany
     {
-        return $this->hasMany(TeamModelEntitlement::class);
+        return $this->hasMany(PlanModelEntitlement::class);
     }
 
     /**

@@ -6,6 +6,7 @@ use App\Actions\Gateway\GatewayRequestProcessor;
 use App\Http\Controllers\Controller;
 use App\Models\LlmModel;
 use App\Models\Team;
+use App\Models\TeamQuotaPolicy;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Str;
@@ -69,6 +70,8 @@ class CompatibilityGatewayController extends Controller
     }
 
     /**
+     * Resolve models available to the team based on their current plan.
+     *
      * @return Collection<int, LlmModel>
      */
     protected function resolveModelsForTeam(?Team $team): Collection
@@ -77,17 +80,27 @@ class CompatibilityGatewayController extends Controller
             return collect();
         }
 
+        $planCode = TeamQuotaPolicy::query()
+            ->where('team_id', $team->id)
+            ->where('is_active', true)
+            ->orderByDesc('effective_from')
+            ->value('plan_code');
+
+        if (! $planCode) {
+            return collect();
+        }
+
         return LlmModel::query()
             ->with('provider')
             ->where('is_active', true)
-            ->whereHas('entitlements', function ($query) use ($team) {
-                $query->where('team_id', $team->id)
+            ->whereHas('planEntitlements', function ($query) use ($planCode) {
+                $query->where('plan_code', $planCode)
                     ->where('is_enabled', true);
             })
-            ->whereHas('provider', function ($query) use ($team) {
+            ->whereHas('provider', function ($query) use ($planCode) {
                 $query->where('is_active', true)
-                    ->whereHas('entitlements', function ($entitlements) use ($team) {
-                        $entitlements->where('team_id', $team->id)
+                    ->whereHas('planEntitlements', function ($entitlements) use ($planCode) {
+                        $entitlements->where('plan_code', $planCode)
                             ->where('is_enabled', true);
                     });
             })

@@ -11,6 +11,7 @@ use App\Models\ApiKey;
 use App\Models\LlmModel;
 use App\Models\LlmProvider;
 use App\Models\Team;
+use App\Models\TeamQuotaPolicy;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\Client\Response as HttpResponse;
 use Illuminate\Http\Request;
@@ -473,19 +474,27 @@ class GatewayRequestProcessor
 
     protected function resolveModelForTeam(Team $team, string $externalModelId): ?LlmModel
     {
+        $planCode = TeamQuotaPolicy::query()
+            ->where('team_id', $team->id)
+            ->where('is_active', true)
+            ->orderByDesc('effective_from')
+            ->value('plan_code');
+
+        if (! $planCode) {
+            return null;
+        }
+
         return LlmModel::query()
             ->with('provider')
             ->where('external_model_id', $externalModelId)
             ->where('is_active', true)
-            ->whereHas('entitlements', function ($query) use ($team) {
-                $query->where('team_id', $team->id)
-                    ->where('is_enabled', true);
+            ->whereHas('planEntitlements', function ($query) use ($planCode) {
+                $query->where('plan_code', $planCode)->where('is_enabled', true);
             })
-            ->whereHas('provider', function ($query) use ($team) {
+            ->whereHas('provider', function ($query) use ($planCode) {
                 $query->where('is_active', true)
-                    ->whereHas('entitlements', function ($entitlements) use ($team) {
-                        $entitlements->where('team_id', $team->id)
-                            ->where('is_enabled', true);
+                    ->whereHas('planEntitlements', function ($entitlements) use ($planCode) {
+                        $entitlements->where('plan_code', $planCode)->where('is_enabled', true);
                     });
             })
             ->first();
@@ -950,19 +959,27 @@ class GatewayRequestProcessor
             return null;
         }
 
+        $planCode = TeamQuotaPolicy::query()
+            ->where('team_id', $team->id)
+            ->where('is_active', true)
+            ->orderByDesc('effective_from')
+            ->value('plan_code');
+
+        if (! $planCode) {
+            return null;
+        }
+
         $fallback = LlmModel::query()
             ->with('provider')
             ->where('id', $fallbackId)
             ->where('is_active', true)
-            ->whereHas('entitlements', function ($query) use ($team) {
-                $query->where('team_id', $team->id)
-                    ->where('is_enabled', true);
+            ->whereHas('planEntitlements', function ($query) use ($planCode) {
+                $query->where('plan_code', $planCode)->where('is_enabled', true);
             })
-            ->whereHas('provider', function ($query) use ($team) {
+            ->whereHas('provider', function ($query) use ($planCode) {
                 $query->where('is_active', true)
-                    ->whereHas('entitlements', function ($entitlements) use ($team) {
-                        $entitlements->where('team_id', $team->id)
-                            ->where('is_enabled', true);
+                    ->whereHas('planEntitlements', function ($entitlements) use ($planCode) {
+                        $entitlements->where('plan_code', $planCode)->where('is_enabled', true);
                     });
             })
             ->first();

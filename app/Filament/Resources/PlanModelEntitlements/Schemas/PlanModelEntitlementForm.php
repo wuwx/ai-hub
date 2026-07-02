@@ -1,21 +1,24 @@
 <?php
 
-namespace App\Filament\Resources\TeamModelEntitlements\Schemas;
+namespace App\Filament\Resources\PlanModelEntitlements\Schemas;
 
-use Filament\Forms\Components\Hidden;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\Toggle;
 use Filament\Schemas\Schema;
-use Illuminate\Support\Facades\Auth;
 
-class TeamModelEntitlementForm
+class PlanModelEntitlementForm
 {
     public static function configure(Schema $schema): Schema
     {
         return $schema
             ->components([
-                Hidden::make('team_id')
-                    ->default(fn () => Auth::user()?->current_team_id),
+                Select::make('plan_code')
+                    ->options([
+                        'free' => 'Free',
+                        'pro' => 'Pro',
+                        'enterprise' => 'Enterprise',
+                    ])
+                    ->required(),
                 Select::make('llm_model_id')
                     ->relationship('llmModel', 'name')
                     ->required(),

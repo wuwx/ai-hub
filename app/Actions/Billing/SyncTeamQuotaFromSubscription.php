@@ -39,6 +39,7 @@ class SyncTeamQuotaFromSubscription
 
         return $this->upsertPolicy(
             team: $team,
+            planCode: $planCode,
             dailyTokenLimit: $plan['daily_token_limit'],
             weeklyTokenLimit: $plan['weekly_token_limit'],
             monthlyTokenLimit: $plan['monthly_token_limit'],
@@ -77,6 +78,7 @@ class SyncTeamQuotaFromSubscription
 
     protected function upsertPolicy(
         Team $team,
+        string $planCode,
         ?int $dailyTokenLimit,
         ?int $weeklyTokenLimit,
         ?int $monthlyTokenLimit,
@@ -90,6 +92,7 @@ class SyncTeamQuotaFromSubscription
 
         if (
             $activePolicy
+            && $activePolicy->plan_code === $planCode
             && $activePolicy->daily_token_limit === $dailyTokenLimit
             && $activePolicy->weekly_token_limit === $weeklyTokenLimit
             && $activePolicy->monthly_token_limit === $monthlyTokenLimit
@@ -107,6 +110,7 @@ class SyncTeamQuotaFromSubscription
 
         return TeamQuotaPolicy::create([
             'team_id' => $team->id,
+            'plan_code' => $planCode,
             'daily_token_limit' => $dailyTokenLimit,
             'weekly_token_limit' => $weeklyTokenLimit,
             'monthly_token_limit' => $monthlyTokenLimit,

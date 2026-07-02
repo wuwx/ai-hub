@@ -4,8 +4,9 @@ use App\Actions\ApiKeys\GenerateApiKey;
 use App\Actions\Billing\RechargeTeamWallet;
 use App\Models\LlmModel;
 use App\Models\LlmProvider;
-use App\Models\TeamModelEntitlement;
-use App\Models\TeamProviderEntitlement;
+use App\Models\PlanModelEntitlement;
+use App\Models\PlanProviderEntitlement;
+use App\Models\TeamQuotaPolicy;
 use App\Models\User;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
@@ -15,6 +16,15 @@ beforeEach(function () {
     $this->team = $this->user->currentTeam;
 
     app(RechargeTeamWallet::class)->handle($this->team, 100_00, 'Test balance');
+
+    TeamQuotaPolicy::create([
+        'team_id' => $this->team->id,
+        'plan_code' => 'free',
+        'daily_token_limit' => 100000,
+        'monthly_token_limit' => 1000000,
+        'effective_from' => now()->subMinute(),
+        'is_active' => true,
+    ]);
 
     // Primary provider (will be circuit-opened)
     $this->primaryProvider = LlmProvider::create([
@@ -59,11 +69,11 @@ beforeEach(function () {
         'fallback_model_id' => $this->fallbackModel->id,
     ]);
 
-    // Entitle both providers and models to the team
-    TeamProviderEntitlement::create(['team_id' => $this->team->id, 'llm_provider_id' => $this->primaryProvider->id, 'is_enabled' => true]);
-    TeamProviderEntitlement::create(['team_id' => $this->team->id, 'llm_provider_id' => $this->fallbackProvider->id, 'is_enabled' => true]);
-    TeamModelEntitlement::create(['team_id' => $this->team->id, 'llm_model_id' => $this->primaryModel->id, 'is_enabled' => true]);
-    TeamModelEntitlement::create(['team_id' => $this->team->id, 'llm_model_id' => $this->fallbackModel->id, 'is_enabled' => true]);
+    // Entitle both providers and models to the plan
+    PlanProviderEntitlement::create(['plan_code' => 'free', 'llm_provider_id' => $this->primaryProvider->id, 'is_enabled' => true]);
+    PlanProviderEntitlement::create(['plan_code' => 'free', 'llm_provider_id' => $this->fallbackProvider->id, 'is_enabled' => true]);
+    PlanModelEntitlement::create(['plan_code' => 'free', 'llm_model_id' => $this->primaryModel->id, 'is_enabled' => true]);
+    PlanModelEntitlement::create(['plan_code' => 'free', 'llm_model_id' => $this->fallbackModel->id, 'is_enabled' => true]);
 
     $this->apiKey = app(GenerateApiKey::class)->handle(
         team: $this->team,

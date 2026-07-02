@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Billing;
 
 use App\Actions\Billing\RechargeTeamWallet;
+use App\Actions\Billing\SyncTeamQuotaFromSubscription;
 use App\Models\BillingInvoice;
 use App\Models\Team;
 use App\Models\TeamWalletTransaction;
@@ -21,6 +22,7 @@ class CheckoutReturnController
 {
     public function __construct(
         private readonly RechargeTeamWallet $rechargeTeamWallet,
+        private readonly SyncTeamQuotaFromSubscription $syncTeamQuotaFromSubscription,
     ) {}
 
     /**
@@ -91,6 +93,19 @@ class CheckoutReturnController
             'paid_at' => now(),
             'payment_reference' => $paymentReference,
         ])->save();
+
+        // If the invoice has a plan_code in notes, activate the quota policy.
+        if ($invoice->notes) {
+            $notes = json_decode($invoice->notes, true);
+            $planCode = $notes['plan_code'] ?? '';
+            if ($planCode !== '') {
+                $this->syncTeamQuotaFromSubscription->handle(
+                    team: $team,
+                    planCode: $planCode,
+                    status: 'active',
+                );
+            }
+        }
     }
 
     /**

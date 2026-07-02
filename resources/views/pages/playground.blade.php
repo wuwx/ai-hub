@@ -2,6 +2,7 @@
 
 use App\Models\LlmModel;
 use App\Models\Team;
+use App\Models\TeamQuotaPolicy;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Http;
 use Livewire\Attributes\Computed;
@@ -48,18 +49,26 @@ new #[Title('Playground')] class extends Component
             return [];
         }
 
+        $planCode = TeamQuotaPolicy::query()
+            ->where('team_id', $this->team->id)
+            ->where('is_active', true)
+            ->orderByDesc('effective_from')
+            ->value('plan_code');
+
+        if (! $planCode) {
+            return [];
+        }
+
         return LlmModel::query()
             ->with('provider')
             ->where('is_active', true)
-            ->whereHas('entitlements', function ($query) {
-                $query->where('team_id', $this->team->id)
-                    ->where('is_enabled', true);
+            ->whereHas('planEntitlements', function ($query) use ($planCode) {
+                $query->where('plan_code', $planCode)->where('is_enabled', true);
             })
-            ->whereHas('provider', function ($query) {
+            ->whereHas('provider', function ($query) use ($planCode) {
                 $query->where('is_active', true)
-                    ->whereHas('entitlements', function ($entitlements) {
-                        $entitlements->where('team_id', $this->team->id)
-                            ->where('is_enabled', true);
+                    ->whereHas('planEntitlements', function ($entitlements) use ($planCode) {
+                        $entitlements->where('plan_code', $planCode)->where('is_enabled', true);
                     });
             })
             ->orderBy('name')

@@ -1,20 +1,21 @@
 <?php
 
-namespace App\Filament\Resources\TeamModelEntitlements\Tables;
+namespace App\Filament\Resources\PlanModelEntitlements\Tables;
 
 use Filament\Actions\EditAction;
 use Filament\Tables\Columns\IconColumn;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
 
-class TeamModelEntitlementsTable
+class PlanModelEntitlementsTable
 {
     public static function configure(Table $table): Table
     {
         return $table
             ->columns([
-                TextColumn::make('team.name')
-                    ->searchable(),
+                TextColumn::make('plan_code')
+                    ->searchable()
+                    ->sortable(),
                 TextColumn::make('llmModel.name')
                     ->searchable(),
                 IconColumn::make('is_enabled')

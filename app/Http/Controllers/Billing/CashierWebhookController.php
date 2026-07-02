@@ -268,6 +268,19 @@ class CashierWebhookController extends CashierBaseWebhookController
             'paid_at' => now(),
             'payment_reference' => $paymentReference,
         ])->save();
+
+        // If the invoice has a plan_code in metadata, activate the quota policy.
+        $planCode = (string) data_get($dataObject, 'metadata.plan_code', '');
+        if ($planCode !== '') {
+            $team = Team::query()->find($invoice->team_id);
+            if ($team) {
+                $this->syncTeamQuotaFromSubscription->handle(
+                    team: $team,
+                    planCode: $planCode,
+                    status: 'active',
+                );
+            }
+        }
     }
 
     // ------------------------------------------------------------------
