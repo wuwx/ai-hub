@@ -20,8 +20,11 @@ class CreateTeam
     /**
      * Create a new team and add the user as owner.
      */
-    public function handle(User $user, string $name, bool $isPersonal = false): Team
-    {
+    public function handle(
+        User $user,
+        string $name,
+        bool $isPersonal = false,
+    ): Team {
         return DB::transaction(function () use ($user, $name, $isPersonal) {
             $team = Team::create([
                 'name' => $name,
@@ -35,10 +38,17 @@ class CreateTeam
 
             $user->switchTeam($team);
 
-            // Provision free-plan quota policy and wallet
-            // so the team can immediately use the gateway.
-            $freePlan = (string) config('services.billing.free_plan_code', 'free');
-            $this->syncTeamQuota->handle(team: $team, planCode: $freePlan, status: 'active');
+            // Provision the free-plan quota policy so the team can
+            // immediately use the gateway.
+            $freePlan = (string) config(
+                'services.billing.free_plan_code',
+                'free',
+            );
+            $this->syncTeamQuota->handle(
+                team: $team,
+                planCode: $freePlan,
+                status: 'active',
+            );
 
             return $team;
         });

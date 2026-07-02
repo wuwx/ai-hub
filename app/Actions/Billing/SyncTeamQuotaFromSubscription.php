@@ -4,38 +4,28 @@ namespace App\Actions\Billing;
 
 use App\Models\Team;
 use App\Models\TeamQuotaPolicy;
-use App\Models\TeamWallet;
 use Carbon\CarbonInterface;
 
 class SyncTeamQuotaFromSubscription
 {
-    public function handle(Team $team, string $planCode, string $status = 'active', ?CarbonInterface $at = null): TeamQuotaPolicy
-    {
+    public function handle(
+        Team $team,
+        string $planCode,
+        string $status = 'active',
+        ?CarbonInterface $at = null,
+    ): TeamQuotaPolicy {
         $at ??= now();
 
         $status = strtolower($status);
 
         if (! in_array($status, ['active', 'trialing'], true)) {
-            $planCode = (string) config('services.billing.free_plan_code', 'free');
+            $planCode = (string) config(
+                'services.billing.free_plan_code',
+                'free',
+            );
         }
 
         $plan = $this->resolvePlan($planCode);
-
-        // Provision a post-paid wallet for teams on an active subscription so
-        // the gateway's pre-flight balance check admits traffic. The wallet
-        // balance goes negative as usage is debited and is settled via the
-        // monthly invoice + Stripe checkout flow.
-        if (in_array($status, ['active', 'trialing'], true)) {
-            TeamWallet::query()->firstOrCreate(
-                ['team_id' => $team->id],
-                [
-                    'balance_cents' => 0,
-                    'credit_grant_cents' => 0,
-                    'currency' => (string) config('services.billing.currency', 'USD'),
-                    'is_postpaid' => true,
-                ],
-            );
-        }
 
         return $this->upsertPolicy(
             team: $team,
@@ -54,12 +44,23 @@ class SyncTeamQuotaFromSubscription
     {
         $plans = (array) config('services.billing.plans', []);
 
-        $plan = $plans[$planCode] ?? $plans[(string) config('services.billing.free_plan_code', 'free')] ?? [];
+        $plan =
+            $plans[$planCode] ??
+            ($plans[
+                (string) config('services.billing.free_plan_code', 'free')
+            ] ??
+                []);
 
         return [
-            'daily_token_limit' => $this->nullableInt($plan['daily_token_limit'] ?? null),
-            'weekly_token_limit' => $this->nullableInt($plan['weekly_token_limit'] ?? null),
-            'monthly_token_limit' => $this->nullableInt($plan['monthly_token_limit'] ?? null),
+            'daily_token_limit' => $this->nullableInt(
+                $plan['daily_token_limit'] ?? null,
+            ),
+            'weekly_token_limit' => $this->nullableInt(
+                $plan['weekly_token_limit'] ?? null,
+            ),
+            'monthly_token_limit' => $this->nullableInt(
+                $plan['monthly_token_limit'] ?? null,
+            ),
         ];
     }
 
@@ -91,11 +92,11 @@ class SyncTeamQuotaFromSubscription
             ->first();
 
         if (
-            $activePolicy
-            && $activePolicy->plan_code === $planCode
-            && $activePolicy->daily_token_limit === $dailyTokenLimit
-            && $activePolicy->weekly_token_limit === $weeklyTokenLimit
-            && $activePolicy->monthly_token_limit === $monthlyTokenLimit
+            $activePolicy &&
+            $activePolicy->plan_code === $planCode &&
+            $activePolicy->daily_token_limit === $dailyTokenLimit &&
+            $activePolicy->weekly_token_limit === $weeklyTokenLimit &&
+            $activePolicy->monthly_token_limit === $monthlyTokenLimit
         ) {
             return $activePolicy;
         }

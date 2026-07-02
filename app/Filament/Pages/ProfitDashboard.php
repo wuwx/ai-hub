@@ -2,11 +2,15 @@
 
 namespace App\Filament\Pages;
 
-use App\Models\TeamWalletTransaction;
+use App\Actions\Billing\ResolveModelPricing;
+use App\Models\LlmModel;
+use App\Models\RequestLog;
+use App\Models\TeamQuotaPolicy;
 use BackedEnum;
+use Carbon\CarbonInterface;
 use Filament\Pages\Page;
 use Filament\Support\Icons\Heroicon;
-use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Collection;
 use UnitEnum;
 
 class ProfitDashboard extends Page
@@ -33,120 +37,195 @@ class ProfitDashboard extends Page
      */
     protected function getViewData(): array
     {
+        $monthStart = now()->startOfMonth();
+        $monthEnd = now()->endOfMonth();
+
         return [
-            'totals' => $this->getTotals(),
-            'byModel' => $this->getByModel(),
-            'byTeam' => $this->getByTeam(),
+            'totals' => $this->getTotals($monthStart, $monthEnd),
+            'byModel' => $this->getByModel($monthStart, $monthEnd),
+            'byTeam' => $this->getByTeam($monthStart, $monthEnd),
         ];
     }
 
     /**
-     * @return array{revenue_cents: int, cost_cents: int, profit_cents: int, margin_pct: float, today_revenue_cents: int, month_revenue_cents: int}
+     * Revenue is the flat monthly subscription fee for each team's active
+     * plan (real MRR, driven by Stripe subscriptions synced into
+     * TeamQuotaPolicy). Cost is the upstream LLM spend incurred this month.
+     * There is no more per-request metered billing, so profit here reflects
+     * subscription income against infrastructure cost, not per-token margin.
+     *
+     * @return array{revenue_cents: int, cost_cents: int, profit_cents: int, margin_pct: float, active_paid_teams: int, free_teams: int}
      */
-    protected function getTotals(): array
-    {
-        $row = DB::table('team_wallet_transactions')
-            ->selectRaw('
-                COALESCE(SUM(CASE WHEN type = "debit" THEN -amount_cents ELSE 0 END), 0) as revenue_cents,
-                COALESCE(SUM(CASE WHEN type = "debit" THEN COALESCE(JSON_UNEXTRACT(metadata, "$.cost_cents"), 0) ELSE 0 END), 0) as cost_cents
-            ')
-            ->first();
+    protected function getTotals(
+        CarbonInterface $monthStart,
+        CarbonInterface $monthEnd,
+    ): array {
+        $freeCode = (string) config('services.billing.free_plan_code', 'free');
+        $planCounts = $this->activePlanCounts();
 
-        // SQLite doesn't support JSON_UNEXTRACT in tests; compute cost from metadata via PHP
-        $revenueCents = (int) TeamWalletTransaction::where('type', 'debit')->sum(DB::raw('ABS(amount_cents)'));
-
-        $costCents = 0;
-        TeamWalletTransaction::where('type', 'debit')->chunk(500, function ($transactions) use (&$costCents) {
-            foreach ($transactions as $tx) {
-                $metadata = is_array($tx->metadata) ? $tx->metadata : json_decode($tx->metadata ?? '{}', true);
-                $costCents += (int) ($metadata['cost_cents'] ?? 0);
-            }
-        });
+        $revenueCents = $this->monthlyRecurringRevenueCents($planCounts);
+        $costCents = $this->usageCostCents($monthStart, $monthEnd);
 
         $profitCents = $revenueCents - $costCents;
-        $marginPct = $revenueCents > 0 ? round(($profitCents / $revenueCents) * 100, 1) : 0.0;
-
-        $todayRevenue = (int) TeamWalletTransaction::where('type', 'debit')
-            ->whereDate('created_at', today())
-            ->sum(DB::raw('ABS(amount_cents)'));
-
-        $monthRevenue = (int) TeamWalletTransaction::where('type', 'debit')
-            ->whereMonth('created_at', now()->month)
-            ->whereYear('created_at', now()->year)
-            ->sum(DB::raw('ABS(amount_cents)'));
+        $marginPct =
+            $revenueCents > 0
+                ? round(($profitCents / $revenueCents) * 100, 1)
+                : 0.0;
 
         return [
             'revenue_cents' => $revenueCents,
             'cost_cents' => $costCents,
             'profit_cents' => $profitCents,
             'margin_pct' => $marginPct,
-            'today_revenue_cents' => $todayRevenue,
-            'month_revenue_cents' => $monthRevenue,
+            'active_paid_teams' => (int) $planCounts->except($freeCode)->sum(),
+            'free_teams' => (int) $planCounts->get($freeCode, 0),
         ];
     }
 
     /**
-     * @return array<int, array<string, mixed>>
+     * @return Collection<string, int> team count keyed by plan code
      */
-    protected function getByModel(): array
+    protected function activePlanCounts(): Collection
     {
-        $transactions = TeamWalletTransaction::where('type', 'debit')->get();
+        return TeamQuotaPolicy::query()
+            ->where('is_active', true)
+            ->selectRaw('plan_code, COUNT(*) as team_count')
+            ->groupBy('plan_code')
+            ->pluck('team_count', 'plan_code');
+    }
 
-        $byModel = [];
+    /**
+     * @param  Collection<string, int>  $planCounts
+     */
+    protected function monthlyRecurringRevenueCents(Collection $planCounts): int
+    {
+        $plans = (array) config('services.billing.plans', []);
+        $revenueCents = 0;
 
-        foreach ($transactions as $tx) {
-            $metadata = is_array($tx->metadata) ? $tx->metadata : json_decode($tx->metadata ?? '{}', true);
-            $modelId = $metadata['model_external_id'] ?? 'unknown';
-
-            if (! isset($byModel[$modelId])) {
-                $byModel[$modelId] = [
-                    'model' => $modelId,
-                    'revenue_cents' => 0,
-                    'cost_cents' => 0,
-                    'request_count' => 0,
-                ];
-            }
-
-            $byModel[$modelId]['revenue_cents'] += abs($tx->amount_cents);
-            $byModel[$modelId]['cost_cents'] += (int) ($metadata['cost_cents'] ?? 0);
-            $byModel[$modelId]['request_count']++;
+        foreach ($planCounts as $planCode => $teamCount) {
+            $revenueCents +=
+                (int) ($plans[$planCode]['monthly_price_cents'] ?? 0) *
+                $teamCount;
         }
 
-        // Calculate profit and sort by profit descending
-        return collect($byModel)
-            ->map(fn ($row) => array_merge($row, [
-                'profit_cents' => $row['revenue_cents'] - $row['cost_cents'],
-                'margin_pct' => $row['revenue_cents'] > 0
-                    ? round((($row['revenue_cents'] - $row['cost_cents']) / $row['revenue_cents']) * 100, 1)
-                    : 0.0,
-            ]))
-            ->sortByDesc('profit_cents')
+        return $revenueCents;
+    }
+
+    protected function usageCostCents(
+        CarbonInterface $monthStart,
+        CarbonInterface $monthEnd,
+    ): int {
+        return collect($this->getByModel($monthStart, $monthEnd))->sum(
+            'cost_cents',
+        );
+    }
+
+    /**
+     * @return array<int, array{model: string, request_count: int, cost_cents: int}>
+     */
+    protected function getByModel(
+        CarbonInterface $monthStart,
+        CarbonInterface $monthEnd,
+    ): array {
+        $resolver = app(ResolveModelPricing::class);
+
+        $rows = RequestLog::query()
+            ->whereBetween('requested_at', [$monthStart, $monthEnd])
+            ->selectRaw(
+                'llm_model_id, SUM(token_input) as token_input, SUM(token_output) as token_output, COUNT(*) as request_count',
+            )
+            ->groupBy('llm_model_id')
+            ->get();
+
+        $models = LlmModel::query()
+            ->whereIn('id', $rows->pluck('llm_model_id')->filter()->values())
+            ->get()
+            ->keyBy('id');
+
+        return $rows
+            ->map(function ($row) use ($models, $resolver) {
+                $model = $row->llm_model_id
+                    ? $models->get((int) $row->llm_model_id)
+                    : null;
+
+                return [
+                    'model' => $model?->external_model_id ?? 'unknown',
+                    'request_count' => (int) $row->request_count,
+                    'cost_cents' => $model
+                        ? $resolver->costCents(
+                            $model,
+                            (int) $row->token_input,
+                            (int) $row->token_output,
+                        )
+                        : 0,
+                ];
+            })
+            ->sortByDesc('cost_cents')
             ->values()
             ->toArray();
     }
 
     /**
-     * @return array<int, array<string, mixed>>
+     * @return array<int, array{team_name: string, plan_code: string, request_count: int, revenue_cents: int, cost_cents: int, profit_cents: int}>
      */
-    protected function getByTeam(): array
-    {
-        $transactions = TeamWalletTransaction::where('type', 'debit')
+    protected function getByTeam(
+        CarbonInterface $monthStart,
+        CarbonInterface $monthEnd,
+    ): array {
+        $plans = (array) config('services.billing.plans', []);
+        $freeCode = (string) config('services.billing.free_plan_code', 'free');
+        $resolver = app(ResolveModelPricing::class);
+
+        $policies = TeamQuotaPolicy::query()
+            ->where('is_active', true)
             ->with('team')
+            ->get()
+            ->keyBy('team_id');
+
+        $usageRows = RequestLog::query()
+            ->whereBetween('requested_at', [$monthStart, $monthEnd])
+            ->selectRaw(
+                'team_id, llm_model_id, SUM(token_input) as token_input, SUM(token_output) as token_output, COUNT(*) as request_count',
+            )
+            ->groupBy('team_id', 'llm_model_id')
             ->get()
             ->groupBy('team_id');
 
+        $models = LlmModel::query()->get()->keyBy('id');
+
         $byTeam = [];
 
-        foreach ($transactions as $teamId => $txs) {
-            $revenue = $txs->sum(fn ($tx) => abs($tx->amount_cents));
-            $cost = $txs->sum(fn ($tx) => (int) (is_array($tx->metadata) ? ($tx->metadata['cost_cents'] ?? 0) : 0));
+        foreach ($usageRows as $teamId => $rows) {
+            $policy = $policies->get($teamId);
+            $planCode = $policy->plan_code ?? $freeCode;
+
+            $costCents = 0;
+            $requestCount = 0;
+
+            foreach ($rows as $row) {
+                $model = $row->llm_model_id
+                    ? $models->get((int) $row->llm_model_id)
+                    : null;
+                $costCents += $model
+                    ? $resolver->costCents(
+                        $model,
+                        (int) $row->token_input,
+                        (int) $row->token_output,
+                    )
+                    : 0;
+                $requestCount += (int) $row->request_count;
+            }
+
+            $revenueCents =
+                (int) ($plans[$planCode]['monthly_price_cents'] ?? 0);
 
             $byTeam[] = [
-                'team_name' => $txs->first()?->team?->name ?? "Team #{$teamId}",
-                'revenue_cents' => $revenue,
-                'cost_cents' => $cost,
-                'profit_cents' => $revenue - $cost,
-                'request_count' => $txs->count(),
+                'team_name' => $policy?->team?->name ?? "Team #{$teamId}",
+                'plan_code' => $planCode,
+                'request_count' => $requestCount,
+                'revenue_cents' => $revenueCents,
+                'cost_cents' => $costCents,
+                'profit_cents' => $revenueCents - $costCents,
             ];
         }
 

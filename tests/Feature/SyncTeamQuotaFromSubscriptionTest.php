@@ -2,7 +2,6 @@
 
 use App\Actions\Billing\SyncTeamQuotaFromSubscription;
 use App\Models\TeamQuotaPolicy;
-use App\Models\TeamWallet;
 use App\Models\User;
 
 beforeEach(function () {
@@ -19,18 +18,11 @@ it('creates a quota policy with the correct plan_code', function () {
         ->and($policy->is_active)->toBeTrue();
 });
 
-it('creates a wallet for active subscriptions', function () {
+it('deactivates policy for inactive subscriptions', function () {
     $sync = app(SyncTeamQuotaFromSubscription::class);
-    $sync->handle(team: $this->team, planCode: 'pro', status: 'active');
+    $policy = $sync->handle(team: $this->team, planCode: 'pro', status: 'canceled');
 
-    expect(TeamWallet::where('team_id', $this->team->id)->exists())->toBeTrue();
-});
-
-it('does not create a wallet for inactive subscriptions', function () {
-    $sync = app(SyncTeamQuotaFromSubscription::class);
-    $sync->handle(team: $this->team, planCode: 'pro', status: 'canceled');
-
-    expect(TeamWallet::where('team_id', $this->team->id)->exists())->toBeFalse();
+    expect($policy->plan_code)->toBe('free');
 });
 
 it('falls back to free plan when status is not active or trialing', function () {

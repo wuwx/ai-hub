@@ -1,7 +1,6 @@
 <?php
 
 use App\Actions\ApiKeys\GenerateApiKey;
-use App\Actions\Billing\RechargeTeamWallet;
 use App\Models\LlmModel;
 use App\Models\LlmProvider;
 use App\Models\PlanModelEntitlement;
@@ -44,10 +43,16 @@ beforeEach(function () {
         'is_active' => true,
     ]);
 
-    PlanProviderEntitlement::create(['plan_code' => 'free', 'llm_provider_id' => $provider->id, 'is_enabled' => true]);
-    PlanModelEntitlement::create(['plan_code' => 'free', 'llm_model_id' => $model->id, 'is_enabled' => true]);
-
-    app(RechargeTeamWallet::class)->handle($this->team, 100_00, 'Test balance');
+    PlanProviderEntitlement::create([
+        'plan_code' => 'free',
+        'llm_provider_id' => $provider->id,
+        'is_enabled' => true,
+    ]);
+    PlanModelEntitlement::create([
+        'plan_code' => 'free',
+        'llm_model_id' => $model->id,
+        'is_enabled' => true,
+    ]);
 
     $this->apiKey = app(GenerateApiKey::class)->handle(
         team: $this->team,
@@ -60,32 +65,55 @@ beforeEach(function () {
 
 it('allows requests when under the concurrent limit', function () {
     Http::fake([
-        'https://openai.mock/v1/chat/completions' => Http::response([
-            'id' => 'test',
-            'object' => 'chat.completion',
-            'choices' => [['index' => 0, 'finish_reason' => 'stop', 'message' => ['role' => 'assistant', 'content' => 'ok']]],
-            'usage' => ['prompt_tokens' => 5, 'completion_tokens' => 3, 'total_tokens' => 8],
-        ], 200),
+        'https://openai.mock/v1/chat/completions' => Http::response(
+            [
+                'id' => 'test',
+                'object' => 'chat.completion',
+                'choices' => [
+                    [
+                        'index' => 0,
+                        'finish_reason' => 'stop',
+                        'message' => ['role' => 'assistant', 'content' => 'ok'],
+                    ],
+                ],
+                'usage' => [
+                    'prompt_tokens' => 5,
+                    'completion_tokens' => 3,
+                    'total_tokens' => 8,
+                ],
+            ],
+            200,
+        ),
     ]);
 
-    $response = $this->withToken($this->apiKey->plainTextKey)->postJson('/api/v1/chat/completions', [
-        'model' => 'gpt-4.1',
-        'messages' => [['role' => 'user', 'content' => 'hello']],
-    ]);
+    $response = $this->withToken($this->apiKey->plainTextKey)->postJson(
+        '/api/v1/chat/completions',
+        [
+            'model' => 'gpt-4.1',
+            'messages' => [['role' => 'user', 'content' => 'hello']],
+        ],
+    );
 
     $response->assertOk();
 });
 
 it('blocks requests when concurrent limit is reached', function () {
     // Simulate max concurrent requests already in flight
-    Cache::put(sprintf('gateway:concurrent:%d', $this->team->id), 50, now()->addMinutes(10));
+    Cache::put(
+        sprintf('gateway:concurrent:%d', $this->team->id),
+        50,
+        now()->addMinutes(10),
+    );
 
     Http::fake();
 
-    $response = $this->withToken($this->apiKey->plainTextKey)->postJson('/api/v1/chat/completions', [
-        'model' => 'gpt-4.1',
-        'messages' => [['role' => 'user', 'content' => 'hello']],
-    ]);
+    $response = $this->withToken($this->apiKey->plainTextKey)->postJson(
+        '/api/v1/chat/completions',
+        [
+            'model' => 'gpt-4.1',
+            'messages' => [['role' => 'user', 'content' => 'hello']],
+        ],
+    );
 
     $response->assertStatus(429);
     $response->assertJsonPath('error.code', 'too_many_concurrent_requests');
@@ -94,18 +122,34 @@ it('blocks requests when concurrent limit is reached', function () {
 
 it('decrements concurrent counter after request completes', function () {
     Http::fake([
-        'https://openai.mock/v1/chat/completions' => Http::response([
-            'id' => 'test2',
-            'object' => 'chat.completion',
-            'choices' => [['index' => 0, 'finish_reason' => 'stop', 'message' => ['role' => 'assistant', 'content' => 'ok']]],
-            'usage' => ['prompt_tokens' => 5, 'completion_tokens' => 3, 'total_tokens' => 8],
-        ], 200),
+        'https://openai.mock/v1/chat/completions' => Http::response(
+            [
+                'id' => 'test2',
+                'object' => 'chat.completion',
+                'choices' => [
+                    [
+                        'index' => 0,
+                        'finish_reason' => 'stop',
+                        'message' => ['role' => 'assistant', 'content' => 'ok'],
+                    ],
+                ],
+                'usage' => [
+                    'prompt_tokens' => 5,
+                    'completion_tokens' => 3,
+                    'total_tokens' => 8,
+                ],
+            ],
+            200,
+        ),
     ]);
 
-    $this->withToken($this->apiKey->plainTextKey)->postJson('/api/v1/chat/completions', [
-        'model' => 'gpt-4.1',
-        'messages' => [['role' => 'user', 'content' => 'hello']],
-    ]);
+    $this->withToken($this->apiKey->plainTextKey)->postJson(
+        '/api/v1/chat/completions',
+        [
+            'model' => 'gpt-4.1',
+            'messages' => [['role' => 'user', 'content' => 'hello']],
+        ],
+    );
 
     // After request completes, concurrent counter should be 0 (or not exist)
     $count = Cache::get(sprintf('gateway:concurrent:%d', $this->team->id), 0);

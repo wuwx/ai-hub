@@ -1,7 +1,6 @@
 <?php
 
 use App\Actions\ApiKeys\GenerateApiKey;
-use App\Actions\Billing\RechargeTeamWallet;
 use App\Models\LlmModel;
 use App\Models\LlmProvider;
 use App\Models\PlanModelEntitlement;
@@ -341,13 +340,6 @@ function provisionGatewayTargetForTeam(string $adapterType, string $externalMode
         'llm_model_id' => $model->id,
         'is_enabled' => true,
     ]);
-
-    // Pre-pay the wallet so the gateway pre-flight balance check passes.
-    app(RechargeTeamWallet::class)->handle(
-        team: $team,
-        amountCents: 100_00, // $100.00
-        description: 'Test seed balance',
-    );
 
     $apiKey = app(GenerateApiKey::class)->handle(
         team: $team,

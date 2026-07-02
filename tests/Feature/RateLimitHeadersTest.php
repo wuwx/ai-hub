@@ -1,7 +1,6 @@
 <?php
 
 use App\Actions\ApiKeys\GenerateApiKey;
-use App\Actions\Billing\RechargeTeamWallet;
 use App\Models\LlmModel;
 use App\Models\LlmProvider;
 use App\Models\PlanModelEntitlement;
@@ -52,12 +51,6 @@ beforeEach(function () {
         'llm_model_id' => $this->model->id,
         'is_enabled' => true,
     ]);
-
-    app(RechargeTeamWallet::class)->handle(
-        team: $this->team,
-        amountCents: 100_00,
-        description: 'Test seed balance',
-    );
 
     $this->apiKey = app(GenerateApiKey::class)->handle(
         team: $this->team,

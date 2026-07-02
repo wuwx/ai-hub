@@ -209,11 +209,7 @@
                                 <td class="px-6 py-3 pr-4 font-mono text-emerald-400">unauthorized</td>
                                 <td class="px-6 py-3">Missing or invalid API key</td>
                             </tr>
-                            <tr class="border-b border-zinc-800/50">
-                                <td class="px-6 py-3 pr-4 font-mono text-red-400">402</td>
-                                <td class="px-6 py-3 pr-4 font-mono text-emerald-400">insufficient_balance</td>
-                                <td class="px-6 py-3">Wallet balance is insufficient for this request</td>
-                            </tr>
+
                             <tr class="border-b border-zinc-800/50">
                                 <td class="px-6 py-3 pr-4 font-mono text-red-400">403</td>
                                 <td class="px-6 py-3 pr-4 font-mono text-emerald-400">model_not_allowed</td>

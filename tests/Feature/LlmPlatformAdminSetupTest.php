@@ -14,15 +14,11 @@ it('creates llm platform tables with key columns', function () {
     expect(Schema::hasTable('api_keys'))->toBeTrue();
     expect(Schema::hasTable('usage_ledgers'))->toBeTrue();
     expect(Schema::hasTable('request_logs'))->toBeTrue();
-    expect(Schema::hasTable('billing_invoices'))->toBeTrue();
-    expect(Schema::hasTable('billing_invoice_items'))->toBeTrue();
     expect(Schema::hasTable('subscriptions'))->toBeTrue();
 
     expect(Schema::hasColumns('api_keys', ['team_id', 'key_hash', 'last_four', 'revoked_at']))->toBeTrue();
     expect(Schema::hasColumns('team_quota_policies', ['daily_token_limit', 'weekly_token_limit', 'monthly_token_limit']))->toBeTrue();
     expect(Schema::hasColumns('request_logs', ['protocol', 'is_streaming', 'tool_calls_count', 'latency_ms']))->toBeTrue();
-    expect(Schema::hasColumns('billing_invoices', ['team_id', 'invoice_number', 'billing_month', 'status', 'total_cents']))->toBeTrue();
-    expect(Schema::hasColumns('billing_invoice_items', ['billing_invoice_id', 'llm_model_id', 'token_total', 'line_subtotal_cents']))->toBeTrue();
     expect(Schema::hasColumns('subscriptions', ['team_id', 'stripe_id', 'stripe_status', 'stripe_price']))->toBeTrue();
 });
 

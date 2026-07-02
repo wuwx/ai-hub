@@ -3,12 +3,11 @@
 namespace App\Http\Controllers;
 
 use App\Models\ApiKey;
-use App\Models\BillingInvoice;
 use App\Models\LlmProvider;
 use App\Models\RequestLog;
 use App\Models\Team;
-use App\Models\TeamWallet;
 use Illuminate\Http\Response;
+use Laravel\Cashier\Subscription;
 
 class PrometheusMetricsController extends Controller
 {
@@ -19,7 +18,10 @@ class PrometheusMetricsController extends Controller
         // Gateway request metrics
         $totalRequests = RequestLog::count();
         $totalErrors = RequestLog::where('status_code', '>=', 400)->count();
-        $todayRequests = RequestLog::whereDate('requested_at', today())->count();
+        $todayRequests = RequestLog::whereDate(
+            'requested_at',
+            today(),
+        )->count();
         $todayErrors = RequestLog::whereDate('requested_at', today())
             ->where('status_code', '>=', 400)
             ->count();
@@ -47,7 +49,9 @@ class PrometheusMetricsController extends Controller
         $totalApiKeys = ApiKey::count();
         $activeApiKeys = ApiKey::whereNull('revoked_at')
             ->where(function ($query) {
-                $query->whereNull('expires_at')->orWhere('expires_at', '>', now());
+                $query
+                    ->whereNull('expires_at')
+                    ->orWhere('expires_at', '>', now());
             })
             ->count();
 
@@ -74,21 +78,29 @@ class PrometheusMetricsController extends Controller
         }
 
         // Billing metrics
-        $totalWalletBalance = (int) TeamWallet::where('is_postpaid', false)->sum('balance_cents');
-        $overdueInvoices = BillingInvoice::where('status', 'overdue')->count();
-        $paidInvoices = BillingInvoice::where('status', 'paid')->count();
-        $issuedInvoices = BillingInvoice::where('status', 'issued')->count();
+        $activeSubscriptions = Subscription::where(
+            'stripe_status',
+            'active',
+        )->count();
+        $trialingSubscriptions = Subscription::where(
+            'stripe_status',
+            'trialing',
+        )->count();
+        $pastDueSubscriptions = Subscription::where(
+            'stripe_status',
+            'past_due',
+        )->count();
 
-        $metrics[] = '# TYPE ai_hub_wallet_balance_cents gauge';
-        $metrics[] = "ai_hub_wallet_balance_cents {$totalWalletBalance}";
-        $metrics[] = '# TYPE ai_hub_invoices gauge';
-        $metrics[] = "ai_hub_invoices{status=\"overdue\"} {$overdueInvoices}";
-        $metrics[] = "ai_hub_invoices{status=\"paid\"} {$paidInvoices}";
-        $metrics[] = "ai_hub_invoices{status=\"issued\"} {$issuedInvoices}";
+        $metrics[] = '# TYPE ai_hub_subscriptions gauge';
+        $metrics[] = "ai_hub_subscriptions{status=\"active\"} {$activeSubscriptions}";
+        $metrics[] = "ai_hub_subscriptions{status=\"trialing\"} {$trialingSubscriptions}";
+        $metrics[] = "ai_hub_subscriptions{status=\"past_due\"} {$pastDueSubscriptions}";
 
         // Latency metrics (average over last 24h)
-        $avgLatency = (int) RequestLog::where('requested_at', '>=', now()->subDay())
-            ->avg('latency_ms') ?? 0;
+        $avgLatency =
+            (int) RequestLog::where('requested_at', '>=', now()->subDay())->avg(
+                'latency_ms',
+            ) ?? 0;
 
         $metrics[] = '# TYPE ai_hub_request_latency_ms_avg gauge';
         $metrics[] = "ai_hub_request_latency_ms_avg {$avgLatency}";

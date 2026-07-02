@@ -22,7 +22,6 @@ it('documents error codes', function () {
     $response = $this->get('/docs');
 
     $response->assertOk();
-    $response->assertSee('insufficient_balance');
     $response->assertSee('quota_exceeded');
     $response->assertSee('provider_circuit_open');
 });

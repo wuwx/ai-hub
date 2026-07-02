@@ -1,7 +1,6 @@
 <?php
 
 use App\Actions\ApiKeys\GenerateApiKey;
-use App\Actions\Billing\RechargeTeamWallet;
 use App\Models\LlmModel;
 use App\Models\LlmProvider;
 use App\Models\PlanModelEntitlement;
@@ -11,44 +10,55 @@ use App\Models\User;
 use Illuminate\Http\Client\Request as HttpRequest;
 use Illuminate\Support\Facades\Http;
 
-it('forwards embeddings requests to the upstream provider and returns the response', function () {
-    [$plainTextKey, $modelExternalId] = provisionEmbeddingsTargetForTeam();
+it(
+    'forwards embeddings requests to the upstream provider and returns the response',
+    function () {
+        [$plainTextKey, $modelExternalId] = provisionEmbeddingsTargetForTeam();
 
-    Http::fake([
-        'https://openai.mock/v1/embeddings' => function (HttpRequest $request) {
-            expect($request['model'])->toBe('text-embedding-3-small');
-            expect($request['input'])->toBe('hello world');
+        Http::fake([
+            'https://openai.mock/v1/embeddings' => function (
+                HttpRequest $request,
+            ) {
+                expect($request['model'])->toBe('text-embedding-3-small');
+                expect($request['input'])->toBe('hello world');
 
-            return Http::response([
-                'object' => 'list',
-                'data' => [
+                return Http::response(
                     [
-                        'object' => 'embedding',
-                        'index' => 0,
-                        'embedding' => [0.1, 0.2, 0.3],
+                        'object' => 'list',
+                        'data' => [
+                            [
+                                'object' => 'embedding',
+                                'index' => 0,
+                                'embedding' => [0.1, 0.2, 0.3],
+                            ],
+                        ],
+                        'model' => 'text-embedding-3-small',
+                        'usage' => [
+                            'prompt_tokens' => 2,
+                            'total_tokens' => 2,
+                        ],
                     ],
-                ],
-                'model' => 'text-embedding-3-small',
-                'usage' => [
-                    'prompt_tokens' => 2,
-                    'total_tokens' => 2,
-                ],
-            ], 200);
-        },
-    ]);
+                    200,
+                );
+            },
+        ]);
 
-    $response = $this->withToken($plainTextKey)->postJson('/api/v1/embeddings', [
-        'model' => $modelExternalId,
-        'input' => 'hello world',
-    ]);
+        $response = $this->withToken($plainTextKey)->postJson(
+            '/api/v1/embeddings',
+            [
+                'model' => $modelExternalId,
+                'input' => 'hello world',
+            ],
+        );
 
-    $response->assertOk();
-    $response->assertHeader('X-Trace-Id');
-    $response->assertJsonPath('object', 'list');
-    $response->assertJsonPath('data.0.object', 'embedding');
-    $response->assertJsonPath('data.0.embedding', [0.1, 0.2, 0.3]);
-    $response->assertJsonPath('usage.prompt_tokens', 2);
-});
+        $response->assertOk();
+        $response->assertHeader('X-Trace-Id');
+        $response->assertJsonPath('object', 'list');
+        $response->assertJsonPath('data.0.object', 'embedding');
+        $response->assertJsonPath('data.0.embedding', [0.1, 0.2, 0.3]);
+        $response->assertJsonPath('usage.prompt_tokens', 2);
+    },
+);
 
 it('accepts an array of inputs for batch embeddings', function () {
     [$plainTextKey, $modelExternalId] = provisionEmbeddingsTargetForTeam();
@@ -57,22 +67,36 @@ it('accepts an array of inputs for batch embeddings', function () {
         'https://openai.mock/v1/embeddings' => function (HttpRequest $request) {
             expect($request['input'])->toBe(['first', 'second']);
 
-            return Http::response([
-                'object' => 'list',
-                'data' => [
-                    ['object' => 'embedding', 'index' => 0, 'embedding' => [0.1]],
-                    ['object' => 'embedding', 'index' => 1, 'embedding' => [0.2]],
+            return Http::response(
+                [
+                    'object' => 'list',
+                    'data' => [
+                        [
+                            'object' => 'embedding',
+                            'index' => 0,
+                            'embedding' => [0.1],
+                        ],
+                        [
+                            'object' => 'embedding',
+                            'index' => 1,
+                            'embedding' => [0.2],
+                        ],
+                    ],
+                    'model' => 'text-embedding-3-small',
+                    'usage' => ['prompt_tokens' => 4, 'total_tokens' => 4],
                 ],
-                'model' => 'text-embedding-3-small',
-                'usage' => ['prompt_tokens' => 4, 'total_tokens' => 4],
-            ], 200);
+                200,
+            );
         },
     ]);
 
-    $response = $this->withToken($plainTextKey)->postJson('/api/v1/embeddings', [
-        'model' => $modelExternalId,
-        'input' => ['first', 'second'],
-    ]);
+    $response = $this->withToken($plainTextKey)->postJson(
+        '/api/v1/embeddings',
+        [
+            'model' => $modelExternalId,
+            'input' => ['first', 'second'],
+        ],
+    );
 
     $response->assertOk();
     $response->assertJsonPath('data.0.embedding', [0.1]);
@@ -82,9 +106,12 @@ it('accepts an array of inputs for batch embeddings', function () {
 it('rejects embeddings without a model field', function () {
     [$plainTextKey] = provisionEmbeddingsTargetForTeam();
 
-    $response = $this->withToken($plainTextKey)->postJson('/api/v1/embeddings', [
-        'input' => 'hello',
-    ]);
+    $response = $this->withToken($plainTextKey)->postJson(
+        '/api/v1/embeddings',
+        [
+            'input' => 'hello',
+        ],
+    );
 
     $response->assertStatus(422);
     $response->assertJsonPath('error.code', 'missing_model');
@@ -93,9 +120,12 @@ it('rejects embeddings without a model field', function () {
 it('rejects embeddings without an input field', function () {
     [$plainTextKey, $modelExternalId] = provisionEmbeddingsTargetForTeam();
 
-    $response = $this->withToken($plainTextKey)->postJson('/api/v1/embeddings', [
-        'model' => $modelExternalId,
-    ]);
+    $response = $this->withToken($plainTextKey)->postJson(
+        '/api/v1/embeddings',
+        [
+            'model' => $modelExternalId,
+        ],
+    );
 
     $response->assertStatus(422);
     $response->assertJsonPath('error.code', 'missing_input');
@@ -108,30 +138,48 @@ it('rejects embeddings without a valid API key', function () {
     ])->assertUnauthorized();
 });
 
-it('records usage and debits the wallet for successful embeddings', function () {
-    [$plainTextKey, $modelExternalId, $team] = provisionEmbeddingsTargetForTeam();
+it(
+    'records usage for successful embeddings',
+    function () {
+        [
+            $plainTextKey,
+            $modelExternalId,
+            $team,
+        ] = provisionEmbeddingsTargetForTeam();
 
-    $balanceBefore = $team->wallet()->first()->balance_cents;
+        Http::fake([
+            'https://openai.mock/v1/embeddings' => Http::response(
+                [
+                    'object' => 'list',
+                    'data' => [
+                        [
+                            'object' => 'embedding',
+                            'index' => 0,
+                            'embedding' => [0.1],
+                        ],
+                    ],
+                    'model' => 'text-embedding-3-small',
+                    'usage' => ['prompt_tokens' => 10, 'total_tokens' => 10],
+                ],
+                200,
+            ),
+        ]);
 
-    Http::fake([
-        'https://openai.mock/v1/embeddings' => Http::response([
-            'object' => 'list',
-            'data' => [['object' => 'embedding', 'index' => 0, 'embedding' => [0.1]]],
-            'model' => 'text-embedding-3-small',
-            'usage' => ['prompt_tokens' => 10, 'total_tokens' => 10],
-        ], 200),
-    ]);
+        $this->withToken($plainTextKey)
+            ->postJson('/api/v1/embeddings', [
+                'model' => $modelExternalId,
+                'input' => 'chargeable input',
+            ])
+            ->assertOk();
 
-    $this->withToken($plainTextKey)->postJson('/api/v1/embeddings', [
-        'model' => $modelExternalId,
-        'input' => 'chargeable input',
-    ])->assertOk();
-
-    $team->refresh();
-    $balanceAfter = $team->wallet()->first()->balance_cents;
-
-    expect($balanceAfter)->toBeLessThan($balanceBefore);
-});
+        $this->assertDatabaseHas('request_logs', [
+            'team_id' => $team->id,
+            'protocol' => 'openai',
+            'endpoint' => '/v1/embeddings',
+            'status_code' => 200,
+        ]);
+    },
+);
 
 function provisionEmbeddingsTargetForTeam(): array
 {
@@ -182,12 +230,6 @@ function provisionEmbeddingsTargetForTeam(): array
         'llm_model_id' => $model->id,
         'is_enabled' => true,
     ]);
-
-    app(RechargeTeamWallet::class)->handle(
-        team: $team,
-        amountCents: 100_00,
-        description: 'Test seed balance',
-    );
 
     $apiKey = app(GenerateApiKey::class)->handle(
         team: $team,

@@ -7,9 +7,6 @@ use App\Models\Membership;
 use App\Models\PlanModelEntitlement;
 use App\Models\PlanProviderEntitlement;
 use App\Models\RequestLog;
-use App\Models\Team;
-use App\Models\TeamWallet;
-use App\Models\TeamWalletTransaction;
 use App\Models\UsageLedger;
 use App\Models\User;
 use Carbon\CarbonInterface;
@@ -75,40 +72,6 @@ it('relates plan provider entitlements to plan code and provider with boolean ca
 
     expect($entitlement->provider->is($provider))->toBeTrue()
         ->and($entitlement->is_enabled)->toBeTrue();
-});
-
-it('relates wallet transactions to team wallet and morph source with casts', function () {
-    $owner = User::factory()->create();
-    $team = $owner->currentTeam;
-    $wallet = TeamWallet::create([
-        'team_id' => $team->id,
-        'balance_cents' => 10000,
-        'currency' => 'USD',
-        'type' => 'prepaid',
-    ]);
-
-    $transaction = TeamWalletTransaction::create([
-        'team_id' => $team->id,
-        'team_wallet_id' => $wallet->id,
-        'source_type' => Team::class,
-        'source_id' => $team->id,
-        'type' => 'recharge',
-        'amount_cents' => 5000,
-        'balance_after_cents' => 15000,
-        'currency' => 'USD',
-        'description' => 'Stripe recharge',
-        'metadata' => ['stripe_pi' => 'pi_123'],
-        'reference_id' => 'ref-1',
-    ]);
-
-    $fresh = $transaction->fresh();
-
-    expect($fresh->team->is($team))->toBeTrue()
-        ->and($fresh->wallet->is($wallet))->toBeTrue()
-        ->and($fresh->source->is($team))->toBeTrue()
-        ->and($fresh->amount_cents)->toBe(5000)
-        ->and($fresh->balance_after_cents)->toBe(15000)
-        ->and($fresh->metadata)->toBe(['stripe_pi' => 'pi_123']);
 });
 
 it('relates usage ledger to team api key provider and model with casts', function () {
@@ -241,8 +204,7 @@ it('relates llm model to provider entitlements request logs usage ledgers and in
     expect($model->provider->is($provider))->toBeTrue()
         ->and($model->planEntitlements)->toBeInstanceOf(Collection::class)
         ->and($model->requestLogs)->toBeInstanceOf(Collection::class)
-        ->and($model->usageLedgers)->toBeInstanceOf(Collection::class)
-        ->and($model->billingInvoiceItems)->toBeInstanceOf(Collection::class);
+        ->and($model->usageLedgers)->toBeInstanceOf(Collection::class);
 });
 
 it('relates llm provider to models entitlements request logs and usage ledgers', function () {

@@ -1,7 +1,6 @@
 <?php
 
 use App\Actions\ApiKeys\GenerateApiKey;
-use App\Actions\Billing\RechargeTeamWallet;
 use App\Models\ApiKey;
 use App\Models\LlmModel;
 use App\Models\LlmProvider;
@@ -67,8 +66,6 @@ function provisionScopedKeyForTeam(array $allowedModels = []): array
             'is_enabled' => true,
         ]);
     }
-
-    app(RechargeTeamWallet::class)->handle($team, 100_00, 'Seed');
 
     $apiKeyResult = app(GenerateApiKey::class)->handle(
         team: $team,

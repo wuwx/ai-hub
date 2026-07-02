@@ -1,7 +1,6 @@
 <?php
 
 return [
-
     /*
     |--------------------------------------------------------------------------
     | Third Party Services
@@ -37,15 +36,36 @@ return [
 
     'llm_gateway' => [
         'timeout_seconds' => (int) env('LLM_GATEWAY_TIMEOUT_SECONDS', 120),
-        'anthropic_version' => env('LLM_GATEWAY_ANTHROPIC_VERSION', '2023-06-01'),
+        'anthropic_version' => env(
+            'LLM_GATEWAY_ANTHROPIC_VERSION',
+            '2023-06-01',
+        ),
         'retry_attempts' => (int) env('LLM_GATEWAY_RETRY_ATTEMPTS', 2),
         'retry_backoff_ms' => (int) env('LLM_GATEWAY_RETRY_BACKOFF_MS', 150),
-        'circuit_failure_threshold' => (int) env('LLM_GATEWAY_CIRCUIT_FAILURE_THRESHOLD', 5),
-        'circuit_cooldown_seconds' => (int) env('LLM_GATEWAY_CIRCUIT_COOLDOWN_SECONDS', 60),
-        'idempotency_ttl_seconds' => (int) env('LLM_GATEWAY_IDEMPOTENCY_TTL_SECONDS', 300),
-        'api_key_rate_limit_per_minute' => (int) env('LLM_GATEWAY_API_KEY_RATE_LIMIT_PER_MINUTE', 120),
-        'api_key_rate_limit_decay_seconds' => (int) env('LLM_GATEWAY_API_KEY_RATE_LIMIT_DECAY_SECONDS', 60),
-        'max_concurrent_per_team' => (int) env('LLM_GATEWAY_MAX_CONCURRENT_PER_TEAM', 50),
+        'circuit_failure_threshold' => (int) env(
+            'LLM_GATEWAY_CIRCUIT_FAILURE_THRESHOLD',
+            5,
+        ),
+        'circuit_cooldown_seconds' => (int) env(
+            'LLM_GATEWAY_CIRCUIT_COOLDOWN_SECONDS',
+            60,
+        ),
+        'idempotency_ttl_seconds' => (int) env(
+            'LLM_GATEWAY_IDEMPOTENCY_TTL_SECONDS',
+            300,
+        ),
+        'api_key_rate_limit_per_minute' => (int) env(
+            'LLM_GATEWAY_API_KEY_RATE_LIMIT_PER_MINUTE',
+            120,
+        ),
+        'api_key_rate_limit_decay_seconds' => (int) env(
+            'LLM_GATEWAY_API_KEY_RATE_LIMIT_DECAY_SECONDS',
+            60,
+        ),
+        'max_concurrent_per_team' => (int) env(
+            'LLM_GATEWAY_MAX_CONCURRENT_PER_TEAM',
+            50,
+        ),
         // Provider upstream secrets. Each entry is loaded from env() here (so it
         // survives `config:cache`) and referenced from llm_providers.secret_ref
         // as `secret://KEY` (recommended) or legacy `env://KEY`.
@@ -60,9 +80,7 @@ return [
 
     'billing' => [
         'currency' => env('BILLING_CURRENCY', 'USD'),
-        'invoice_due_days' => (int) env('BILLING_INVOICE_DUE_DAYS', 7),
         'free_plan_code' => env('BILLING_FREE_PLAN_CODE', 'free'),
-        'signup_credit_cents' => (int) env('BILLING_SIGNUP_CREDIT_CENTS', 500),
         'plans' => [
             'free' => [
                 'name' => 'Free',
@@ -99,7 +117,10 @@ return [
                 'name' => 'Enterprise',
                 'description' => 'Unlimited scale for large organizations',
                 'monthly_price_cents' => 19900,
-                'stripe_price_id' => env('STRIPE_ENTERPRISE_PRICE_ID', 'price_enterprise'),
+                'stripe_price_id' => env(
+                    'STRIPE_ENTERPRISE_PRICE_ID',
+                    'price_enterprise',
+                ),
                 'daily_token_limit' => null,
                 'weekly_token_limit' => null,
                 'monthly_token_limit' => null,
@@ -114,5 +135,4 @@ return [
             ],
         ],
     ],
-
 ];

@@ -8,8 +8,7 @@ use Livewire\Attributes\Computed;
 use Livewire\Attributes\Title;
 use Livewire\Component;
 
-new #[Title('Dashboard')] class extends Component
-{
+new #[Title("Dashboard")] class extends Component {
     #[Computed]
     public function team(): ?Team
     {
@@ -19,27 +18,27 @@ new #[Title('Dashboard')] class extends Component
     #[Computed]
     public function currentPlanCode(): string
     {
-        if (! $this->team) {
-            return 'free';
+        if (!$this->team) {
+            return "free";
         }
 
         $subscription = $this->team->subscription();
 
         if ($subscription && $subscription->valid()) {
-            $stripePriceId = $subscription->stripe_price ?? '';
+            $stripePriceId = $subscription->stripe_price ?? "";
 
-            if ($stripePriceId !== '') {
-                $plans = (array) config('services.billing.plans', []);
+            if ($stripePriceId !== "") {
+                $plans = (array) config("services.billing.plans", []);
 
                 foreach ($plans as $code => $plan) {
-                    if (($plan['stripe_price_id'] ?? null) === $stripePriceId) {
+                    if (($plan["stripe_price_id"] ?? null) === $stripePriceId) {
                         return (string) $code;
                     }
                 }
             }
         }
 
-        return (string) config('services.billing.free_plan_code', 'free');
+        return (string) config("services.billing.free_plan_code", "free");
     }
 
     /**
@@ -48,20 +47,20 @@ new #[Title('Dashboard')] class extends Component
     #[Computed]
     public function snapshot(): array
     {
-        if (! $this->team) {
+        if (!$this->team) {
             return [
-                'today_tokens' => 0,
-                'today_requests' => 0,
-                'month_tokens' => 0,
-                'month_requests' => 0,
-                'month_errors' => 0,
-                'month_error_rate' => 0.0,
-                'daily_limit' => null,
-                'monthly_limit' => null,
-                'daily_remaining' => null,
-                'monthly_remaining' => null,
-                'top_models' => [],
-                'requests_chart' => ['labels' => [], 'values' => []],
+                "today_tokens" => 0,
+                "today_requests" => 0,
+                "month_tokens" => 0,
+                "month_requests" => 0,
+                "month_errors" => 0,
+                "month_error_rate" => 0.0,
+                "daily_limit" => null,
+                "monthly_limit" => null,
+                "daily_remaining" => null,
+                "monthly_remaining" => null,
+                "top_models" => [],
+                "requests_chart" => ["labels" => [], "values" => []],
             ];
         }
 
@@ -71,38 +70,48 @@ new #[Title('Dashboard')] class extends Component
     #[Computed]
     public function canViewUsage(): bool
     {
-        if (! $this->team) {
+        if (!$this->team) {
             return false;
         }
 
-        return Auth::user()->hasTeamPermission($this->team, TeamPermission::ViewUsage);
+        return Auth::user()->hasTeamPermission(
+            $this->team,
+            TeamPermission::ViewUsage,
+        );
     }
 
     #[Computed]
     public function canManageApiKeys(): bool
     {
-        if (! $this->team) {
+        if (!$this->team) {
             return false;
         }
 
-        return Auth::user()->hasTeamPermission($this->team, TeamPermission::ManageApiKeys);
+        return Auth::user()->hasTeamPermission(
+            $this->team,
+            TeamPermission::ManageApiKeys,
+        );
     }
 
     #[Computed]
     public function canViewBilling(): bool
     {
-        if (! $this->team) {
+        if (!$this->team) {
             return false;
         }
 
-        return Auth::user()->hasTeamPermission($this->team, TeamPermission::ViewBilling);
+        return Auth::user()->hasTeamPermission(
+            $this->team,
+            TeamPermission::ViewBilling,
+        );
     }
 
     public function render()
     {
         return $this->view();
     }
-}; ?>
+};
+?>
 
 <section class="w-full p-6">
     <livewire:pages::teams.pending-invitations-modal />
@@ -265,7 +274,7 @@ new #[Title('Dashboard')] class extends Component
                             </div>
                             <div>
                                 <div class="text-sm font-medium">{{ __('Billing & Subscription') }}</div>
-                                <div class="text-xs text-zinc-500 dark:text-zinc-400">{{ __('Manage plan, wallet & invoices') }}</div>
+                                <div class="text-xs text-zinc-500 dark:text-zinc-400">{{ __('Manage plan & subscription') }}</div>
                             </div>
                         </a>
                     @endif

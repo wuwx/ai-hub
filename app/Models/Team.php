@@ -11,7 +11,6 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
-use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Carbon;
 use Laravel\Cashier\Billable;
@@ -28,7 +27,17 @@ use Laravel\Cashier\Billable;
  * @property-read Collection<int, Membership> $memberships
  * @property-read Collection<int, User> $members
  */
-#[Fillable(['name', 'slug', 'is_personal', 'stripe_id', 'pm_type', 'pm_last_four', 'trial_ends_at'])]
+#[
+    Fillable([
+        'name',
+        'slug',
+        'is_personal',
+        'stripe_id',
+        'pm_type',
+        'pm_last_four',
+        'trial_ends_at',
+    ]),
+]
 class Team extends Model
 {
     /** @use HasFactory<TeamFactory> */
@@ -49,7 +58,10 @@ class Team extends Model
 
         static::updating(function (Team $team) {
             if ($team->isDirty('name')) {
-                $team->slug = static::generateUniqueTeamSlug($team->name, $team->id);
+                $team->slug = static::generateUniqueTeamSlug(
+                    $team->name,
+                    $team->id,
+                );
             }
         });
     }
@@ -71,7 +83,12 @@ class Team extends Model
      */
     public function members(): BelongsToMany
     {
-        return $this->belongsToMany(User::class, 'team_members', 'team_id', 'user_id')
+        return $this->belongsToMany(
+            User::class,
+            'team_members',
+            'team_id',
+            'user_id',
+        )
             ->using(Membership::class)
             ->withPivot(['role'])
             ->withTimestamps();
@@ -135,36 +152,6 @@ class Team extends Model
     public function requestLogs(): HasMany
     {
         return $this->hasMany(RequestLog::class);
-    }
-
-    /**
-     * Get billing invoices for this team.
-     *
-     * @return HasMany<BillingInvoice, $this>
-     */
-    public function billingInvoices(): HasMany
-    {
-        return $this->hasMany(BillingInvoice::class);
-    }
-
-    /**
-     * Get the team's pre-paid / post-paid wallet.
-     *
-     * @return HasOne<TeamWallet, $this>
-     */
-    public function wallet(): HasOne
-    {
-        return $this->hasOne(TeamWallet::class);
-    }
-
-    /**
-     * Get wallet transactions for this team.
-     *
-     * @return HasMany<TeamWalletTransaction, $this>
-     */
-    public function walletTransactions(): HasMany
-    {
-        return $this->hasMany(TeamWalletTransaction::class);
     }
 
     /**

@@ -7,22 +7,24 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
-#[Fillable([
-    'llm_provider_id',
-    'name',
-    'external_model_id',
-    'capabilities',
-    'pricing',
-    'context_window',
-    'max_output_tokens',
-    'cost_input_per_1m_usd',
-    'cost_output_per_1m_usd',
-    'sell_input_per_1m_usd',
-    'sell_output_per_1m_usd',
-    'markup_percent',
-    'is_active',
-    'fallback_model_id',
-])]
+#[
+    Fillable([
+        'llm_provider_id',
+        'name',
+        'external_model_id',
+        'capabilities',
+        'pricing',
+        'context_window',
+        'max_output_tokens',
+        'cost_input_per_1m_usd',
+        'cost_output_per_1m_usd',
+        'sell_input_per_1m_usd',
+        'sell_output_per_1m_usd',
+        'markup_percent',
+        'is_active',
+        'fallback_model_id',
+    ]),
+]
 class LlmModel extends Model
 {
     /**
@@ -63,14 +65,6 @@ class LlmModel extends Model
     public function usageLedgers(): HasMany
     {
         return $this->hasMany(UsageLedger::class);
-    }
-
-    /**
-     * @return HasMany<BillingInvoiceItem, $this>
-     */
-    public function billingInvoiceItems(): HasMany
-    {
-        return $this->hasMany(BillingInvoiceItem::class);
     }
 
     /**

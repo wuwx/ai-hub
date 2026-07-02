@@ -3,9 +3,7 @@
 use App\Http\Controllers\Billing\CashierWebhookController;
 use App\Http\Controllers\Billing\CheckoutReturnController;
 use App\Http\Controllers\Billing\StripePortalController;
-use App\Http\Controllers\Billing\WalletRechargeController;
 use App\Http\Controllers\DataExportController;
-use App\Http\Controllers\InvoiceViewController;
 use App\Http\Middleware\EnsureTeamMembership;
 use Illuminate\Support\Facades\Route;
 
@@ -21,8 +19,14 @@ Route::view('privacy', 'privacy')->name('privacy');
 Route::prefix(config('cashier.path', 'stripe'))
     ->name('cashier.')
     ->group(function () {
-        Route::post('webhook', [CashierWebhookController::class, 'handleWebhook'])->name('webhook');
-        Route::get('payment/{id}', '\Laravel\Cashier\Http\Controllers\PaymentController@show')->name('payment');
+        Route::post('webhook', [
+            CashierWebhookController::class,
+            'handleWebhook',
+        ])->name('webhook');
+        Route::get(
+            'payment/{id}',
+            "\Laravel\Cashier\Http\Controllers\PaymentController@show",
+        )->name('payment');
     });
 
 Route::prefix('{current_team}')
@@ -34,42 +38,43 @@ Route::prefix('{current_team}')
 
         Route::livewire('usage', 'pages::usage')->name('usage.index');
 
-        Route::livewire('playground', 'pages::playground')->name('playground.index');
+        Route::livewire('playground', 'pages::playground')->name(
+            'playground.index',
+        );
 
         Route::livewire('billing', 'pages::billing')->name('billing.index');
 
-        Route::livewire('request-logs', 'pages::request-logs')->name('request-logs.index');
+        Route::livewire('request-logs', 'pages::request-logs')->name(
+            'request-logs.index',
+        );
 
-        // Stripe checkout return handlers — verify payment & redirect to billing.
-        Route::get('billing/success', [CheckoutReturnController::class, 'invoice'])->name('billing.success');
-        Route::get('billing/cancel', fn () => to_route('billing.index'))->name('billing.cancel');
-        Route::get('billing/wallet/success', [CheckoutReturnController::class, 'wallet'])->name('billing.wallet.success');
-        Route::get('billing/wallet/cancel', fn () => to_route('billing.index'))->name('billing.wallet.cancel');
-
-        // Customer self-service wallet top-up endpoint.
-        Route::post('billing/wallet/recharge', [WalletRechargeController::class, 'store'])
-            ->name('billing.wallet.recharge');
+        // Stripe checkout return handlers — verify the subscription & redirect to billing.
+        Route::get('billing/success', [
+            CheckoutReturnController::class,
+            'subscription',
+        ])->name('billing.success');
+        Route::get('billing/cancel', fn () => to_route('billing.index'))->name(
+            'billing.cancel',
+        );
 
         // Stripe Customer Portal — manage subscription, payment methods, invoices.
-        Route::post('billing/portal', [StripePortalController::class, 'store'])
-            ->name('billing.portal');
+        Route::post('billing/portal', [
+            StripePortalController::class,
+            'store',
+        ])->name('billing.portal');
 
         // CSV data export endpoints.
-        Route::get('usage/export', [DataExportController::class, 'exportUsage'])
-            ->name('usage.export');
-
-        Route::get('billing/transactions/export', [DataExportController::class, 'exportWalletTransactions'])
-            ->name('billing.transactions.export');
-
-        Route::get('billing/invoices/export', [DataExportController::class, 'exportInvoices'])
-            ->name('billing.invoices.export');
-
-        Route::get('billing/invoices/{invoice}', [InvoiceViewController::class, 'show'])
-            ->name('billing.invoices.show');
+        Route::get('usage/export', [
+            DataExportController::class,
+            'exportUsage',
+        ])->name('usage.export');
     });
 
 Route::middleware(['auth'])->group(function () {
-    Route::livewire('invitations/{invitation}/accept', 'pages::teams.accept-invitation')->name('invitations.accept');
+    Route::livewire(
+        'invitations/{invitation}/accept',
+        'pages::teams.accept-invitation',
+    )->name('invitations.accept');
 });
 
 require __DIR__.'/settings.php';

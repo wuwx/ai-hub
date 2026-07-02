@@ -1,7 +1,6 @@
 <?php
 
 use App\Actions\ApiKeys\GenerateApiKey;
-use App\Actions\Billing\RechargeTeamWallet;
 use App\Models\LlmModel;
 use App\Models\LlmProvider;
 use App\Models\PlanModelEntitlement;
@@ -14,8 +13,6 @@ use Illuminate\Support\Facades\Http;
 beforeEach(function () {
     $this->user = User::factory()->create();
     $this->team = $this->user->currentTeam;
-
-    app(RechargeTeamWallet::class)->handle($this->team, 100_00, 'Test balance');
 
     TeamQuotaPolicy::create([
         'team_id' => $this->team->id,

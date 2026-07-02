@@ -37,13 +37,13 @@
                     <li>Attempt to overwhelm, reverse-engineer, or attack the Service infrastructure</li>
                     <li>Resell or redistribute API access without authorization</li>
                 </ul>
-                <p class="mt-2">Violations may result in immediate account suspension and forfeiture of prepaid balances.</p>
+                <p class="mt-2">Violations may result in immediate account suspension.</p>
             </section>
 
             <section>
                 <h2 class="text-xl font-semibold text-zinc-100">4. Billing and Payment</h2>
-                <p class="mt-2">The Service offers prepaid and postpaid billing models. For prepaid accounts, you must maintain a positive wallet balance; requests will be rejected when balance is insufficient. For postpaid accounts, you are billed monthly and must pay invoices by the due date. Credit limits apply to postpaid accounts.</p>
-                <p class="mt-2">Overdue invoices may result in service suspension. Refunds are processed according to our refund policy and applicable law.</p>
+                <p class="mt-2">The Service is billed as a recurring monthly subscription via Stripe. Each plan grants a fixed token quota; usage beyond your plan's limits is rejected until you upgrade or your quota resets. Subscriptions renew automatically each billing cycle until cancelled.</p>
+                <p class="mt-2">Failed or overdue payments may result in service suspension. Refunds are processed according to our refund policy and applicable law.</p>
             </section>
 
             <section>
