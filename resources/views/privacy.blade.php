@@ -69,17 +69,12 @@
             </section>
 
             <section>
-                <h2 class="text-xl font-semibold text-zinc-100">7. Webhooks</h2>
-                <p class="mt-2">If you configure customer event webhooks, event data is delivered to your specified endpoints with HMAC signature verification. Delivery logs (including response bodies) are retained for debugging purposes.</p>
-            </section>
-
-            <section>
-                <h2 class="text-xl font-semibold text-zinc-100">8. Changes to This Policy</h2>
+                <h2 class="text-xl font-semibold text-zinc-100">7. Changes to This Policy</h2>
                 <p class="mt-2">We may update this Privacy Policy from time to time. Material changes will be communicated via email or dashboard notification.</p>
             </section>
 
             <section>
-                <h2 class="text-xl font-semibold text-zinc-100">9. Contact</h2>
+                <h2 class="text-xl font-semibold text-zinc-100">8. Contact</h2>
                 <p class="mt-2">For privacy questions or data requests, contact the platform operator.</p>
             </section>
         </div>

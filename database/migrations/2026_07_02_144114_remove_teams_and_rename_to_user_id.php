@@ -64,29 +64,6 @@ return new class extends Migration
         });
         Schema::rename('team_quota_policies', 'quota_policies');
 
-        // 4. Rename team_webhook_endpoints -> webhook_endpoints and team_id -> user_id.
-        // First drop the foreign key in webhook_deliveries.
-        Schema::table('webhook_deliveries', function (Blueprint $table) {
-            $table->dropForeign(['team_webhook_endpoint_id']);
-            $table->dropIndex('webhook_deliveries_endpoint_created_idx');
-            $table->renameColumn('team_webhook_endpoint_id', 'webhook_endpoint_id');
-        });
-
-        Schema::table('team_webhook_endpoints', function (Blueprint $table) {
-            $table->dropForeign(['team_id']);
-            $table->dropIndex('team_webhooks_team_active_idx');
-            $table->renameColumn('team_id', 'user_id');
-            $table->foreign('user_id')->references('id')->on('users')->cascadeOnDelete();
-            $table->index(['user_id', 'is_active'], 'webhooks_user_active_idx');
-        });
-        Schema::rename('team_webhook_endpoints', 'webhook_endpoints');
-
-        // Re-add the foreign key in webhook_deliveries pointing to the renamed table.
-        Schema::table('webhook_deliveries', function (Blueprint $table) {
-            $table->foreign('webhook_endpoint_id')->references('id')->on('webhook_endpoints')->cascadeOnDelete();
-            $table->index(['webhook_endpoint_id', 'created_at'], 'webhook_deliveries_endpoint_created_idx');
-        });
-
         // 5. Rename team_id -> user_id in subscriptions table.
         Schema::table('subscriptions', function (Blueprint $table) {
             $table->renameColumn('team_id', 'user_id');
@@ -152,27 +129,6 @@ return new class extends Migration
                 ->after('password')
                 ->constrained('teams')
                 ->nullOnDelete();
-        });
-
-        // Rename webhook_endpoints back to team_webhook_endpoints.
-        Schema::table('webhook_deliveries', function (Blueprint $table) {
-            $table->dropForeign(['webhook_endpoint_id']);
-            $table->dropIndex('webhook_deliveries_endpoint_created_idx');
-            $table->renameColumn('webhook_endpoint_id', 'team_webhook_endpoint_id');
-        });
-
-        Schema::rename('webhook_endpoints', 'team_webhook_endpoints');
-        Schema::table('team_webhook_endpoints', function (Blueprint $table) {
-            $table->dropForeign(['user_id']);
-            $table->dropIndex('webhooks_user_active_idx');
-            $table->renameColumn('user_id', 'team_id');
-            $table->foreign('team_id')->references('id')->on('teams')->cascadeOnDelete();
-            $table->index(['team_id', 'is_active'], 'team_webhooks_team_active_idx');
-        });
-
-        Schema::table('webhook_deliveries', function (Blueprint $table) {
-            $table->foreign('team_webhook_endpoint_id')->references('id')->on('team_webhook_endpoints')->cascadeOnDelete();
-            $table->index(['team_webhook_endpoint_id', 'created_at'], 'webhook_deliveries_endpoint_created_idx');
         });
 
         // Rename quota_policies back to team_quota_policies.

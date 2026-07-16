@@ -2,7 +2,6 @@
 
 namespace App\Actions\Usage;
 
-use App\Actions\Webhooks\DispatchWebhookEvent;
 use App\Models\QuotaPolicy;
 use App\Models\UsageLedger;
 use App\Models\User;
@@ -12,12 +11,6 @@ use Illuminate\Support\Facades\Cache;
 
 class CheckQuotaThresholds
 {
-    public function __construct(
-        private readonly DispatchWebhookEvent $dispatchWebhookEvent,
-    ) {
-        //
-    }
-
     /**
      * Inspect the user's current usage against their active quota policy and
      * notify them when a configured alert threshold is crossed.
@@ -94,12 +87,5 @@ class CheckQuotaThresholds
             percentage: $percentage,
             userName: $user->name,
         ));
-
-        $this->dispatchWebhookEvent->handle($user, 'quota.threshold_exceeded', [
-            'period' => $period,
-            'used' => $used,
-            'limit' => $limit,
-            'percentage' => $percentage,
-        ]);
     }
 }
