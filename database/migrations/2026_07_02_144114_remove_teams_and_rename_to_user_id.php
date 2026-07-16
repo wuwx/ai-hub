@@ -44,14 +44,6 @@ return new class extends Migration
             $table->index(['user_id', 'created_at'], 'request_logs_user_created_idx');
         });
 
-        Schema::table('audit_logs', function (Blueprint $table) {
-            $table->dropForeign(['team_id']);
-            $table->dropIndex('audit_logs_team_created_idx');
-            $table->renameColumn('team_id', 'user_id');
-            $table->foreign('user_id')->references('id')->on('users')->cascadeOnDelete();
-            $table->index(['user_id', 'created_at'], 'audit_logs_user_created_idx');
-        });
-
         // 3. Rename team_quota_policies -> quota_policies and team_id -> user_id.
         Schema::table('team_quota_policies', function (Blueprint $table) {
             $table->dropForeign(['team_id']);
@@ -151,14 +143,6 @@ return new class extends Migration
         });
 
         // Rename user_id back to team_id in dependent tables.
-        Schema::table('audit_logs', function (Blueprint $table) {
-            $table->dropForeign(['user_id']);
-            $table->dropIndex('audit_logs_user_created_idx');
-            $table->renameColumn('user_id', 'team_id');
-            $table->foreign('team_id')->references('id')->on('teams')->cascadeOnDelete();
-            $table->index(['team_id', 'created_at'], 'audit_logs_team_created_idx');
-        });
-
         Schema::table('request_logs', function (Blueprint $table) {
             $table->dropForeign(['user_id']);
             $table->dropIndex('request_logs_user_created_idx');

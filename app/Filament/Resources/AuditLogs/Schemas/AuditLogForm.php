@@ -12,15 +12,13 @@ class AuditLogForm
     {
         return $schema
             ->components([
-                TextInput::make('action')
+                TextInput::make('description')
+                    ->label('Action')
                     ->required(),
-                TextInput::make('actor.name')
+                TextInput::make('causer.name')
                     ->label('Actor'),
                 TextInput::make('subject_type'),
                 TextInput::make('subject_id'),
-                TextInput::make('ip_address'),
-                TextInput::make('user_agent')
-                    ->columnSpanFull(),
                 KeyValue::make('properties')
                     ->columnSpanFull(),
             ])

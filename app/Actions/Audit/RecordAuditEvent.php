@@ -2,50 +2,41 @@
 
 namespace App\Actions\Audit;
 
-use App\Models\AuditLog;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Http\Request;
+use Spatie\Activitylog\Models\Activity;
 
 class RecordAuditEvent
 {
     /**
-     * Record an audit event for a user-scoped administrative action.
+     * Record an audit event for an administrative action.
+     *
+     * The acting user is stored via Spatie's native causer relation; system
+     * events pass a null actor and are recorded anonymously.
      *
      * @param  array<string, mixed>  $properties
      */
     public function handle(
-        User $user,
         string $action,
         ?Model $subject = null,
         array $properties = [],
         ?User $actor = null,
-        ?string $ipAddress = null,
-        ?string $userAgent = null,
-    ): AuditLog {
-        return AuditLog::create([
-            'user_id' => $user->id,
-            'actor_id' => $actor?->id,
-            'action' => $action,
-            'subject_type' => $subject?->getMorphClass(),
-            'subject_id' => $subject?->getKey(),
-            'properties' => $properties,
-            'ip_address' => $ipAddress,
-            'user_agent' => $userAgent,
-        ]);
-    }
+    ): Activity {
+        $logger = activity();
 
-    /**
-     * Resolve actor, IP, and user-agent from the incoming HTTP request.
-     *
-     * @return array{0: ?User, 1: ?string, 2: ?string}
-     */
-    public function fromRequest(Request $request): array
-    {
-        return [
-            $request->user(),
-            $request->ip(),
-            $request->userAgent(),
-        ];
+        if ($subject instanceof Model) {
+            $logger->performedOn($subject);
+        }
+
+        if ($actor instanceof User) {
+            $logger->causedBy($actor);
+        } else {
+            $logger->causedByAnonymous();
+        }
+
+        $logger->withProperties($properties);
+
+        /** @var Activity $activity */
+        return $logger->log($action);
     }
 }

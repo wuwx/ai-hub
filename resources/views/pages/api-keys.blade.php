@@ -72,7 +72,6 @@ new #[Title('API Keys')] class extends Component
         );
 
         app(RecordAuditEvent::class)->handle(
-            user: Auth::user(),
             action: 'api_key.created',
             subject: $generated->apiKey,
             properties: [
@@ -81,8 +80,6 @@ new #[Title('API Keys')] class extends Component
                 'expires_at' => $generated->apiKey->expires_at?->toDateTimeString(),
             ],
             actor: Auth::user(),
-            ipAddress: request()->ip(),
-            userAgent: request()->userAgent(),
         );
 
         $this->generatedPlainTextKey = $generated->plainTextKey;
@@ -106,7 +103,6 @@ new #[Title('API Keys')] class extends Component
         $apiKey->update(['revoked_at' => now()]);
 
         app(RecordAuditEvent::class)->handle(
-            user: Auth::user(),
             action: 'api_key.revoked',
             subject: $apiKey,
             properties: [
@@ -114,8 +110,6 @@ new #[Title('API Keys')] class extends Component
                 'last_four' => $apiKey->last_four,
             ],
             actor: Auth::user(),
-            ipAddress: request()->ip(),
-            userAgent: request()->userAgent(),
         );
 
         $this->dispatch('api-key-revoked');
@@ -136,7 +130,6 @@ new #[Title('API Keys')] class extends Component
         $generated = app(RotateApiKey::class)->handle($apiKey);
 
         app(RecordAuditEvent::class)->handle(
-            user: Auth::user(),
             action: 'api_key.rotated',
             subject: $generated->apiKey,
             properties: [
@@ -144,8 +137,6 @@ new #[Title('API Keys')] class extends Component
                 'last_four' => $generated->apiKey->last_four,
             ],
             actor: Auth::user(),
-            ipAddress: request()->ip(),
-            userAgent: request()->userAgent(),
         );
 
         $this->rotatedPlainTextKey = $generated->plainTextKey;

@@ -11,18 +11,17 @@ class AuditLogsTable
     {
         return $table
             ->columns([
-                TextColumn::make('action')
+                TextColumn::make('description')
+                    ->label('Action')
                     ->searchable()
                     ->sortable()
                     ->badge(),
-                TextColumn::make('actor.name')
+                TextColumn::make('causer.name')
                     ->label('Actor')
                     ->searchable(),
                 TextColumn::make('subject_type')
                     ->label('Subject')
                     ->formatStateUsing(fn ($state, $record) => $state ? class_basename($state).' #'.$record->subject_id : '—'),
-                TextColumn::make('ip_address')
-                    ->searchable(),
                 TextColumn::make('created_at')
                     ->dateTime()
                     ->sortable(),
