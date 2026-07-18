@@ -306,10 +306,12 @@ test('switching to the free plan syncs quota back to free limits', function () {
     expect($activePolicy->daily_token_limit)->toBe(20000);
 });
 
-test(
-    'switching plans while already subscribed swaps the stripe price in place',
-    function () {
-        Plan::updateOrCreate(['code' => 'pro'], [
+    test(
+        'switching plans while already subscribed swaps the stripe price in place',
+        function () {
+            config()->set('cashier.secret', 'sk_test_swap');
+
+            Plan::updateOrCreate(['code' => 'pro'], [
             'name' => 'Pro',
             'stripe_price_id' => 'price_pro',
             'monthly_price_cents' => 4900,
