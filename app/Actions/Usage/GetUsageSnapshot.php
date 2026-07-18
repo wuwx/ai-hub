@@ -106,7 +106,7 @@ class GetUsageSnapshot
             ->limit(5)
             ->toBase()->get([
                 'llm_models.name as model_name',
-                \DB::raw('COALESCE(SUM(usage_ledgers.token_total), 0) as tokens'),
+                DB::raw('COALESCE(SUM(usage_ledgers.token_total), 0) as tokens'),
             ])
             ->map(fn ($row) => [
                 'name' => (string) ($row->model_name ?: 'Unknown model'),
