@@ -2,12 +2,13 @@
 
 namespace App\Filament\Resources\Plans\RelationManagers;
 
+use App\Models\Plan;
+use Filament\Actions\AttachAction;
+use Filament\Actions\DetachAction;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\Toggle;
 use Filament\Resources\RelationManagers\RelationManager;
 use Filament\Schemas\Schema;
-use Filament\Tables\Actions\AttachAction;
-use Filament\Tables\Actions\DetachAction;
 use Filament\Tables\Columns\IconColumn;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
@@ -32,6 +33,9 @@ class ProviderEntitlementsRelationManager extends RelationManager
 
     public function table(Table $table): Table
     {
+        /** @var Plan $owner */
+        $owner = $this->getOwnerRecord();
+
         return $table
             ->recordTitleAttribute('provider.name')
             ->columns([
@@ -59,7 +63,7 @@ class ProviderEntitlementsRelationManager extends RelationManager
                                 'name',
                                 fn ($query) => $query->whereNotIn(
                                     'id',
-                                    $this->getOwnerRecord()->providerEntitlements()->pluck('llm_provider_id'),
+                                    $owner->providerEntitlements()->pluck('llm_provider_id'),
                                 ),
                             )
                             ->required()

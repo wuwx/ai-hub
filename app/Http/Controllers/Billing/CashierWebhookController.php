@@ -47,8 +47,9 @@ class CashierWebhookController extends CashierBaseWebhookController
     protected function handleSubscriptionChange(array $payload): Response
     {
         // Let Cashier's parent handle the subscription record first.
+        $encodedPayload = json_encode($payload);
         $response = parent::handleWebhook(
-            new Request([], [], [], [], [], [], json_encode($payload)),
+            new Request([], [], [], [], [], [], is_string($encodedPayload) ? $encodedPayload : ''),
         );
 
         $dataObject = data_get($payload, 'data.object');

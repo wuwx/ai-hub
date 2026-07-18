@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Actions\ApiKeys\GenerateApiKey;
+use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -22,8 +23,28 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
     'revoked_at',
     'created_by',
 ])]
+/**
+ * @property Carbon|null $expires_at
+ * @property Carbon|null $last_used_at
+ * @property Carbon|null $revoked_at
+ * @property array<string> $allowed_models
+ * @property array<string> $allowed_ips
+ */
 class ApiKey extends Model
 {
+    /**
+     * @var array<string, string>
+     */
+    protected $casts = [
+        'allowed_models' => 'array',
+        'allowed_ips' => 'array',
+        'daily_token_limit' => 'integer',
+        'rate_limit_per_minute' => 'integer',
+        'last_used_at' => 'datetime',
+        'expires_at' => 'datetime',
+        'revoked_at' => 'datetime',
+    ];
+
     /**
      * @return BelongsTo<User, $this>
      */

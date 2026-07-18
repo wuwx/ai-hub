@@ -54,7 +54,7 @@ class DataExportController extends Controller
                 SUM(usage_ledgers.error_count) as error_count
             ',
             )
-            ->get();
+            ->toBase()->get();
 
         $csv = $this->buildCsv(
             [
@@ -120,12 +120,16 @@ class DataExportController extends Controller
 
     /**
      * @param  array<string>  $headers
-     * @param  array<array<string|int|null>>  $rows
+     * @param  array<int, array<mixed>>  $rows
      */
     protected function buildCsv(array $headers, array $rows): string
     {
         $callback = function () use ($headers, $rows) {
             $file = fopen('php://output', 'w');
+
+            if ($file === false) {
+                return;
+            }
 
             fputcsv($file, $headers);
 

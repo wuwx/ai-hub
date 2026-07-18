@@ -4,7 +4,7 @@ namespace App\Actions\Audit;
 
 use App\Models\User;
 use Illuminate\Database\Eloquent\Model;
-use Spatie\Activitylog\Models\Activity;
+use Spatie\Activitylog\Contracts\Activity as ActivityContract;
 
 class RecordAuditEvent
 {
@@ -21,7 +21,7 @@ class RecordAuditEvent
         ?Model $subject = null,
         array $properties = [],
         ?User $actor = null,
-    ): Activity {
+    ): ?ActivityContract {
         $logger = activity();
 
         if ($subject instanceof Model) {
@@ -36,7 +36,6 @@ class RecordAuditEvent
 
         $logger->withProperties($properties);
 
-        /** @var Activity $activity */
         return $logger->log($action);
     }
 }

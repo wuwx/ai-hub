@@ -53,6 +53,8 @@ class User extends Authenticatable implements PasskeyUser
 
     /**
      * Get the user's API keys.
+     *
+     * @return HasMany<ApiKey, $this>
      */
     public function apiKeys(): HasMany
     {

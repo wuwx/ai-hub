@@ -386,9 +386,10 @@ class GatewayRequestProcessor
         );
 
         $idempotencyKey = (string) $request->header('Idempotency-Key', '');
+        $encodedPayload = json_encode($payload, JSON_UNESCAPED_UNICODE);
         $payloadHash = hash(
             'sha256',
-            json_encode($payload, JSON_UNESCAPED_UNICODE),
+            is_string($encodedPayload) ? $encodedPayload : '',
         );
 
         $idempotencyCacheKey = null;
@@ -897,10 +898,7 @@ class GatewayRequestProcessor
             },
             $status,
             [
-                'Content-Type' => $response->header(
-                    'Content-Type',
-                    'text/event-stream',
-                ),
+                'Content-Type' => $response->header('Content-Type') ?: 'text/event-stream',
                 'Cache-Control' => 'no-cache',
                 'Connection' => 'keep-alive',
                 'X-Accel-Buffering' => 'no',

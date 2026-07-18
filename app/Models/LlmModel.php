@@ -25,8 +25,26 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
         'fallback_model_id',
     ]),
 ]
+/**
+ * @property array<mixed> $pricing
+ * @property array<mixed> $capabilities
+ */
 class LlmModel extends Model
 {
+    /**
+     * @var array<string, string>
+     */
+    protected $casts = [
+        'capabilities' => 'array',
+        'pricing' => 'array',
+        'is_active' => 'boolean',
+        'cost_input_per_1m_usd' => 'float',
+        'cost_output_per_1m_usd' => 'float',
+        'sell_input_per_1m_usd' => 'float',
+        'sell_output_per_1m_usd' => 'float',
+        'markup_percent' => 'integer',
+    ];
+
     /**
      * @return BelongsTo<LlmProvider, $this>
      */

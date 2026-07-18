@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Billing;
 use App\Actions\Billing\SyncQuotaFromSubscription;
 use App\Models\User;
 use App\Services\PlanService;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
 
@@ -26,7 +27,7 @@ class CheckoutReturnController
     /**
      * Confirm a subscription checkout session.
      */
-    public function subscription(Request $request)
+    public function subscription(Request $request): RedirectResponse
     {
         $user = $request->user();
         $sessionId = $request->query('session_id');

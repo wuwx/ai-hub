@@ -58,11 +58,11 @@ class GetUsageSnapshot
             ->orderByDesc('effective_from')
             ->first();
 
-        $todayTokens = (int) ($todayUsage?->token_total ?? 0);
-        $todayRequests = (int) ($todayUsage?->request_count ?? 0);
-        $monthTokens = (int) ($monthUsage?->token_total ?? 0);
-        $monthRequests = (int) ($monthUsage?->request_count ?? 0);
-        $monthErrors = (int) ($monthUsage?->error_count ?? 0);
+        $todayTokens = (int) ($todayUsage->token_total ?? 0);
+        $todayRequests = (int) ($todayUsage->request_count ?? 0);
+        $monthTokens = (int) ($monthUsage->token_total ?? 0);
+        $monthRequests = (int) ($monthUsage->request_count ?? 0);
+        $monthErrors = (int) ($monthUsage->error_count ?? 0);
 
         $dailyLimit = $activePolicy?->daily_token_limit;
         $monthlyLimit = $activePolicy?->monthly_token_limit;
@@ -104,7 +104,7 @@ class GetUsageSnapshot
             ->groupBy('usage_ledgers.llm_model_id', 'llm_models.name')
             ->orderByDesc('tokens')
             ->limit(5)
-            ->get([
+            ->toBase()->get([
                 'llm_models.name as model_name',
                 \DB::raw('COALESCE(SUM(usage_ledgers.token_total), 0) as tokens'),
             ])

@@ -57,8 +57,8 @@ class CompatibilityGatewayController extends Controller
         $data = $models->map(fn (LlmModel $model) => [
             'id' => $model->external_model_id,
             'object' => 'model',
-            'created' => $model->created_at?->timestamp ?? time(),
-            'owned_by' => $model->provider?->slug ?? 'gateway',
+            'created' => $model->created_at->timestamp,
+            'owned_by' => $model->provider->slug ?? 'gateway',
         ])->values()->all();
 
         return response()->json([

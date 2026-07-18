@@ -97,10 +97,7 @@ class PrometheusMetricsController extends Controller
         $metrics[] = "ai_hub_subscriptions{status=\"past_due\"} {$pastDueSubscriptions}";
 
         // Latency metrics (average over last 24h)
-        $avgLatency =
-            (int) RequestLog::where('requested_at', '>=', now()->subDay())->avg(
-                'latency_ms',
-            ) ?? 0;
+        $avgLatency = (int) RequestLog::where('requested_at', '>=', now()->subDay())->avg('latency_ms');
 
         $metrics[] = '# TYPE ai_hub_request_latency_ms_avg gauge';
         $metrics[] = "ai_hub_request_latency_ms_avg {$avgLatency}";

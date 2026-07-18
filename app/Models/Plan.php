@@ -44,6 +44,7 @@ class Plan extends Model
 
     /**
      * @param  Builder<self>  $query
+     * @return Builder<self>
      */
     public function scopeActive(Builder $query): Builder
     {
@@ -52,6 +53,7 @@ class Plan extends Model
 
     /**
      * @param  Builder<self>  $query
+     * @return Builder<self>
      */
     public function scopeByCode(Builder $query, string $code): Builder
     {

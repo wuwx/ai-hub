@@ -4,6 +4,7 @@ namespace App\Filament\Resources\ApiKeys\Pages;
 
 use App\Actions\ApiKeys\RotateApiKey;
 use App\Filament\Resources\ApiKeys\ApiKeyResource;
+use App\Models\ApiKey;
 use Filament\Actions\Action;
 use Filament\Notifications\Notification;
 use Filament\Resources\Pages\EditRecord;
@@ -14,12 +15,15 @@ class EditApiKey extends EditRecord
 
     protected function getHeaderActions(): array
     {
+        /** @var ApiKey $record */
+        $record = $this->getRecord();
+
         return [
             Action::make('rotate')
                 ->label('Rotate Key')
                 ->requiresConfirmation()
-                ->action(function (): void {
-                    $result = app(RotateApiKey::class)->handle($this->getRecord());
+                ->action(function () use ($record): void {
+                    $result = app(RotateApiKey::class)->handle($record);
 
                     Notification::make()
                         ->title('API key rotated')
@@ -32,7 +36,7 @@ class EditApiKey extends EditRecord
                 ->label('Revoke Key')
                 ->color('danger')
                 ->requiresConfirmation()
-                ->visible(fn (): bool => $this->getRecord()->revoked_at === null)
+                ->visible(fn (): bool => $record->revoked_at === null)
                 ->action(function (): void {
                     $this->getRecord()->update(['revoked_at' => now()]);
 
@@ -43,7 +47,7 @@ class EditApiKey extends EditRecord
                 }),
             Action::make('reactivate')
                 ->label('Reactivate Key')
-                ->visible(fn (): bool => $this->getRecord()->revoked_at !== null)
+                ->visible(fn (): bool => $record->revoked_at !== null)
                 ->action(function (): void {
                     $this->getRecord()->update(['revoked_at' => null]);
 

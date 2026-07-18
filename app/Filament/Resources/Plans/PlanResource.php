@@ -15,6 +15,7 @@ use Filament\Resources\Resource;
 use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Table;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Auth;
 use UnitEnum;
 
@@ -36,12 +37,12 @@ class PlanResource extends Resource
         return Auth::check();
     }
 
-    public static function canEdit($record): bool
+    public static function canEdit(Model $record): bool
     {
         return Auth::check();
     }
 
-    public static function canDelete($record): bool
+    public static function canDelete(Model $record): bool
     {
         return Auth::check();
     }

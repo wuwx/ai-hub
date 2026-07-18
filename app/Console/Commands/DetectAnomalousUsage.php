@@ -42,7 +42,7 @@ class DetectAnomalousUsage extends Command
             ->whereNotNull('api_key_id')
             ->groupBy('api_key_id', 'user_id')
             ->having('request_count', '>=', $minRequests)
-            ->get();
+            ->toBase()->get();
 
         if ($rows->isEmpty()) {
             $this->info("No API key reached {$minRequests} requests in the last {$windowMinutes}m.");
@@ -60,8 +60,8 @@ class DetectAnomalousUsage extends Command
                 continue;
             }
 
-            $user = User::find($row->user_id);
-            $apiKey = ApiKey::find($row->api_key_id);
+            $user = User::find((int) $row->user_id);
+            $apiKey = ApiKey::find((int) $row->api_key_id);
 
             if (! $user || ! $apiKey) {
                 continue;

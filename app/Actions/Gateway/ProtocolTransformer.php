@@ -40,13 +40,16 @@ class ProtocolTransformer
     public function toProviderPayload(array $canonical, string $providerProtocol): array
     {
         if ($providerProtocol === 'anthropic') {
-            $systemMessages = collect($canonical['messages'] ?? [])
+            /** @var array<int, array<string, mixed>> $sourceMessages */
+            $sourceMessages = $canonical['messages'] ?? [];
+
+            $systemMessages = collect($sourceMessages)
                 ->filter(fn ($message) => ($message['role'] ?? null) === 'system')
                 ->map(fn ($message) => $this->stringContent($message['content'] ?? ''))
                 ->filter()
                 ->values();
 
-            $messages = collect($canonical['messages'] ?? [])
+            $messages = collect($sourceMessages)
                 ->reject(fn ($message) => ($message['role'] ?? null) === 'system')
                 ->values()
                 ->all();
@@ -62,7 +65,9 @@ class ProtocolTransformer
             ]);
         }
 
-        $messages = collect($canonical['messages'] ?? [])->values()->all();
+        /** @var array<int, array<string, mixed>> $sourceMessages */
+        $sourceMessages = $canonical['messages'] ?? [];
+        $messages = collect($sourceMessages)->values()->all();
 
         if (! empty($canonical['system']) && ! collect($messages)->contains(fn ($message) => ($message['role'] ?? null) === 'system')) {
             array_unshift($messages, [
@@ -149,12 +154,18 @@ class ProtocolTransformer
     public function extractToolCallsCount(array $response, string $incomingProtocol): int
     {
         if ($incomingProtocol === 'anthropic') {
-            return collect(data_get($response, 'content', []))
+            /** @var array<int, array<string, mixed>> $content */
+            $content = data_get($response, 'content', []);
+
+            return collect($content)
                 ->filter(fn ($block) => ($block['type'] ?? null) === 'tool_use')
                 ->count();
         }
 
-        return collect(data_get($response, 'choices.0.message.tool_calls', []))->count();
+        /** @var array<int, array<string, mixed>> $toolCalls */
+        $toolCalls = data_get($response, 'choices.0.message.tool_calls', []);
+
+        return collect($toolCalls)->count();
     }
 
     /**
@@ -162,7 +173,9 @@ class ProtocolTransformer
      */
     public function estimateInputTokens(array $canonical): int
     {
-        $text = collect($canonical['messages'] ?? [])
+        /** @var array<int, array<string, mixed>> $sourceMessages */
+        $sourceMessages = $canonical['messages'] ?? [];
+        $text = collect($sourceMessages)
             ->map(fn ($message) => $this->stringContent($message['content'] ?? ''))
             ->implode(' ');
 
@@ -399,7 +412,9 @@ class ProtocolTransformer
      */
     protected function anthropicToOpenAi(array $anthropicResponse, string $model): array
     {
-        $contentBlocks = collect(data_get($anthropicResponse, 'content', []));
+        /** @var array<int, array<string, mixed>> $rawContentBlocks */
+        $rawContentBlocks = data_get($anthropicResponse, 'content', []);
+        $contentBlocks = collect($rawContentBlocks);
 
         $text = $contentBlocks
             ->filter(fn ($block) => ($block['type'] ?? null) === 'text')
@@ -523,7 +538,8 @@ class ProtocolTransformer
 
     protected function extractSseData(string $frame): ?string
     {
-        $lines = preg_split('/\r\n|\r|\n/', trim($frame));
+        /** @var array<int, string> $lines */
+        $lines = preg_split('/\r\n|\r|\n/', trim($frame)) ?: [];
         $dataLines = collect($lines)
             ->filter(fn ($line) => str_starts_with((string) $line, 'data:'))
             ->map(fn ($line) => trim(substr((string) $line, 5)))

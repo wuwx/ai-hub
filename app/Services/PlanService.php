@@ -41,7 +41,7 @@ class PlanService
             ->where('stripe_price_id', $stripePriceId)
             ->first();
 
-        return $plan?->code ?? $this->freePlanCode();
+        return $plan instanceof Plan ? $plan->code : $this->freePlanCode();
     }
 
     /**
