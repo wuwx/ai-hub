@@ -11,10 +11,10 @@ return new class extends Migration
      */
     public function up(): void
     {
-        // Add plan_code to team_quota_policies so the gateway can resolve
-        // a team's current plan and look up plan-level entitlements.
-        Schema::table('team_quota_policies', function (Blueprint $table) {
-            $table->string('plan_code')->default('free')->after('team_id');
+        // Add plan_code to quota_policies so the gateway can resolve
+        // a user's current plan and look up plan-level entitlements.
+        Schema::table('quota_policies', function (Blueprint $table) {
+            $table->string('plan_code')->default('free')->after('user_id');
         });
 
         // Plan-level model entitlements: defines which models each plan can access.
@@ -47,7 +47,7 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::table('team_quota_policies', function (Blueprint $table) {
+        Schema::table('quota_policies', function (Blueprint $table) {
             $table->dropColumn('plan_code');
         });
 

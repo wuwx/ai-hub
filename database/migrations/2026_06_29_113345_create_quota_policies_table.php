@@ -11,9 +11,9 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::create('team_quota_policies', function (Blueprint $table) {
+        Schema::create('quota_policies', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('team_id')->constrained()->cascadeOnDelete();
+            $table->foreignId('user_id')->constrained()->cascadeOnDelete();
             $table->unsignedBigInteger('daily_token_limit')->nullable();
             $table->unsignedBigInteger('weekly_token_limit')->nullable();
             $table->unsignedBigInteger('monthly_token_limit')->nullable();
@@ -24,8 +24,8 @@ return new class extends Migration
             $table->boolean('is_active')->default(true);
             $table->timestamps();
 
-            $table->index(['team_id', 'is_active']);
-            $table->index(['team_id', 'effective_from', 'effective_to'], 'team_quota_policy_effective_idx');
+            $table->index(['user_id', 'is_active']);
+            $table->index(['user_id', 'effective_from', 'effective_to'], 'quota_policy_effective_idx');
         });
     }
 
@@ -34,6 +34,6 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::dropIfExists('team_quota_policies');
+        Schema::dropIfExists('quota_policies');
     }
 };

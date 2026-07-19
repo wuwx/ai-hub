@@ -13,7 +13,7 @@ return new class extends Migration
     {
         Schema::create('api_keys', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('team_id')->constrained()->cascadeOnDelete();
+            $table->foreignId('user_id')->constrained()->cascadeOnDelete();
             $table->string('name');
             $table->string('key_hash')->unique();
             $table->char('last_four', 4);
@@ -23,7 +23,7 @@ return new class extends Migration
             $table->foreignId('created_by')->nullable()->constrained('users')->nullOnDelete();
             $table->timestamps();
 
-            $table->index(['team_id', 'revoked_at']);
+            $table->index(['user_id', 'revoked_at']);
         });
     }
 
