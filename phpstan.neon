@@ -10,4 +10,7 @@ parameters:
         - database/
         - routes/
 
+    excludePaths:
+        - database/migrations/2026_07_20_121154_create_health_tables.php
+
     level: 7

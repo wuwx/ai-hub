@@ -6,6 +6,7 @@ use App\Models\LlmModel;
 use App\Models\LlmProvider;
 use App\Models\User;
 use Illuminate\Http\Client\ConnectionException;
+use Illuminate\Http\Client\RequestException;
 use Illuminate\Http\Client\Response as HttpResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Http;
@@ -454,8 +455,8 @@ class GatewayRequestProcessor
             ->retry(
                 $attempts,
                 $backoffMs,
-                fn ($exception, $response) => $exception instanceof ConnectionException
-                    || ($response instanceof HttpResponse && $response->status() >= 500),
+                fn ($exception) => $exception instanceof ConnectionException
+                    || ($exception instanceof RequestException && $exception->response->status() >= 500),
             );
 
         if ($stream) {
