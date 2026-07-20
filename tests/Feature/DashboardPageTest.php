@@ -1,8 +1,8 @@
 <?php
 
-use App\Actions\Billing\SyncQuotaFromSubscription;
 use App\Models\User;
 use Livewire\Livewire;
+use Tests\TestCase;
 
 test('dashboard page requires authentication', function () {
 
@@ -36,11 +36,7 @@ test('dashboard shows active subscription plan in badge', function () {
 
     $this->makeSubscriptionifyPlan('pro', []);
 
-    app(SyncQuotaFromSubscription::class)->handle(
-        user: $user,
-        planCode: 'pro',
-        status: 'active',
-    );
+    TestCase::subscribeUserToPlan($user, 'pro');
 
     $this->actingAs($user);
 

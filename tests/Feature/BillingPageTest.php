@@ -1,8 +1,8 @@
 <?php
 
-use App\Actions\Billing\SyncQuotaFromSubscription;
 use App\Models\User;
 use Livewire\Livewire;
+use Tests\TestCase;
 
 test('billing page requires authentication', function () {
     $response = $this->get(route('billing.index'));
@@ -37,11 +37,7 @@ test('billing page shows active subscription plan', function () {
     $this->makeSubscriptionifyPlan('pro', []);
 
     // Provision the user's subscriptionify subscription directly.
-    app(SyncQuotaFromSubscription::class)->handle(
-        user: $user,
-        planCode: 'pro',
-        status: 'active',
-    );
+    TestCase::subscribeUserToPlan($user, 'pro');
 
     $this->actingAs($user);
 
@@ -85,11 +81,7 @@ test('switching to the free plan syncs quota back to free limits', function () {
     // User is on the Pro plan's quota, but has no live Stripe subscription
     // record (e.g. it was provisioned manually) — downgrading should not
     // need to call Stripe at all.
-    app(SyncQuotaFromSubscription::class)->handle(
-        user: $user,
-        planCode: 'pro',
-        status: 'active',
-    );
+    TestCase::subscribeUserToPlan($user, 'pro');
 
     $this->actingAs($user);
 

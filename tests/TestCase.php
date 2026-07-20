@@ -2,7 +2,6 @@
 
 namespace Tests;
 
-use App\Actions\Billing\SyncQuotaFromSubscription;
 use App\Models\LlmModel;
 use App\Models\LlmProvider;
 use App\Models\User;
@@ -96,16 +95,35 @@ abstract class TestCase extends BaseTestCase
     }
 
     /**
+     * Subscribe (or move) a user onto the given plan code and flush the
+     * Subscriptionify feature cache so quota limits reflect within the test.
+     */
+    public static function subscribeUserToPlan(User $user, string $planCode): User
+    {
+        $plan = Plan::query()->where('slug', $planCode)->firstOrFail();
+
+        if ($user->subscribed()) {
+            $user->subscription()->changePlan($plan, resetUsages: false);
+        } else {
+            $user->subscribe($plan);
+        }
+
+        resolve(FeatureResolver::class)->flush();
+
+        return $user;
+    }
+
+    /**
      * Subscribe a user to the free plan so the Subscriptionify-backed quota
      * path (plan resolution, model entitlements) is exercised in tests.
      */
-    protected function subscribeUserToFreePlan(User $user): User
+    public static function subscribeUserToFreePlan(User $user): User
     {
-        $this->seedSubscriptionify();
+        (new SubscriptionifySeeder)->run();
 
-        return app(SyncQuotaFromSubscription::class)->handle(
-            user: $user,
-            planCode: (string) config('services.billing.free_plan_code', 'free'),
+        return self::subscribeUserToPlan(
+            $user,
+            (string) config('services.billing.free_plan_code', 'free'),
         );
     }
 

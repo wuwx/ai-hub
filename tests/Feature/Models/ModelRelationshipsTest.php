@@ -1,12 +1,12 @@
 <?php
 
-use App\Actions\Billing\SyncQuotaFromSubscription;
 use App\Models\LlmModel;
 use App\Models\LlmProvider;
 use App\Models\User;
 use Revoltify\Subscriptionify\Enums\FeatureType;
 use Revoltify\Subscriptionify\Models\Feature;
 use Revoltify\Subscriptionify\Models\Plan;
+use Tests\TestCase;
 
 it('grants model access to a plan via a subscriptionify toggle feature', function () {
     $provider = LlmProvider::create([
@@ -34,7 +34,7 @@ it('grants model access to a plan via a subscriptionify toggle feature', functio
         ->features()->syncWithoutDetaching([$feature->getKey() => ['value' => '1']]);
 
     $user = User::factory()->create();
-    app(SyncQuotaFromSubscription::class)->handle(user: $user, planCode: 'free');
+    TestCase::subscribeUserToFreePlan($user);
 
     expect($user->hasFeature('model:'.$model->external_model_id))->toBeTrue();
 });
@@ -59,7 +59,7 @@ it('grants provider access to a plan via a subscriptionify toggle feature', func
         ->features()->syncWithoutDetaching([$feature->getKey() => ['value' => '1']]);
 
     $user = User::factory()->create();
-    app(SyncQuotaFromSubscription::class)->handle(user: $user, planCode: 'free');
+    TestCase::subscribeUserToFreePlan($user);
 
     expect($user->hasFeature('provider:'.$provider->slug))->toBeTrue();
 });

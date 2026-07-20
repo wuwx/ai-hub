@@ -1,6 +1,5 @@
 <?php
 
-use App\Actions\Billing\SyncQuotaFromSubscription;
 use App\Models\LlmModel;
 use App\Models\LlmProvider;
 use App\Models\User;
@@ -141,7 +140,7 @@ function provisionEmbeddingsTarget(): array
     $user = User::factory()->create();
 
     (new SubscriptionifySeeder)->run();
-    app(SyncQuotaFromSubscription::class)->handle(user: $user, planCode: 'free');
+    TestCase::subscribeUserToFreePlan($user);
 
     $provider = LlmProvider::create([
         'name' => 'OpenAI Mock',

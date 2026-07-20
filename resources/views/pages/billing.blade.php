@@ -1,9 +1,9 @@
 <?php
 
-use App\Actions\Billing\SyncQuotaFromSubscription;
 use App\Models\User;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
+use Revoltify\Subscriptionify\Services\FeatureResolver;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\Title;
 use Livewire\Component;
@@ -30,6 +30,7 @@ new #[Title("Billing")] class extends Component {
     #[Computed]
     public function currentSubscription(): ?\Revoltify\Subscriptionify\Models\Subscription
     {
+        /** @var User|null $user */
         $user = Auth::user();
 
         return $user ? $user->subscription() : null;
@@ -38,6 +39,7 @@ new #[Title("Billing")] class extends Component {
     #[Computed]
     public function currentPlanCode(): string
     {
+        /** @var User|null $user */
         $user = Auth::user();
 
         if ($user && $user->subscribed()) {
@@ -53,6 +55,7 @@ new #[Title("Billing")] class extends Component {
     #[Computed]
     public function quotaLimits(): ?array
     {
+        /** @var User|null $user */
         $user = Auth::user();
         if (! $user || ! $user->subscribed()) {
             return null;
@@ -114,23 +117,27 @@ new #[Title("Billing")] class extends Component {
     /**
      * Switch the user's plan. Plan changes are quota-only: no Stripe checkout
      * is performed, the Subscriptionify subscription (and thus the enforced
-     * token quota) is updated directly via {@see SyncQuotaFromSubscription}.
+     * token quota) is updated directly on the user via the Subscriptionify
+     * {@see \Revoltify\Subscriptionify\Concerns\ManagesSubscription} methods.
      */
     public function subscribeToPlan(string $planCode): void
     {
         abort_unless($this->canManageBilling, 403);
 
+        /** @var User $user */
         $user = Auth::user();
         abort_unless($user, 404);
 
         $plan = Plan::query()->where('slug', $planCode)->first();
         abort_unless($plan, 404);
 
-        app(SyncQuotaFromSubscription::class)->handle(
-            user: $user,
-            planCode: $planCode,
-            status: "active",
-        );
+        if ($user->subscribed()) {
+            $user->subscription()->changePlan($plan, resetUsages: false);
+        } else {
+            $user->subscribe($plan);
+        }
+
+        resolve(FeatureResolver::class)->flush();
 
         unset($this->currentSubscription, $this->currentPlanCode, $this->quotaLimits, $this->plans);
 

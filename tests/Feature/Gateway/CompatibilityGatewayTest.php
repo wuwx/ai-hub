@@ -1,6 +1,5 @@
 <?php
 
-use App\Actions\Billing\SyncQuotaFromSubscription;
 use App\Models\LlmModel;
 use App\Models\LlmProvider;
 use App\Models\User;
@@ -146,7 +145,7 @@ function provisionGatewayTarget(string $adapterType, string $externalModelId): a
     $user = User::factory()->create();
 
     (new SubscriptionifySeeder)->run();
-    app(SyncQuotaFromSubscription::class)->handle(user: $user, planCode: 'free');
+    TestCase::subscribeUserToFreePlan($user);
 
     $provider = LlmProvider::create([
         'name' => 'Provider '.$adapterType,
