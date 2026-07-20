@@ -5,20 +5,13 @@ use App\Actions\Usage\RecordApiRequestUsage;
 use App\Exceptions\QuotaExceededException;
 use App\Models\LlmModel;
 use App\Models\LlmProvider;
-use App\Models\QuotaPolicy;
 use App\Models\UsageLedger;
 use App\Models\User;
 
 it('records request log and updates day/week/month ledgers', function () {
     $user = User::factory()->create();
 
-    QuotaPolicy::create([
-        'user_id' => $user->id,
-        'daily_token_limit' => 10_000,
-        'monthly_token_limit' => 50_000,
-        'effective_from' => now()->subDay(),
-        'is_active' => true,
-    ]);
+    $this->grantQuota($user, daily: 10_000, monthly: 50_000);
 
     $provider = LlmProvider::create([
         'name' => 'OpenAI Proxy',
@@ -101,13 +94,7 @@ it('records request log and updates day/week/month ledgers', function () {
 it('increments error counters when status indicates failure', function () {
     $user = User::factory()->create();
 
-    QuotaPolicy::create([
-        'user_id' => $user->id,
-        'daily_token_limit' => 10_000,
-        'monthly_token_limit' => 50_000,
-        'effective_from' => now()->subDay(),
-        'is_active' => true,
-    ]);
+    $this->grantQuota($user, daily: 10_000, monthly: 50_000);
 
     app(RecordApiRequestUsage::class)->handle(
         user: $user,
@@ -132,13 +119,7 @@ it('increments error counters when status indicates failure', function () {
 it('throws when recording would exceed token quota', function () {
     $user = User::factory()->create();
 
-    QuotaPolicy::create([
-        'user_id' => $user->id,
-        'daily_token_limit' => 50,
-        'monthly_token_limit' => 100,
-        'effective_from' => now()->subDay(),
-        'is_active' => true,
-    ]);
+    $this->grantQuota($user, daily: 50, monthly: 100);
 
     expect(fn () => app(RecordApiRequestUsage::class)->handle(
         user: $user,

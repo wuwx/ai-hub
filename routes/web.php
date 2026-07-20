@@ -1,32 +1,13 @@
 <?php
 
-use App\Http\Controllers\Billing\CashierWebhookController;
-use App\Http\Controllers\Billing\CheckoutReturnController;
-use App\Http\Controllers\Billing\StripePortalController;
 use App\Http\Controllers\DataExportController;
 use Illuminate\Support\Facades\Route;
 
 Route::view('/', 'welcome')->name('home');
 
 Route::view('docs', 'docs')->name('docs');
-
 Route::view('terms', 'terms')->name('terms');
-
 Route::view('privacy', 'privacy')->name('privacy');
-
-// Cashier webhook & payment confirmation routes (no auth — called by Stripe).
-Route::prefix(config('cashier.path', 'stripe'))
-    ->name('cashier.')
-    ->group(function () {
-        Route::post('webhook', [
-            CashierWebhookController::class,
-            'handleWebhook',
-        ])->name('webhook');
-        Route::get(
-            'payment/{id}',
-            "\Laravel\Cashier\Http\Controllers\PaymentController@show",
-        )->name('payment');
-    });
 
 Route::middleware(['auth', 'verified'])
     ->group(function () {
@@ -45,21 +26,6 @@ Route::middleware(['auth', 'verified'])
         Route::livewire('request-logs', 'pages::request-logs')->name(
             'request-logs.index',
         );
-
-        // Stripe checkout return handlers — verify the subscription & redirect to billing.
-        Route::get('billing/success', [
-            CheckoutReturnController::class,
-            'subscription',
-        ])->name('billing.success');
-        Route::get('billing/cancel', fn () => to_route('billing.index'))->name(
-            'billing.cancel',
-        );
-
-        // Stripe Customer Portal — manage subscription, payment methods, invoices.
-        Route::post('billing/portal', [
-            StripePortalController::class,
-            'store',
-        ])->name('billing.portal');
 
         // CSV data export endpoints.
         Route::get('usage/export', [

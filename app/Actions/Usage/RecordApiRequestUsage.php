@@ -2,6 +2,7 @@
 
 namespace App\Actions\Usage;
 
+use App\Exceptions\QuotaExceededException;
 use App\Models\ApiKey;
 use App\Models\LlmModel;
 use App\Models\LlmProvider;
@@ -13,8 +14,18 @@ use Illuminate\Support\Facades\DB;
 
 class RecordApiRequestUsage
 {
+    /**
+     * Token quota features consumed per request, mapped to their period name.
+     *
+     * @var array<string, string>
+     */
+    private const PERIODS = [
+        'daily-tokens' => 'daily',
+        'weekly-tokens' => 'weekly',
+        'monthly-tokens' => 'monthly',
+    ];
+
     public function __construct(
-        private readonly EnforceTokenQuota $enforceTokenQuota,
         private readonly CheckQuotaThresholds $checkQuotaThresholds,
     ) {
         //
@@ -68,11 +79,7 @@ class RecordApiRequestUsage
             $enforceQuota,
         ) {
             if ($enforceQuota && $tokenTotal > 0) {
-                $this->enforceTokenQuota->handle(
-                    $user,
-                    $tokenTotal,
-                    $requestedAt,
-                );
+                $this->consumeQuota($user, $tokenTotal);
             }
 
             $requestLog = RequestLog::create([
@@ -152,6 +159,35 @@ class RecordApiRequestUsage
         }
 
         return $requestLog;
+    }
+
+    /**
+     * Atomically check and consume token quota across all periods.
+     *
+     * Delegates to Subscriptionify on the user (which is the subscribable).
+     * Only runs when the user has an active quota subscription; otherwise
+     * quota is unlimited (no policy).
+     */
+    protected function consumeQuota(User $user, int $tokenTotal): void
+    {
+        foreach (self::PERIODS as $slug => $period) {
+            if (! $user->hasFeature($slug) || $user->isUnlimitedUsage($slug)) {
+                continue;
+            }
+
+            if ($user->tryConsume($slug, $tokenTotal)) {
+                continue;
+            }
+
+            $info = $user->featureInfo($slug);
+
+            throw new QuotaExceededException(
+                period: $period,
+                limit: (int) $info->limit,
+                used: (int) $info->used,
+                requested: $tokenTotal,
+            );
+        }
     }
 
     protected function incrementLedger(

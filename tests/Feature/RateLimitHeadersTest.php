@@ -3,23 +3,13 @@
 use App\Actions\ApiKeys\GenerateApiKey;
 use App\Models\LlmModel;
 use App\Models\LlmProvider;
-use App\Models\PlanModelEntitlement;
-use App\Models\PlanProviderEntitlement;
-use App\Models\QuotaPolicy;
 use App\Models\User;
 use Illuminate\Support\Facades\Http;
 
 beforeEach(function () {
     $this->user = User::factory()->create();
 
-    QuotaPolicy::create([
-        'user_id' => $this->user->id,
-        'plan_code' => 'free',
-        'daily_token_limit' => 100000,
-        'monthly_token_limit' => 1000000,
-        'effective_from' => now()->subMinute(),
-        'is_active' => true,
-    ]);
+    $this->subscribeUserToFreePlan($this->user);
 
     $this->provider = LlmProvider::create([
         'name' => 'OpenAI Mock',
@@ -39,17 +29,8 @@ beforeEach(function () {
         'is_active' => true,
     ]);
 
-    PlanProviderEntitlement::create([
-        'plan_code' => 'free',
-        'llm_provider_id' => $this->provider->id,
-        'is_enabled' => true,
-    ]);
-
-    PlanModelEntitlement::create([
-        'plan_code' => 'free',
-        'llm_model_id' => $this->model->id,
-        'is_enabled' => true,
-    ]);
+    $this->entitleProvider($this->provider);
+    $this->entitleModel($this->model);
 
     $this->apiKey = app(GenerateApiKey::class)->handle(
         user: $this->user,

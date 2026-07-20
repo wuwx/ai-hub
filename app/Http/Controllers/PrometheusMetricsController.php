@@ -7,7 +7,8 @@ use App\Models\LlmProvider;
 use App\Models\RequestLog;
 use App\Models\User;
 use Illuminate\Http\Response;
-use Laravel\Cashier\Subscription;
+use Revoltify\Subscriptionify\Enums\SubscriptionStatus;
+use Revoltify\Subscriptionify\Models\Subscription;
 
 class PrometheusMetricsController extends Controller
 {
@@ -62,7 +63,7 @@ class PrometheusMetricsController extends Controller
         $metrics[] = '# TYPE ai_hub_api_keys_active gauge';
         $metrics[] = "ai_hub_api_keys_active {$activeApiKeys}";
 
-        // Provider health
+        // Provider availability
         $providers = LlmProvider::all();
         $metrics[] = '# TYPE ai_hub_provider_active gauge';
         foreach ($providers as $provider) {
@@ -70,25 +71,18 @@ class PrometheusMetricsController extends Controller
             $metrics[] = "ai_hub_provider_active{provider=\"{$provider->slug}\"} {$value}";
         }
 
-        $metrics[] = '# TYPE ai_hub_provider_health gauge';
-        foreach ($providers as $provider) {
-            $status = $provider->last_health_status ?? 'unknown';
-            $value = $status === 'healthy' ? 1 : 0;
-            $metrics[] = "ai_hub_provider_health{provider=\"{$provider->slug}\",status=\"{$status}\"} {$value}";
-        }
-
         // Billing metrics
         $activeSubscriptions = Subscription::where(
-            'stripe_status',
-            'active',
+            'status',
+            SubscriptionStatus::Active,
         )->count();
         $trialingSubscriptions = Subscription::where(
-            'stripe_status',
-            'trialing',
+            'status',
+            SubscriptionStatus::Trialing,
         )->count();
         $pastDueSubscriptions = Subscription::where(
-            'stripe_status',
-            'past_due',
+            'status',
+            SubscriptionStatus::PastDue,
         )->count();
 
         $metrics[] = '# TYPE ai_hub_subscriptions gauge';

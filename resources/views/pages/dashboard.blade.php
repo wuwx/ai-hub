@@ -16,14 +16,8 @@ new #[Title("Dashboard")] class extends Component {
             return "free";
         }
 
-        $subscription = $user->subscription();
-
-        if ($subscription && $subscription->valid()) {
-            $stripePriceId = $subscription->stripe_price ?? "";
-
-            if ($stripePriceId !== "") {
-                return app(PlanService::class)->resolveCodeFromPriceId($stripePriceId);
-            }
+        if ($user->subscribed()) {
+            return $user->subscription()->plan->slug;
         }
 
         return app(PlanService::class)->freePlanCode();

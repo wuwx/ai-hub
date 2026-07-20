@@ -2,7 +2,6 @@
 
 namespace App\Actions\Usage;
 
-use App\Models\QuotaPolicy;
 use App\Models\UsageLedger;
 use App\Models\User;
 use Carbon\CarbonInterface;
@@ -48,24 +47,14 @@ class GetUsageSnapshot
             ->selectRaw('COALESCE(SUM(token_total), 0) as token_total, COALESCE(SUM(request_count), 0) as request_count, COALESCE(SUM(error_count), 0) as error_count')
             ->first();
 
-        $activePolicy = QuotaPolicy::query()
-            ->where('user_id', $user->id)
-            ->where('is_active', true)
-            ->where('effective_from', '<=', $at)
-            ->where(function ($query) use ($at) {
-                $query->whereNull('effective_to')->orWhere('effective_to', '>', $at);
-            })
-            ->orderByDesc('effective_from')
-            ->first();
+        $dailyLimit = $this->limitFor($user, 'daily-tokens');
+        $monthlyLimit = $this->limitFor($user, 'monthly-tokens');
 
         $todayTokens = (int) ($todayUsage->token_total ?? 0);
         $todayRequests = (int) ($todayUsage->request_count ?? 0);
         $monthTokens = (int) ($monthUsage->token_total ?? 0);
         $monthRequests = (int) ($monthUsage->request_count ?? 0);
         $monthErrors = (int) ($monthUsage->error_count ?? 0);
-
-        $dailyLimit = $activePolicy?->daily_token_limit;
-        $monthlyLimit = $activePolicy?->monthly_token_limit;
 
         $dailyRemaining = $dailyLimit !== null ? max(0, $dailyLimit - $todayTokens) : null;
         $monthlyRemaining = $monthlyLimit !== null ? max(0, $monthlyLimit - $monthTokens) : null;
@@ -88,6 +77,18 @@ class GetUsageSnapshot
             'top_models' => $this->getTopModels($user, $monthStart),
             'requests_chart' => $this->getRequestsChart($user, $at),
         ];
+    }
+
+    protected function limitFor(User $user, string $slug): ?int
+    {
+        if (
+            ! $user->hasFeature($slug)
+            || $user->isUnlimitedUsage($slug)
+        ) {
+            return null;
+        }
+
+        return (int) $user->featureInfo($slug)->limit;
     }
 
     /**
@@ -121,7 +122,7 @@ class GetUsageSnapshot
      */
     protected function getRequestsChart(User $user, CarbonInterface $at): array
     {
-        $start = $at->copy()->subDays(13)->startOfDay();
+        $start = $at->copy()->subDays(14)->startOfDay();
 
         /** @var Collection<string, int> $rows */
         $rows = DB::table('usage_ledgers')
@@ -137,6 +138,7 @@ class GetUsageSnapshot
         $values = [];
 
         $date = $start->copy();
+
         while ($date->lte($at)) {
             $bucketDate = $date->toDateString();
             $labels[] = $date->format('m-d');

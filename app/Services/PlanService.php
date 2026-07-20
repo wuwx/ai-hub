@@ -2,8 +2,8 @@
 
 namespace App\Services;
 
-use App\Models\Plan;
 use Illuminate\Database\Eloquent\Collection;
+use Revoltify\Subscriptionify\Models\Plan;
 
 class PlanService
 {
@@ -21,27 +21,11 @@ class PlanService
     }
 
     /**
-     * Find a plan by its code.
+     * Find a plan by its code (the subscriptionify slug).
      */
     public function findByCode(string $code): ?Plan
     {
-        return Plan::query()->byCode($code)->first();
-    }
-
-    /**
-     * Resolve a plan code from a Stripe price ID.
-     */
-    public function resolveCodeFromPriceId(string $stripePriceId): string
-    {
-        if ($stripePriceId === '') {
-            return $this->freePlanCode();
-        }
-
-        $plan = Plan::query()
-            ->where('stripe_price_id', $stripePriceId)
-            ->first();
-
-        return $plan instanceof Plan ? $plan->code : $this->freePlanCode();
+        return Plan::query()->where('slug', $code)->first();
     }
 
     /**

@@ -11,8 +11,3 @@ parameters:
         - routes/
 
     level: 7
-
-    ignoreErrors:
-        -
-            message: "#^Called 'env' outside of the config directory#"
-            path: bootstrap/app.php

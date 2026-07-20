@@ -1,7 +1,6 @@
 <?php
 
 use App\Models\LlmModel;
-use App\Models\QuotaPolicy;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Http;
 use Livewire\Attributes\Computed;
@@ -40,30 +39,15 @@ new #[Title('Playground')] class extends Component
             return [];
         }
 
-        $planCode = QuotaPolicy::query()
-            ->where('user_id', $user->id)
-            ->where('is_active', true)
-            ->orderByDesc('effective_from')
-            ->value('plan_code');
-
-        if (! $planCode) {
-            return [];
-        }
-
         return LlmModel::query()
             ->with('provider')
             ->where('is_active', true)
-            ->whereHas('planEntitlements', function ($query) use ($planCode) {
-                $query->where('plan_code', $planCode)->where('is_enabled', true);
-            })
-            ->whereHas('provider', function ($query) use ($planCode) {
-                $query->where('is_active', true)
-                    ->whereHas('planEntitlements', function ($entitlements) use ($planCode) {
-                        $entitlements->where('plan_code', $planCode)->where('is_enabled', true);
-                    });
-            })
+            ->whereHas('provider', fn ($query) => $query->where('is_active', true))
             ->orderBy('name')
             ->get()
+            ->filter(fn (LlmModel $model) => $model->provider
+                && $user->hasFeature('model:'.$model->external_model_id)
+                && $user->hasFeature('provider:'.$model->provider->slug))
             ->map(fn (LlmModel $model) => [
                 'value' => $model->external_model_id,
                 'label' => $model->name,

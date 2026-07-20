@@ -2,13 +2,11 @@
 
 namespace App\Providers;
 
-use App\Models\User;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Validation\Rules\Password;
-use Laravel\Cashier\Cashier;
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -26,7 +24,6 @@ class AppServiceProvider extends ServiceProvider
     public function boot(): void
     {
         $this->configureDefaults();
-        $this->configureCashier();
     }
 
     /**
@@ -49,14 +46,5 @@ class AppServiceProvider extends ServiceProvider
                 ->uncompromised()
             : null,
         );
-    }
-
-    /**
-     * Configure Laravel Cashier for user-based billing.
-     */
-    protected function configureCashier(): void
-    {
-        Cashier::useCustomerModel(User::class);
-        Cashier::ignoreRoutes();
     }
 }

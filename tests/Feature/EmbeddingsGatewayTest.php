@@ -1,14 +1,14 @@
 <?php
 
 use App\Actions\ApiKeys\GenerateApiKey;
+use App\Actions\Billing\SyncQuotaFromSubscription;
 use App\Models\LlmModel;
 use App\Models\LlmProvider;
-use App\Models\PlanModelEntitlement;
-use App\Models\PlanProviderEntitlement;
-use App\Models\QuotaPolicy;
 use App\Models\User;
+use Database\Seeders\SubscriptionifySeeder;
 use Illuminate\Http\Client\Request as HttpRequest;
 use Illuminate\Support\Facades\Http;
+use Tests\TestCase;
 
 it(
     'forwards embeddings requests to the upstream provider and returns the response',
@@ -185,14 +185,8 @@ function provisionEmbeddingsTarget(): array
 {
     $user = User::factory()->create();
 
-    QuotaPolicy::create([
-        'user_id' => $user->id,
-        'plan_code' => 'free',
-        'daily_token_limit' => 100000,
-        'monthly_token_limit' => 1000000,
-        'effective_from' => now()->subMinute(),
-        'is_active' => true,
-    ]);
+    (new SubscriptionifySeeder)->run();
+    app(SyncQuotaFromSubscription::class)->handle(user: $user, planCode: 'free');
 
     $provider = LlmProvider::create([
         'name' => 'OpenAI Mock',
@@ -213,22 +207,11 @@ function provisionEmbeddingsTarget(): array
         'llm_provider_id' => $provider->id,
         'name' => 'TEXT-EMBEDDING-3-SMALL',
         'external_model_id' => 'text-embedding-3-small',
-        'sell_input_per_1m_usd' => 1000.0,
-        'cost_input_per_1m_usd' => 500.0,
         'is_active' => true,
     ]);
 
-    PlanProviderEntitlement::create([
-        'plan_code' => 'free',
-        'llm_provider_id' => $provider->id,
-        'is_enabled' => true,
-    ]);
-
-    PlanModelEntitlement::create([
-        'plan_code' => 'free',
-        'llm_model_id' => $model->id,
-        'is_enabled' => true,
-    ]);
+    TestCase::entitleProvider($provider);
+    TestCase::entitleModel($model);
 
     $apiKey = app(GenerateApiKey::class)->handle(
         user: $user,

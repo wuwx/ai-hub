@@ -38,15 +38,13 @@ it('does not require authentication', function () {
     $this->get('/api/metrics')->assertOk();
 });
 
-it('includes provider health metrics', function () {
+it('includes provider availability metrics', function () {
     $response = $this->get('/api/metrics');
 
     $content = $response->getContent();
 
     expect($content)
-        ->toContain('ai_hub_provider_active')
-        ->and($content)
-        ->toContain('ai_hub_provider_health');
+        ->toContain('ai_hub_provider_active');
 });
 
 it('includes subscription status metrics', function () {

@@ -8,7 +8,6 @@ use App\Exceptions\QuotaExceededException;
 use App\Models\ApiKey;
 use App\Models\LlmModel;
 use App\Models\LlmProvider;
-use App\Models\QuotaPolicy;
 use App\Models\User;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\Client\Response as HttpResponse;
@@ -444,39 +443,16 @@ class GatewayRequestProcessor
         }
 
         if ($this->isProviderCircuitOpen($provider)) {
-            // Try fallback model if configured and available for this user.
-            $fallbackModel = $this->resolveFallbackModel($user, $model);
-
-            if ($fallbackModel) {
-                Log::info('gateway.fallback.activated', [
-                    'original_model' => $model->external_model_id,
-                    'fallback_model' => $fallbackModel->external_model_id,
-                    'provider_id' => $provider->id,
-                    'trace_id' => $traceId,
-                ]);
-
-                $model = $fallbackModel;
-                $provider = $model->provider;
-                $providerProtocol = $this->protocolTransformer->providerProtocol(
-                    $provider->adapter_type,
-                );
-                $canonical['model'] = $model->external_model_id;
-                $providerPayload = $this->protocolTransformer->toProviderPayload(
-                    $canonical,
-                    $providerProtocol,
-                );
-            } else {
-                return $this->jsonWithTrace(
-                    $this->protocolTransformer->errorPayload(
-                        $incomingProtocol,
-                        'Provider is temporarily unavailable. Please retry later.',
-                        'provider_circuit_open',
-                        'api_error',
-                    ),
-                    503,
-                    $traceId,
-                );
-            }
+            return $this->jsonWithTrace(
+                $this->protocolTransformer->errorPayload(
+                    $incomingProtocol,
+                    'Provider is temporarily unavailable. Please retry later.',
+                    'provider_circuit_open',
+                    'api_error',
+                ),
+                503,
+                $traceId,
+            );
         }
 
         $headers = $this->providerHeaders($provider, $providerProtocol);
@@ -522,41 +498,57 @@ class GatewayRequestProcessor
         );
     }
 
+    /**
+     * Resolve the LLM model a user may use for a given external model id.
+     *
+     * A model is usable when it (and its provider) is entitled to the user's
+     * current plan via Subscriptionify toggle features (`model:<id>` /
+     * `provider:<slug>`).
+     */
     protected function resolveModelForUser(
         User $user,
         string $externalModelId,
     ): ?LlmModel {
-        $planCode = QuotaPolicy::query()
-            ->where('user_id', $user->id)
-            ->where('is_active', true)
-            ->orderByDesc('effective_from')
-            ->value('plan_code');
-
-        if (! $planCode) {
-            return null;
-        }
-
-        return LlmModel::query()
+        $model = LlmModel::query()
             ->with('provider')
             ->where('external_model_id', $externalModelId)
             ->where('is_active', true)
-            ->whereHas('planEntitlements', function ($query) use ($planCode) {
-                $query
-                    ->where('plan_code', $planCode)
-                    ->where('is_enabled', true);
-            })
-            ->whereHas('provider', function ($query) use ($planCode) {
-                $query
-                    ->where('is_active', true)
-                    ->whereHas('planEntitlements', function (
-                        $entitlements,
-                    ) use ($planCode) {
-                        $entitlements
-                            ->where('plan_code', $planCode)
-                            ->where('is_enabled', true);
-                    });
-            })
+            ->whereHas('provider', fn ($query) => $query->where('is_active', true))
             ->first();
+
+        if (! $model || ! $model->provider instanceof LlmProvider) {
+            return null;
+        }
+
+        if (! $this->modelAllowedForUser($user, $model)) {
+            return null;
+        }
+
+        return $model;
+    }
+
+    /**
+     * Whether the user's plan entitles them to use the given model (and its
+     * provider) via Subscriptionify toggle features.
+     */
+    protected function modelAllowedForUser(User $user, LlmModel $model): bool
+    {
+        if (! $model->provider instanceof LlmProvider) {
+            return false;
+        }
+
+        return $user->hasFeature($this->modelFeatureSlug($model))
+            && $user->hasFeature($this->providerFeatureSlug($model->provider));
+    }
+
+    protected function modelFeatureSlug(LlmModel $model): string
+    {
+        return 'model:'.$model->external_model_id;
+    }
+
+    protected function providerFeatureSlug(LlmProvider $provider): string
+    {
+        return 'provider:'.$provider->slug;
     }
 
     /**
@@ -1140,64 +1132,5 @@ class GatewayRequestProcessor
         LlmProvider $provider,
     ): string {
         return sprintf('gateway:circuit:provider:%d:open_until', $provider->id);
-    }
-
-    /**
-     * Resolve a fallback model for the user when the primary provider is down.
-     * The fallback model must be active, entitled to the user, and its provider
-     * must not also have its circuit open.
-     */
-    protected function resolveFallbackModel(
-        User $user,
-        LlmModel $primaryModel,
-    ): ?LlmModel {
-        $fallbackId = $primaryModel->fallback_model_id;
-
-        if (! $fallbackId) {
-            return null;
-        }
-
-        $planCode = QuotaPolicy::query()
-            ->where('user_id', $user->id)
-            ->where('is_active', true)
-            ->orderByDesc('effective_from')
-            ->value('plan_code');
-
-        if (! $planCode) {
-            return null;
-        }
-
-        $fallback = LlmModel::query()
-            ->with('provider')
-            ->where('id', $fallbackId)
-            ->where('is_active', true)
-            ->whereHas('planEntitlements', function ($query) use ($planCode) {
-                $query
-                    ->where('plan_code', $planCode)
-                    ->where('is_enabled', true);
-            })
-            ->whereHas('provider', function ($query) use ($planCode) {
-                $query
-                    ->where('is_active', true)
-                    ->whereHas('planEntitlements', function (
-                        $entitlements,
-                    ) use ($planCode) {
-                        $entitlements
-                            ->where('plan_code', $planCode)
-                            ->where('is_enabled', true);
-                    });
-            })
-            ->first();
-
-        if (! $fallback || ! $fallback->provider) {
-            return null;
-        }
-
-        // Don't fallback to a provider that's also circuit-open.
-        if ($this->isProviderCircuitOpen($fallback->provider)) {
-            return null;
-        }
-
-        return $fallback;
     }
 }

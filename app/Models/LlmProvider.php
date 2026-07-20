@@ -19,9 +19,6 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
     'secret_ref',
     'options',
     'is_active',
-    'last_health_status',
-    'last_health_checked_at',
-    'last_health_error',
 ])]
 class LlmProvider extends Model
 {
@@ -31,14 +28,6 @@ class LlmProvider extends Model
     public function models(): HasMany
     {
         return $this->hasMany(LlmModel::class);
-    }
-
-    /**
-     * @return HasMany<PlanProviderEntitlement, $this>
-     */
-    public function planEntitlements(): HasMany
-    {
-        return $this->hasMany(PlanProviderEntitlement::class);
     }
 
     /**
@@ -66,7 +55,6 @@ class LlmProvider extends Model
             'secret_ref' => 'encrypted',
             'options' => 'array',
             'is_active' => 'boolean',
-            'last_health_checked_at' => 'datetime',
         ];
     }
 }

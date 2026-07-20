@@ -4,11 +4,12 @@ namespace Database\Seeders;
 
 use App\Models\LlmModel;
 use App\Models\LlmProvider;
-use App\Models\PlanModelEntitlement;
-use App\Models\PlanProviderEntitlement;
 use App\Models\User;
 use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
+use Revoltify\Subscriptionify\Enums\FeatureType;
+use Revoltify\Subscriptionify\Models\Feature;
+use Revoltify\Subscriptionify\Models\Plan;
 
 class DatabaseSeeder extends Seeder
 {
@@ -27,11 +28,11 @@ class DatabaseSeeder extends Seeder
         ]);
 
         $this->call([
-            PlanSeeder::class,
+            SubscriptionifySeeder::class,
         ]);
 
         $this->seedLlmProviders();
-        $this->seedPlanEntitlements();
+        $this->seedModelProviderFeatures();
     }
 
     private function seedLlmProviders(): void
@@ -85,11 +86,10 @@ class DatabaseSeeder extends Seeder
             'capabilities' => ['chat', 'vision', 'function_calling'],
             'context_window' => 128000,
             'max_output_tokens' => 16384,
-            'cost_input_per_1m_usd' => 2.50,
-            'cost_output_per_1m_usd' => 10.00,
-            'sell_input_per_1m_usd' => 3.75,
-            'sell_output_per_1m_usd' => 15.00,
-            'markup_percent' => 50,
+            'pricing' => [
+                'input_per_1m_tokens' => 2.50,
+                'output_per_1m_tokens' => 10.00,
+            ],
             'is_active' => true,
         ]);
 
@@ -100,13 +100,11 @@ class DatabaseSeeder extends Seeder
             'capabilities' => ['chat', 'vision', 'function_calling'],
             'context_window' => 128000,
             'max_output_tokens' => 16384,
-            'cost_input_per_1m_usd' => 0.15,
-            'cost_output_per_1m_usd' => 0.60,
-            'sell_input_per_1m_usd' => 0.23,
-            'sell_output_per_1m_usd' => 0.90,
-            'markup_percent' => 50,
+            'pricing' => [
+                'input_per_1m_tokens' => 0.15,
+                'output_per_1m_tokens' => 0.60,
+            ],
             'is_active' => true,
-            'fallback_model_id' => $gpt4o->id,
         ]);
 
         LlmModel::create([
@@ -116,11 +114,10 @@ class DatabaseSeeder extends Seeder
             'capabilities' => ['chat', 'reasoning'],
             'context_window' => 200000,
             'max_output_tokens' => 100000,
-            'cost_input_per_1m_usd' => 1.10,
-            'cost_output_per_1m_usd' => 4.40,
-            'sell_input_per_1m_usd' => 1.65,
-            'sell_output_per_1m_usd' => 6.60,
-            'markup_percent' => 50,
+            'pricing' => [
+                'input_per_1m_tokens' => 1.10,
+                'output_per_1m_tokens' => 4.40,
+            ],
             'is_active' => true,
         ]);
 
@@ -132,11 +129,10 @@ class DatabaseSeeder extends Seeder
             'capabilities' => ['chat', 'vision', 'function_calling'],
             'context_window' => 200000,
             'max_output_tokens' => 8192,
-            'cost_input_per_1m_usd' => 3.00,
-            'cost_output_per_1m_usd' => 15.00,
-            'sell_input_per_1m_usd' => 4.50,
-            'sell_output_per_1m_usd' => 22.50,
-            'markup_percent' => 50,
+            'pricing' => [
+                'input_per_1m_tokens' => 3.00,
+                'output_per_1m_tokens' => 15.00,
+            ],
             'is_active' => true,
         ]);
 
@@ -147,13 +143,11 @@ class DatabaseSeeder extends Seeder
             'capabilities' => ['chat', 'vision', 'function_calling'],
             'context_window' => 200000,
             'max_output_tokens' => 8192,
-            'cost_input_per_1m_usd' => 0.80,
-            'cost_output_per_1m_usd' => 4.00,
-            'sell_input_per_1m_usd' => 1.20,
-            'sell_output_per_1m_usd' => 6.00,
-            'markup_percent' => 50,
+            'pricing' => [
+                'input_per_1m_tokens' => 0.80,
+                'output_per_1m_tokens' => 4.00,
+            ],
             'is_active' => true,
-            'fallback_model_id' => $claudeSonnet->id,
         ]);
 
         // Google Models
@@ -164,11 +158,10 @@ class DatabaseSeeder extends Seeder
             'capabilities' => ['chat', 'vision', 'function_calling'],
             'context_window' => 1048576,
             'max_output_tokens' => 8192,
-            'cost_input_per_1m_usd' => 0.10,
-            'cost_output_per_1m_usd' => 0.40,
-            'sell_input_per_1m_usd' => 0.15,
-            'sell_output_per_1m_usd' => 0.60,
-            'markup_percent' => 50,
+            'pricing' => [
+                'input_per_1m_tokens' => 0.10,
+                'output_per_1m_tokens' => 0.40,
+            ],
             'is_active' => true,
         ]);
 
@@ -179,11 +172,10 @@ class DatabaseSeeder extends Seeder
             'capabilities' => ['chat', 'vision', 'reasoning', 'function_calling'],
             'context_window' => 1048576,
             'max_output_tokens' => 65536,
-            'cost_input_per_1m_usd' => 1.25,
-            'cost_output_per_1m_usd' => 10.00,
-            'sell_input_per_1m_usd' => 1.88,
-            'sell_output_per_1m_usd' => 15.00,
-            'markup_percent' => 50,
+            'pricing' => [
+                'input_per_1m_tokens' => 1.25,
+                'output_per_1m_tokens' => 10.00,
+            ],
             'is_active' => true,
         ]);
 
@@ -195,11 +187,10 @@ class DatabaseSeeder extends Seeder
             'capabilities' => ['chat', 'function_calling'],
             'context_window' => 128000,
             'max_output_tokens' => 4096,
-            'cost_input_per_1m_usd' => 0,
-            'cost_output_per_1m_usd' => 0,
-            'sell_input_per_1m_usd' => 0,
-            'sell_output_per_1m_usd' => 0,
-            'markup_percent' => 0,
+            'pricing' => [
+                'input_per_1m_tokens' => 0.0,
+                'output_per_1m_tokens' => 0.0,
+            ],
             'is_active' => true,
         ]);
 
@@ -210,11 +201,10 @@ class DatabaseSeeder extends Seeder
             'capabilities' => ['chat', 'function_calling'],
             'context_window' => 128000,
             'max_output_tokens' => 4096,
-            'cost_input_per_1m_usd' => 0,
-            'cost_output_per_1m_usd' => 0,
-            'sell_input_per_1m_usd' => 0,
-            'sell_output_per_1m_usd' => 0,
-            'markup_percent' => 0,
+            'pricing' => [
+                'input_per_1m_tokens' => 0.0,
+                'output_per_1m_tokens' => 0.0,
+            ],
             'is_active' => true,
         ]);
 
@@ -225,11 +215,10 @@ class DatabaseSeeder extends Seeder
             'capabilities' => ['chat', 'function_calling'],
             'context_window' => 32768,
             'max_output_tokens' => 4096,
-            'cost_input_per_1m_usd' => 0,
-            'cost_output_per_1m_usd' => 0,
-            'sell_input_per_1m_usd' => 0,
-            'sell_output_per_1m_usd' => 0,
-            'markup_percent' => 0,
+            'pricing' => [
+                'input_per_1m_tokens' => 0.0,
+                'output_per_1m_tokens' => 0.0,
+            ],
             'is_active' => true,
         ]);
 
@@ -240,11 +229,10 @@ class DatabaseSeeder extends Seeder
             'capabilities' => ['chat'],
             'context_window' => 16384,
             'max_output_tokens' => 4096,
-            'cost_input_per_1m_usd' => 0,
-            'cost_output_per_1m_usd' => 0,
-            'sell_input_per_1m_usd' => 0,
-            'sell_output_per_1m_usd' => 0,
-            'markup_percent' => 0,
+            'pricing' => [
+                'input_per_1m_tokens' => 0.0,
+                'output_per_1m_tokens' => 0.0,
+            ],
             'is_active' => true,
         ]);
 
@@ -255,11 +243,10 @@ class DatabaseSeeder extends Seeder
             'capabilities' => ['chat', 'function_calling'],
             'context_window' => 32768,
             'max_output_tokens' => 4096,
-            'cost_input_per_1m_usd' => 0,
-            'cost_output_per_1m_usd' => 0,
-            'sell_input_per_1m_usd' => 0,
-            'sell_output_per_1m_usd' => 0,
-            'markup_percent' => 0,
+            'pricing' => [
+                'input_per_1m_tokens' => 0.0,
+                'output_per_1m_tokens' => 0.0,
+            ],
             'is_active' => true,
         ]);
 
@@ -270,39 +257,46 @@ class DatabaseSeeder extends Seeder
             'capabilities' => ['chat', 'reasoning'],
             'context_window' => 32768,
             'max_output_tokens' => 4096,
-            'cost_input_per_1m_usd' => 0,
-            'cost_output_per_1m_usd' => 0,
-            'sell_input_per_1m_usd' => 0,
-            'sell_output_per_1m_usd' => 0,
-            'markup_percent' => 0,
+            'pricing' => [
+                'input_per_1m_tokens' => 0.0,
+                'output_per_1m_tokens' => 0.0,
+            ],
             'is_active' => true,
         ]);
     }
 
-    private function seedPlanEntitlements(): void
+    /**
+     * Grant every active plan access to every active provider and model via
+     * Subscriptionify toggle features (namespaced slugs). Replaces the old
+     * plan_entitlements tables.
+     */
+    private function seedModelProviderFeatures(): void
     {
-        $plans = ['free', 'pro', 'enterprise'];
+        $plans = Plan::query()->whereIn('slug', ['free', 'pro', 'enterprise'])->get();
 
-        // Grant all plans access to all active providers and models.
-        // Future: differentiate by plan (e.g., free = open-source only).
-        $providers = LlmProvider::where('is_active', true)->get();
-        $models = LlmModel::where('is_active', true)->get();
+        if ($plans->isEmpty()) {
+            return;
+        }
 
-        foreach ($plans as $plan) {
-            foreach ($providers as $provider) {
-                PlanProviderEntitlement::create([
-                    'plan_code' => $plan,
-                    'llm_provider_id' => $provider->id,
-                    'is_enabled' => true,
-                ]);
+        foreach (LlmProvider::where('is_active', true)->get() as $provider) {
+            $feature = Feature::query()->updateOrCreate(
+                ['slug' => 'provider:'.$provider->slug],
+                ['name' => $provider->name.' provider access', 'type' => FeatureType::Toggle, 'sort_order' => 100],
+            );
+
+            foreach ($plans as $plan) {
+                $plan->features()->syncWithoutDetaching([$feature->getKey() => ['value' => '1']]);
             }
+        }
 
-            foreach ($models as $model) {
-                PlanModelEntitlement::create([
-                    'plan_code' => $plan,
-                    'llm_model_id' => $model->id,
-                    'is_enabled' => true,
-                ]);
+        foreach (LlmModel::where('is_active', true)->get() as $model) {
+            $feature = Feature::query()->updateOrCreate(
+                ['slug' => 'model:'.$model->external_model_id],
+                ['name' => $model->name.' model access', 'type' => FeatureType::Toggle, 'sort_order' => 100],
+            );
+
+            foreach ($plans as $plan) {
+                $plan->features()->syncWithoutDetaching([$feature->getKey() => ['value' => '1']]);
             }
         }
     }

@@ -9,6 +9,10 @@ test('registration screen can be rendered', function () {
 });
 
 test('new users can register', function () {
+    // Registration provisions a free quota subscription via SyncQuotaFromSubscription,
+    // which requires the Subscriptionify plan catalogue to exist.
+    $this->seedSubscriptionify();
+
     $response = $this->post(route('register.store'), [
         'name' => 'John Doe',
         'email' => 'test@example.com',

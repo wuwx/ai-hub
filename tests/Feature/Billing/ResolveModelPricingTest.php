@@ -74,8 +74,10 @@ it('costCents computes the upstream cost for margin reporting', function () {
         'llm_provider_id' => $provider->id,
         'name' => 'M',
         'external_model_id' => 'm-1',
-        'cost_input_per_1m_usd' => 0.5,
-        'cost_output_per_1m_usd' => 1.0,
+        'pricing' => [
+            'input_per_1m_tokens' => 0.5,
+            'output_per_1m_tokens' => 1.0,
+        ],
         'is_active' => true,
     ]);
 

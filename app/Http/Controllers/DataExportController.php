@@ -98,10 +98,9 @@ class DataExportController extends Controller
 
         if (
             $subscription &&
-            $subscription->valid() &&
-            $subscription->created_at
+            $subscription->valid()
         ) {
-            $start = $subscription->created_at->startOfMonth();
+            $start = $subscription->getStartsAt()->startOfMonth();
             $end = $start->copy()->endOfMonth();
 
             return [

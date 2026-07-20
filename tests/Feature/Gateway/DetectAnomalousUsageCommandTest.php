@@ -4,7 +4,6 @@ use App\Actions\ApiKeys\GenerateApiKey;
 use App\Models\ApiKey;
 use App\Models\LlmModel;
 use App\Models\LlmProvider;
-use App\Models\QuotaPolicy;
 use App\Models\RequestLog;
 use App\Models\User;
 use App\Notifications\AnomalousUsageDetected;
@@ -59,13 +58,7 @@ it('skips keys whose request count is below the minimum threshold', function () 
 
     $user = User::factory()->create();
 
-    QuotaPolicy::create([
-        'user_id' => $user->id,
-        'daily_token_limit' => 100000,
-        'monthly_token_limit' => 1000000,
-        'effective_from' => now()->subDay(),
-        'is_active' => true,
-    ]);
+    $this->subscribeUserToFreePlan($user);
 
     $apiKey = app(GenerateApiKey::class)->handle(
         user: $user,
@@ -91,13 +84,7 @@ it('flags high error rate keys and notifies the user', function () {
 
     $user = User::factory()->create();
 
-    QuotaPolicy::create([
-        'user_id' => $user->id,
-        'daily_token_limit' => 100000,
-        'monthly_token_limit' => 1000000,
-        'effective_from' => now()->subDay(),
-        'is_active' => true,
-    ]);
+    $this->subscribeUserToFreePlan($user);
 
     $apiKey = app(GenerateApiKey::class)->handle(
         user: $user,
@@ -126,13 +113,7 @@ it('suppresses duplicate alerts for the same key within the dedupe window', func
 
     $user = User::factory()->create();
 
-    QuotaPolicy::create([
-        'user_id' => $user->id,
-        'daily_token_limit' => 100000,
-        'monthly_token_limit' => 1000000,
-        'effective_from' => now()->subDay(),
-        'is_active' => true,
-    ]);
+    $this->subscribeUserToFreePlan($user);
 
     $apiKey = app(GenerateApiKey::class)->handle(
         user: $user,
@@ -163,13 +144,7 @@ it('ignores keys whose error rate is below the threshold', function () {
 
     $user = User::factory()->create();
 
-    QuotaPolicy::create([
-        'user_id' => $user->id,
-        'daily_token_limit' => 100000,
-        'monthly_token_limit' => 1000000,
-        'effective_from' => now()->subDay(),
-        'is_active' => true,
-    ]);
+    $this->subscribeUserToFreePlan($user);
 
     $apiKey = app(GenerateApiKey::class)->handle(
         user: $user,

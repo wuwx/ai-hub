@@ -2,11 +2,6 @@
 
 use Illuminate\Support\Facades\Schedule;
 
-Schedule::command('gateway:check-provider-health')
-    ->everyFiveMinutes()
-    ->withoutOverlapping()
-    ->description('Poll active LLM providers and update their health status');
-
 Schedule::command('gateway:prune-request-logs --days=30')
     ->dailyAt('02:30')
     ->withoutOverlapping()

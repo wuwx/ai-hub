@@ -1,16 +1,18 @@
 <?php
 
+use App\Actions\Billing\SyncQuotaFromSubscription;
 use App\Models\LlmModel;
 use App\Models\LlmProvider;
-use App\Models\PlanModelEntitlement;
-use App\Models\PlanProviderEntitlement;
 use App\Models\RequestLog;
 use App\Models\UsageLedger;
 use App\Models\User;
 use Carbon\CarbonInterface;
 use Illuminate\Database\Eloquent\Collection;
+use Revoltify\Subscriptionify\Enums\FeatureType;
+use Revoltify\Subscriptionify\Models\Feature;
+use Revoltify\Subscriptionify\Models\Plan;
 
-it('relates plan model entitlements to plan code and model with boolean cast', function () {
+it('grants model access to a plan via a subscriptionify toggle feature', function () {
     $provider = LlmProvider::create([
         'name' => 'Provider A',
         'slug' => 'provider-a',
@@ -26,17 +28,22 @@ it('relates plan model entitlements to plan code and model with boolean cast', f
         'is_active' => true,
     ]);
 
-    $entitlement = PlanModelEntitlement::create([
-        'plan_code' => 'free',
-        'llm_model_id' => $model->id,
-        'is_enabled' => 1,
-    ]);
+    $this->seedSubscriptionify();
 
-    expect($entitlement->llmModel->is($model))->toBeTrue()
-        ->and($entitlement->is_enabled)->toBeTrue();
+    $feature = Feature::query()->updateOrCreate(
+        ['slug' => 'model:'.$model->external_model_id],
+        ['name' => $model->name.' access', 'type' => FeatureType::Toggle],
+    );
+    Plan::query()->where('slug', 'free')->firstOrFail()
+        ->features()->syncWithoutDetaching([$feature->getKey() => ['value' => '1']]);
+
+    $user = User::factory()->create();
+    app(SyncQuotaFromSubscription::class)->handle(user: $user, planCode: 'free');
+
+    expect($user->hasFeature('model:'.$model->external_model_id))->toBeTrue();
 });
 
-it('relates plan provider entitlements to plan code and provider with boolean cast', function () {
+it('grants provider access to a plan via a subscriptionify toggle feature', function () {
     $provider = LlmProvider::create([
         'name' => 'Provider B',
         'slug' => 'provider-b',
@@ -46,14 +53,19 @@ it('relates plan provider entitlements to plan code and provider with boolean ca
         'is_active' => true,
     ]);
 
-    $entitlement = PlanProviderEntitlement::create([
-        'plan_code' => 'free',
-        'llm_provider_id' => $provider->id,
-        'is_enabled' => true,
-    ]);
+    $this->seedSubscriptionify();
 
-    expect($entitlement->provider->is($provider))->toBeTrue()
-        ->and($entitlement->is_enabled)->toBeTrue();
+    $feature = Feature::query()->updateOrCreate(
+        ['slug' => 'provider:'.$provider->slug],
+        ['name' => $provider->name.' access', 'type' => FeatureType::Toggle],
+    );
+    Plan::query()->where('slug', 'free')->firstOrFail()
+        ->features()->syncWithoutDetaching([$feature->getKey() => ['value' => '1']]);
+
+    $user = User::factory()->create();
+    app(SyncQuotaFromSubscription::class)->handle(user: $user, planCode: 'free');
+
+    expect($user->hasFeature('provider:'.$provider->slug))->toBeTrue();
 });
 
 it('relates usage ledger to user api key provider and model with casts', function () {
@@ -182,7 +194,6 @@ it('relates llm model to provider entitlements request logs usage ledgers and in
     ]);
 
     expect($model->provider->is($provider))->toBeTrue()
-        ->and($model->planEntitlements)->toBeInstanceOf(Collection::class)
         ->and($model->requestLogs)->toBeInstanceOf(Collection::class)
         ->and($model->usageLedgers)->toBeInstanceOf(Collection::class);
 });
@@ -203,7 +214,6 @@ it('relates llm provider to models entitlements request logs and usage ledgers',
     expect($fresh->options)->toBe(['timeout' => 30])
         ->and($fresh->is_active)->toBeTrue()
         ->and($fresh->models)->toBeInstanceOf(Collection::class)
-        ->and($fresh->planEntitlements)->toBeInstanceOf(Collection::class)
         ->and($fresh->requestLogs)->toBeInstanceOf(Collection::class)
         ->and($fresh->usageLedgers)->toBeInstanceOf(Collection::class);
 });

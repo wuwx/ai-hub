@@ -389,15 +389,14 @@
             </div>
 
             @php
-                $plans = \App\Models\Plan::where('is_active', true)->orderBy('sort_order')->get();
+                $plans = app(\App\Services\PlanService::class)->allPlans();
             @endphp
 
             <div class="grid md:grid-cols-3 gap-6 lg:gap-8 max-w-5xl mx-auto">
                 @foreach($plans as $plan)
                     @php
-                        $code = $plan->code;
+                        $code = $plan->slug;
                         $isPopular = $code === 'pro';
-                        $price = (int) $plan->monthly_price_cents / 100;
                     @endphp
                     <div class="rounded-2xl p-8 {{ $isPopular ? 'pricing-popular relative' : 'glass' }} transition-all duration-300 hover:-translate-y-1">
                         @if($isPopular)
@@ -412,22 +411,14 @@
                         </div>
 
                         <div class="mb-8">
-                            @if($price > 0)
-                                <span class="text-4xl font-bold">${{ number_format($price) }}</span>
-                                <span class="text-zinc-400 text-sm">/month</span>
-                            @else
+                            @if($code === 'free')
                                 <span class="text-4xl font-bold">Free</span>
+                            @elseif($code === 'enterprise')
+                                <span class="text-4xl font-bold">Custom</span>
+                            @else
+                                <span class="text-4xl font-bold">{{ $plan->name }}</span>
                             @endif
                         </div>
-
-                        <ul class="space-y-3 mb-8">
-                            @foreach($plan->features ?? [] as $feature)
-                                <li class="flex items-start gap-3 text-sm">
-                                    <svg class="w-5 h-5 text-violet-400 shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd" /></svg>
-                                    <span class="text-zinc-300">{{ $feature }}</span>
-                                </li>
-                            @endforeach
-                        </ul>
 
                         @guest
                             <a href="{{ route('register') }}" class="block w-full text-center px-4 py-3 rounded-xl text-sm font-medium transition-all {{ $isPopular ? 'bg-violet-600 hover:bg-violet-500 text-white shadow-lg shadow-violet-600/25' : 'glass text-zinc-200 hover:bg-white/5' }}">

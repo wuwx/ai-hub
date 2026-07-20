@@ -5,7 +5,6 @@ namespace App\Http\Controllers\Gateway;
 use App\Actions\Gateway\GatewayRequestProcessor;
 use App\Http\Controllers\Controller;
 use App\Models\LlmModel;
-use App\Models\QuotaPolicy;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
@@ -74,37 +73,31 @@ class CompatibilityGatewayController extends Controller
      *
      * @return Collection<int, LlmModel>
      */
+    /**
+     * Resolve models available to the user based on their current plan.
+     *
+     * @return Collection<int, LlmModel>
+     */
     protected function resolveModelsForUser(?User $user): Collection
     {
         if (! $user) {
             return collect();
         }
 
-        $planCode = QuotaPolicy::query()
-            ->where('user_id', $user->id)
-            ->where('is_active', true)
-            ->orderByDesc('effective_from')
-            ->value('plan_code');
-
-        if (! $planCode) {
-            return collect();
-        }
-
         return LlmModel::query()
             ->with('provider')
             ->where('is_active', true)
-            ->whereHas('planEntitlements', function ($query) use ($planCode) {
-                $query->where('plan_code', $planCode)
-                    ->where('is_enabled', true);
-            })
-            ->whereHas('provider', function ($query) use ($planCode) {
-                $query->where('is_active', true)
-                    ->whereHas('planEntitlements', function ($entitlements) use ($planCode) {
-                        $entitlements->where('plan_code', $planCode)
-                            ->where('is_enabled', true);
-                    });
-            })
+            ->whereHas('provider', fn ($query) => $query->where('is_active', true))
             ->orderBy('name')
-            ->get();
+            ->get()
+            ->filter(function (LlmModel $model) use ($user) {
+                if (! $model->provider) {
+                    return false;
+                }
+
+                return $user->hasFeature('model:'.$model->external_model_id)
+                    && $user->hasFeature('provider:'.$model->provider->slug);
+            })
+            ->values();
     }
 }

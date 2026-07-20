@@ -17,31 +17,12 @@ class PlansTable
                     ->label('Order')
                     ->numeric()
                     ->sortable(),
-                TextColumn::make('code')
+                TextColumn::make('slug')
                     ->searchable()
                     ->sortable(),
                 TextColumn::make('name')
                     ->searchable()
                     ->sortable(),
-                TextColumn::make('monthly_price_cents')
-                    ->label('Price (cents)')
-                    ->numeric()
-                    ->sortable(),
-                TextColumn::make('daily_token_limit')
-                    ->label('Daily Limit')
-                    ->numeric()
-                    ->sortable()
-                    ->default('∞'),
-                TextColumn::make('weekly_token_limit')
-                    ->label('Weekly Limit')
-                    ->numeric()
-                    ->sortable()
-                    ->default('∞'),
-                TextColumn::make('monthly_token_limit')
-                    ->label('Monthly Limit')
-                    ->numeric()
-                    ->sortable()
-                    ->default('∞'),
                 IconColumn::make('is_active')
                     ->boolean(),
                 TextColumn::make('created_at')

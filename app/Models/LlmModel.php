@@ -16,13 +16,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
         'pricing',
         'context_window',
         'max_output_tokens',
-        'cost_input_per_1m_usd',
-        'cost_output_per_1m_usd',
-        'sell_input_per_1m_usd',
-        'sell_output_per_1m_usd',
-        'markup_percent',
         'is_active',
-        'fallback_model_id',
     ]),
 ]
 /**
@@ -38,11 +32,6 @@ class LlmModel extends Model
         'capabilities' => 'array',
         'pricing' => 'array',
         'is_active' => 'boolean',
-        'cost_input_per_1m_usd' => 'float',
-        'cost_output_per_1m_usd' => 'float',
-        'sell_input_per_1m_usd' => 'float',
-        'sell_output_per_1m_usd' => 'float',
-        'markup_percent' => 'integer',
     ];
 
     /**
@@ -51,22 +40,6 @@ class LlmModel extends Model
     public function provider(): BelongsTo
     {
         return $this->belongsTo(LlmProvider::class, 'llm_provider_id');
-    }
-
-    /**
-     * @return BelongsTo<self, $this>
-     */
-    public function fallbackModel(): BelongsTo
-    {
-        return $this->belongsTo(self::class, 'fallback_model_id');
-    }
-
-    /**
-     * @return HasMany<PlanModelEntitlement, $this>
-     */
-    public function planEntitlements(): HasMany
-    {
-        return $this->hasMany(PlanModelEntitlement::class);
     }
 
     /**
@@ -94,11 +67,6 @@ class LlmModel extends Model
             'capabilities' => 'array',
             'pricing' => 'array',
             'is_active' => 'boolean',
-            'cost_input_per_1m_usd' => 'float',
-            'cost_output_per_1m_usd' => 'float',
-            'sell_input_per_1m_usd' => 'float',
-            'sell_output_per_1m_usd' => 'float',
-            'markup_percent' => 'integer',
         ];
     }
 }

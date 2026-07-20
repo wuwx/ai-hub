@@ -1,9 +1,8 @@
 <?php
 
-use App\Models\Plan;
+use App\Actions\Billing\SyncQuotaFromSubscription;
 use App\Models\UsageLedger;
 use App\Models\User;
-use Laravel\Cashier\Subscription as CashierSubscription;
 use Livewire\Livewire;
 
 test('dashboard page requires authentication', function () {
@@ -36,22 +35,13 @@ test('dashboard shows current plan badge', function () {
 test('dashboard shows active subscription plan in badge', function () {
     $user = User::factory()->create();
 
-    Plan::updateOrCreate(['code' => 'pro'], [
-        'name' => 'Pro',
-        'stripe_price_id' => 'price_pro',
-        'monthly_price_cents' => 4900,
-        'is_active' => true,
-        'sort_order' => 1,
-    ]);
+    $this->makeSubscriptionifyPlan('pro', []);
 
-    CashierSubscription::create([
-        'user_id' => $user->id,
-        'type' => 'default',
-        'stripe_id' => 'sub_test123',
-        'stripe_status' => 'active',
-        'stripe_price' => 'price_pro',
-        'quantity' => 1,
-    ]);
+    app(SyncQuotaFromSubscription::class)->handle(
+        user: $user,
+        planCode: 'pro',
+        status: 'active',
+    );
 
     $this->actingAs($user);
 

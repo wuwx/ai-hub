@@ -13,15 +13,7 @@ class ResolveModelPricing
      */
     public function costRates(LlmModel $model): array
     {
-        $input = (float) $model->cost_input_per_1m_usd;
-        $output = (float) $model->cost_output_per_1m_usd;
-
-        if ($input > 0 || $output > 0) {
-            return [$input, $output];
-        }
-
-        // Fall back to the legacy pricing JSON, which historically encoded
-        // per-1M or per-1K token costs.
+        // Pricing is resolved entirely from the flexible `pricing` JSON column.
         $pricing = is_array($model->pricing) ? $model->pricing : [];
 
         $input =

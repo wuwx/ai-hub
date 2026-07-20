@@ -32,8 +32,8 @@ new #[Title('Usage')] class extends Component
 
         $subscription = Auth::user()->subscription();
 
-        if ($subscription && $subscription->valid() && $subscription->created_at) {
-            $start = $subscription->created_at->startOfMonth();
+        if ($subscription && $subscription->valid()) {
+            $start = $subscription->getStartsAt()->startOfMonth();
             $end = $start->copy()->endOfMonth();
 
             return [

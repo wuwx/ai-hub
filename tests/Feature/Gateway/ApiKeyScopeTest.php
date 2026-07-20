@@ -1,27 +1,21 @@
 <?php
 
 use App\Actions\ApiKeys\GenerateApiKey;
+use App\Actions\Billing\SyncQuotaFromSubscription;
 use App\Models\ApiKey;
 use App\Models\LlmModel;
 use App\Models\LlmProvider;
-use App\Models\PlanModelEntitlement;
-use App\Models\PlanProviderEntitlement;
-use App\Models\QuotaPolicy;
 use App\Models\User;
+use Database\Seeders\SubscriptionifySeeder;
 use Illuminate\Support\Facades\Http;
+use Tests\TestCase;
 
 function provisionScopedKey(array $allowedModels = []): array
 {
     $user = User::factory()->create();
 
-    QuotaPolicy::create([
-        'user_id' => $user->id,
-        'plan_code' => 'free',
-        'daily_token_limit' => 100000,
-        'monthly_token_limit' => 1000000,
-        'effective_from' => now()->subMinute(),
-        'is_active' => true,
-    ]);
+    (new SubscriptionifySeeder)->run();
+    app(SyncQuotaFromSubscription::class)->handle(user: $user, planCode: 'free');
 
     $provider = LlmProvider::create([
         'name' => 'Scoped Provider',
@@ -38,8 +32,6 @@ function provisionScopedKey(array $allowedModels = []): array
         'llm_provider_id' => $provider->id,
         'name' => 'GPT-A',
         'external_model_id' => 'gpt-a',
-        'sell_input_per_1m_usd' => 1.0,
-        'sell_output_per_1m_usd' => 2.0,
         'is_active' => true,
     ]);
 
@@ -47,23 +39,13 @@ function provisionScopedKey(array $allowedModels = []): array
         'llm_provider_id' => $provider->id,
         'name' => 'GPT-B',
         'external_model_id' => 'gpt-b',
-        'sell_input_per_1m_usd' => 1.0,
-        'sell_output_per_1m_usd' => 2.0,
         'is_active' => true,
     ]);
 
-    PlanProviderEntitlement::create([
-        'plan_code' => 'free',
-        'llm_provider_id' => $provider->id,
-        'is_enabled' => true,
-    ]);
+    TestCase::entitleProvider($provider);
 
     foreach ([$modelA, $modelB] as $model) {
-        PlanModelEntitlement::create([
-            'plan_code' => 'free',
-            'llm_model_id' => $model->id,
-            'is_enabled' => true,
-        ]);
+        TestCase::entitleModel($model);
     }
 
     $apiKeyResult = app(GenerateApiKey::class)->handle(

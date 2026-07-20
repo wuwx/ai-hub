@@ -1,10 +1,10 @@
 <?php
 
+use App\Actions\Billing\SyncQuotaFromSubscription;
 use App\Models\LlmModel;
 use App\Models\LlmProvider;
 use App\Models\UsageLedger;
 use App\Models\User;
-use Laravel\Cashier\Subscription as CashierSubscription;
 use Livewire\Livewire;
 
 test('usage page requires authentication', function () {
@@ -27,17 +27,16 @@ test('usage page can be rendered by authenticated users', function () {
 test('usage page shows billing cycle from subscription', function () {
     $user = User::factory()->create();
 
-    $subscription = CashierSubscription::create([
-        'user_id' => $user->id,
-        'type' => 'default',
-        'stripe_id' => 'sub_test123',
-        'stripe_status' => 'active',
-        'stripe_price' => 'price_pro',
-        'quantity' => 1,
-    ]);
+    $this->makeSubscriptionifyPlan('pro', []);
 
-    // Fix created_at to a known date so the billing cycle assertion is deterministic.
-    $subscription->forceFill(['created_at' => '2026-06-15 12:00:00'])->save();
+    app(SyncQuotaFromSubscription::class)->handle(
+        user: $user,
+        planCode: 'pro',
+        status: 'active',
+    );
+
+    // Fix starts_at to a known date so the billing cycle assertion is deterministic.
+    $user->subscription()->forceFill(['starts_at' => '2026-06-15 12:00:00'])->save();
 
     $this->actingAs($user);
 
