@@ -52,7 +52,6 @@ it(
         );
 
         $response->assertOk();
-        $response->assertHeader('X-Trace-Id');
         $response->assertJsonPath('object', 'list');
         $response->assertJsonPath('data.0.object', 'embedding');
         $response->assertJsonPath('data.0.embedding', [0.1, 0.2, 0.3]);

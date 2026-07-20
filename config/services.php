@@ -42,14 +42,6 @@ return [
         ),
         'retry_attempts' => (int) env('LLM_GATEWAY_RETRY_ATTEMPTS', 2),
         'retry_backoff_ms' => (int) env('LLM_GATEWAY_RETRY_BACKOFF_MS', 150),
-        'circuit_failure_threshold' => (int) env(
-            'LLM_GATEWAY_CIRCUIT_FAILURE_THRESHOLD',
-            5,
-        ),
-        'circuit_cooldown_seconds' => (int) env(
-            'LLM_GATEWAY_CIRCUIT_COOLDOWN_SECONDS',
-            60,
-        ),
         'idempotency_ttl_seconds' => (int) env(
             'LLM_GATEWAY_IDEMPOTENCY_TTL_SECONDS',
             300,

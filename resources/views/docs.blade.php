@@ -32,7 +32,6 @@
                     <span class="text-zinc-500"># x-api-key header</span><br>
                     x-api-key: ahk_your_api_key
                 </div>
-                <p class="text-zinc-400 text-sm">Every response includes an <code class="text-emerald-400">X-Trace-Id</code> header for request tracing.</p>
             </div>
         </section>
 

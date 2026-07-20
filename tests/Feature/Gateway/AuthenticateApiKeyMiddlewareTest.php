@@ -11,7 +11,6 @@ it('rejects gateway requests without api key', function () {
 
     $response->assertStatus(401);
     $response->assertJsonPath('error.type', 'authentication_error');
-    $response->assertHeader('X-Trace-Id');
 });
 
 it('rejects gateway requests with invalid api key', function () {
@@ -22,7 +21,6 @@ it('rejects gateway requests with invalid api key', function () {
 
     $response->assertStatus(401);
     $response->assertJsonPath('error.type', 'authentication_error');
-    $response->assertHeader('X-Trace-Id');
 });
 
 it('accepts authenticated requests and reaches gateway model validation', function () {

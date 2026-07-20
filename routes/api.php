@@ -1,6 +1,10 @@
 <?php
 
-use App\Http\Controllers\Gateway\CompatibilityGatewayController;
+use App\Http\Controllers\Api\V1\Chat\CompletionsController;
+use App\Http\Controllers\Api\V1\EmbeddingsController;
+use App\Http\Controllers\Api\V1\MessagesController;
+use App\Http\Controllers\Api\V1\ModelsController;
+use App\Http\Controllers\Api\V1\ResponsesController;
 use App\Http\Controllers\HealthCheckController;
 use App\Http\Controllers\PrometheusMetricsController;
 use App\Http\Middleware\AuthenticateApiKey;
@@ -13,9 +17,10 @@ Route::get('metrics', PrometheusMetricsController::class);
 Route::prefix('v1')
     ->middleware([AuthenticateApiKey::class])
     ->group(function () {
-        Route::get('models', [CompatibilityGatewayController::class, 'listModels']);
-        Route::post('chat/completions', [CompatibilityGatewayController::class, 'openAiChatCompletions']);
-        Route::post('embeddings', [CompatibilityGatewayController::class, 'openAiEmbeddings']);
-        Route::post('responses', [CompatibilityGatewayController::class, 'openAiResponses']);
-        Route::post('messages', [CompatibilityGatewayController::class, 'anthropicMessages']);
+        Route::get('models', [ModelsController::class, 'index']);
+        Route::post('chat/completions', CompletionsController::class);
+        Route::post('embeddings', EmbeddingsController::class);
+        Route::post('responses', ResponsesController::class);
+        Route::post('messages', MessagesController::class);
+
     });

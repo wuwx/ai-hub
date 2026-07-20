@@ -2,28 +2,20 @@
 
 namespace App\Actions\Gateway;
 
-use App\Actions\Quota\EnforceTokenQuota;
-use App\Exceptions\QuotaExceededException;
 use App\Models\LlmModel;
 use App\Models\LlmProvider;
 use App\Models\User;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\Client\Response as HttpResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
-use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Str;
 use Laravel\Sanctum\PersonalAccessToken;
 use Symfony\Component\HttpFoundation\Response;
 
 class GatewayRequestProcessor
 {
     public function __construct(
-        private readonly ProtocolTransformer $protocolTransformer,
         private readonly ResolveProviderSecret $resolveProviderSecret,
-        private readonly EnforceTokenQuota $enforceTokenQuota,
-        private readonly ContentFilter $contentFilter,
     ) {
         //
     }
@@ -43,21 +35,15 @@ class GatewayRequestProcessor
         /** @var PersonalAccessToken|null $token */
         $token = $request->attributes->get('gateway.api_key');
 
-        $traceId =
-            (string) ($request->attributes->get('gateway.trace_id') ?:
-            Str::uuid()->toString());
-        $request->attributes->set('gateway.trace_id', $traceId);
-
         if (! $user || ! $token) {
-            return $this->jsonWithTrace(
-                $this->protocolTransformer->errorPayload(
+            return response()->json(
+                $this->errorPayload(
                     'openai',
                     'Unauthorized',
                     'unauthorized',
                     'authentication_error',
                 ),
                 401,
-                $traceId,
             );
         }
 
@@ -67,86 +53,43 @@ class GatewayRequestProcessor
         $requestedModel = (string) ($payload['model'] ?? '');
 
         if ($requestedModel === '') {
-            return $this->jsonWithTrace(
-                $this->protocolTransformer->errorPayload(
+            return response()->json(
+                $this->errorPayload(
                     'openai',
                     'The model field is required.',
                     'missing_model',
                 ),
                 422,
-                $traceId,
             );
         }
 
         $input = $payload['input'] ?? null;
 
         if ($input === null || $input === '') {
-            return $this->jsonWithTrace(
-                $this->protocolTransformer->errorPayload(
+            return response()->json(
+                $this->errorPayload(
                     'openai',
                     'The input field is required.',
                     'missing_input',
                 ),
                 422,
-                $traceId,
             );
         }
 
-        $model = $this->resolveModelForUser($user, $requestedModel);
+        $model = $this->resolveModelForUser($requestedModel);
 
         if (! $model) {
-            return $this->jsonWithTrace(
-                $this->protocolTransformer->errorPayload(
+            return response()->json(
+                $this->errorPayload(
                     'openai',
                     'Model is unavailable for this user.',
                     'model_unavailable',
                 ),
                 422,
-                $traceId,
             );
         }
 
         $provider = $model->provider;
-
-        // Embeddings input can be a string or an array of strings. Normalize
-        // to a single string for token estimation.
-        $inputText = is_array($input)
-            ? implode(
-                "\n",
-                array_map(fn ($v) => is_string($v) ? $v : '', $input),
-            )
-            : (string) $input;
-        $tokenInputEstimate = $this->protocolTransformer->estimateTextTokens(
-            $inputText,
-        );
-
-        try {
-            $this->enforceTokenQuota->handle($user, $tokenInputEstimate);
-        } catch (QuotaExceededException $exception) {
-            return $this->jsonWithTrace(
-                $this->protocolTransformer->errorPayload(
-                    'openai',
-                    $exception->getMessage(),
-                    'quota_exceeded',
-                    'rate_limit_error',
-                ),
-                429,
-                $traceId,
-            );
-        }
-
-        if ($this->isProviderCircuitOpen($provider)) {
-            return $this->jsonWithTrace(
-                $this->protocolTransformer->errorPayload(
-                    'openai',
-                    'Provider is temporarily unavailable. Please retry later.',
-                    'provider_circuit_open',
-                    'api_error',
-                ),
-                503,
-                $traceId,
-            );
-        }
 
         $headers = $this->providerHeaders($provider, 'openai');
         $endpoint = (string) data_get(
@@ -172,34 +115,16 @@ class GatewayRequestProcessor
                 $providerPayload,
                 false,
             );
-        } catch (ConnectionException $exception) {
-            $this->registerProviderFailure($provider);
-
-            Log::warning('gateway.provider.timeout', [
-                'provider_id' => $provider->id,
-                'provider_slug' => $provider->slug,
-                'url' => $url,
-                'trace_id' => $traceId,
-                'endpoint' => 'embeddings',
-                'error' => $exception->getMessage(),
-            ]);
-
-            return $this->jsonWithTrace(
-                $this->protocolTransformer->errorPayload(
+        } catch (ConnectionException) {
+            return response()->json(
+                $this->errorPayload(
                     'openai',
                     'Provider timeout.',
                     'provider_timeout',
                     'api_error',
                 ),
                 504,
-                $traceId,
             );
-        }
-
-        if ($response->status() >= 500) {
-            $this->registerProviderFailure($provider);
-        } else {
-            $this->registerProviderSuccess($provider);
         }
 
         $status = $response->status();
@@ -209,7 +134,7 @@ class GatewayRequestProcessor
             $body = ['error' => ['message' => (string) $response->body()]];
         }
 
-        return $this->jsonWithTrace($body, $status, $traceId);
+        return response()->json($body, $status);
     }
 
     public function handle(
@@ -222,21 +147,15 @@ class GatewayRequestProcessor
         /** @var PersonalAccessToken|null $token */
         $token = $request->attributes->get('gateway.api_key');
 
-        $traceId =
-            (string) ($request->attributes->get('gateway.trace_id') ?:
-            Str::uuid()->toString());
-        $request->attributes->set('gateway.trace_id', $traceId);
-
         if (! $user || ! $token) {
-            return $this->jsonWithTrace(
-                $this->protocolTransformer->errorPayload(
+            return response()->json(
+                $this->errorPayload(
                     $incomingProtocol,
                     'Unauthorized',
                     'unauthorized',
                     'authentication_error',
                 ),
                 401,
-                $traceId,
             );
         }
 
@@ -246,140 +165,55 @@ class GatewayRequestProcessor
         $requestedModel = (string) ($payload['model'] ?? '');
 
         if ($requestedModel === '') {
-            return $this->jsonWithTrace(
-                $this->protocolTransformer->errorPayload(
+            return response()->json(
+                $this->errorPayload(
                     $incomingProtocol,
                     'The model field is required.',
                     'missing_model',
                 ),
                 422,
-                $traceId,
             );
         }
 
-        $model = $this->resolveModelForUser($user, $requestedModel);
+        $model = $this->resolveModelForUser($requestedModel);
 
         if (! $model) {
-            return $this->jsonWithTrace(
-                $this->protocolTransformer->errorPayload(
+            return response()->json(
+                $this->errorPayload(
                     $incomingProtocol,
                     'Model is unavailable for this user.',
                     'model_unavailable',
                 ),
                 422,
-                $traceId,
             );
         }
 
         $provider = $model->provider;
-        $providerProtocol = $this->protocolTransformer->providerProtocol(
+        $providerProtocol = $this->providerProtocol(
             $provider->adapter_type,
         );
 
-        $canonical = $this->protocolTransformer->toCanonical(
-            $incomingProtocol,
-            $payload,
-        );
-        $canonical['model'] = $model->external_model_id;
-
-        $isStreaming = (bool) ($canonical['stream'] ?? false);
-
-        // Content safety filter: reject requests with prohibited content
-        // before forwarding to upstream providers.
-        $contentCheck = $this->contentFilter->check($canonical);
-
-        if ($contentCheck['blocked']) {
-            return $this->jsonWithTrace(
-                $this->protocolTransformer->errorPayload(
+        // Transparent 1:1 passthrough: the client must speak the same protocol
+        // as the upstream provider. Cross-protocol translation has been removed,
+        // so a mismatch is rejected rather than silently converted.
+        if ($incomingProtocol !== $providerProtocol) {
+            return response()->json(
+                $this->errorPayload(
                     $incomingProtocol,
-                    $contentCheck['reason'] ??
-                        'Request rejected by content filter.',
-                    'content_filtered',
-                    'permission_error',
+                    'The requested model is not available in the '.
+                        $incomingProtocol.' API format.',
+                    'protocol_mismatch',
                 ),
-                400,
-                $traceId,
+                422,
             );
         }
 
-        $providerPayload = $this->protocolTransformer->toProviderPayload(
-            $canonical,
-            $providerProtocol,
-        );
-        $tokenInputEstimate = $this->protocolTransformer->estimateInputTokens(
-            $canonical,
-        );
+        // Forward the request body as-is, only swapping the model identifier for
+        // the provider's external id (a no-op when they already match).
+        $providerPayload = $payload;
+        $providerPayload['model'] = $model->external_model_id;
 
-        $idempotencyKey = (string) $request->header('Idempotency-Key', '');
-        $encodedPayload = json_encode($payload, JSON_UNESCAPED_UNICODE);
-        $payloadHash = hash(
-            'sha256',
-            is_string($encodedPayload) ? $encodedPayload : '',
-        );
-
-        $idempotencyCacheKey = null;
-
-        if (! $isStreaming && $idempotencyKey !== '') {
-            $idempotencyCacheKey = $this->idempotencyCacheKey(
-                $user,
-                $token,
-                $incomingEndpoint,
-                $idempotencyKey,
-            );
-            $cachedResponse = Cache::get($idempotencyCacheKey);
-
-            if (is_array($cachedResponse)) {
-                if (
-                    ($cachedResponse['payload_hash'] ?? null) !==
-                    $payloadHash
-                ) {
-                    return $this->jsonWithTrace(
-                        $this->protocolTransformer->errorPayload(
-                            $incomingProtocol,
-                            'Idempotency key reused with different payload.',
-                            'idempotency_payload_mismatch',
-                        ),
-                        409,
-                        $traceId,
-                    );
-                }
-
-                return $this->jsonWithTrace(
-                    $cachedResponse['body'] ?? [],
-                    (int) ($cachedResponse['status'] ?? 200),
-                    $traceId,
-                    ['X-Idempotent-Replay' => 'true'],
-                );
-            }
-        }
-
-        try {
-            $this->enforceTokenQuota->handle($user, $tokenInputEstimate);
-        } catch (QuotaExceededException $exception) {
-            return $this->jsonWithTrace(
-                $this->protocolTransformer->errorPayload(
-                    $incomingProtocol,
-                    $exception->getMessage(),
-                    'quota_exceeded',
-                    'rate_limit_error',
-                ),
-                429,
-                $traceId,
-            );
-        }
-
-        if ($this->isProviderCircuitOpen($provider)) {
-            return $this->jsonWithTrace(
-                $this->protocolTransformer->errorPayload(
-                    $incomingProtocol,
-                    'Provider is temporarily unavailable. Please retry later.',
-                    'provider_circuit_open',
-                    'api_error',
-                ),
-                503,
-                $traceId,
-            );
-        }
+        $isStreaming = (bool) ($payload['stream'] ?? false);
 
         $headers = $this->providerHeaders($provider, $providerProtocol);
         $endpoint = $this->providerEndpoint(
@@ -391,48 +225,30 @@ class GatewayRequestProcessor
 
         if ($isStreaming) {
             return $this->streamToClient(
-                user: $user,
-                token: $token,
-                provider: $provider,
-                model: $model,
                 protocol: $incomingProtocol,
-                endpoint: $incomingEndpoint,
                 url: $url,
                 headers: $headers,
                 providerPayload: $providerPayload,
-                traceId: $traceId,
-                providerProtocol: $providerProtocol,
             );
         }
 
         return $this->forwardAsJson(
-            user: $user,
-            token: $token,
-            provider: $provider,
-            model: $model,
             incomingProtocol: $incomingProtocol,
-            providerProtocol: $providerProtocol,
-            endpoint: $incomingEndpoint,
             url: $url,
             headers: $headers,
             providerPayload: $providerPayload,
-            traceId: $traceId,
-            idempotencyCacheKey: $idempotencyCacheKey,
-            payloadHash: $payloadHash,
         );
     }
 
     /**
-     * Resolve the LLM model a user may use for a given external model id.
+     * Resolve the LLM model for a given external model id.
      *
-     * A model is usable when it (and its provider) is entitled to the user's
-     * current plan via Subscriptionify toggle features (`model:<id>` /
-     * `provider:<slug>`).
+     * Any active model on an active provider is reachable by any authenticated
+     * caller — entitlement/subscription gating was removed in favor of a
+     * transparent passthrough proxy.
      */
-    protected function resolveModelForUser(
-        User $user,
-        string $externalModelId,
-    ): ?LlmModel {
+    protected function resolveModelForUser(string $externalModelId): ?LlmModel
+    {
         $model = LlmModel::query()
             ->with('provider')
             ->where('external_model_id', $externalModelId)
@@ -444,55 +260,18 @@ class GatewayRequestProcessor
             return null;
         }
 
-        if (! $this->modelAllowedForUser($user, $model)) {
-            return null;
-        }
-
         return $model;
     }
 
     /**
-     * Whether the user's plan entitles them to use the given model (and its
-     * provider) via Subscriptionify toggle features.
-     */
-    protected function modelAllowedForUser(User $user, LlmModel $model): bool
-    {
-        if (! $model->provider instanceof LlmProvider) {
-            return false;
-        }
-
-        return $user->hasFeature($this->modelFeatureSlug($model))
-            && $user->hasFeature($this->providerFeatureSlug($model->provider));
-    }
-
-    protected function modelFeatureSlug(LlmModel $model): string
-    {
-        return 'model:'.$model->external_model_id;
-    }
-
-    protected function providerFeatureSlug(LlmProvider $provider): string
-    {
-        return 'provider:'.$provider->slug;
-    }
-
-    /**
-     * @param  array<string, mixed>  $headers
+     * @param  array<string, string>  $headers
      * @param  array<string, mixed>  $providerPayload
      */
     protected function forwardAsJson(
-        User $user,
-        PersonalAccessToken $token,
-        LlmProvider $provider,
-        LlmModel $model,
         string $incomingProtocol,
-        string $providerProtocol,
-        string $endpoint,
         string $url,
         array $headers,
         array $providerPayload,
-        string $traceId,
-        ?string $idempotencyCacheKey = null,
-        ?string $payloadHash = null,
     ): Response {
         try {
             $response = $this->sendWithRetry(
@@ -501,33 +280,16 @@ class GatewayRequestProcessor
                 $providerPayload,
                 false,
             );
-        } catch (ConnectionException $exception) {
-            $this->registerProviderFailure($provider);
-
-            Log::warning('gateway.provider.timeout', [
-                'provider_id' => $provider->id,
-                'provider_slug' => $provider->slug,
-                'url' => $url,
-                'trace_id' => $traceId,
-                'error' => $exception->getMessage(),
-            ]);
-
-            return $this->jsonWithTrace(
-                $this->protocolTransformer->errorPayload(
+        } catch (ConnectionException) {
+            return response()->json(
+                $this->errorPayload(
                     $incomingProtocol,
                     'Provider timeout.',
                     'provider_timeout',
                     'api_error',
                 ),
                 504,
-                $traceId,
             );
-        }
-
-        if ($response->status() >= 500) {
-            $this->registerProviderFailure($provider);
-        } else {
-            $this->registerProviderSuccess($provider);
         }
 
         $status = $response->status();
@@ -541,49 +303,18 @@ class GatewayRequestProcessor
             ];
         }
 
-        $adapted = $this->protocolTransformer->adaptResponse(
-            $body,
-            $incomingProtocol,
-            $providerProtocol,
-            $model->external_model_id,
-        );
-
-        if ($idempotencyCacheKey && $payloadHash) {
-            Cache::put(
-                $idempotencyCacheKey,
-                [
-                    'payload_hash' => $payloadHash,
-                    'status' => $status,
-                    'body' => $adapted,
-                ],
-                now()->addSeconds(
-                    (int) config(
-                        'services.llm_gateway.idempotency_ttl_seconds',
-                        300,
-                    ),
-                ),
-            );
-        }
-
-        return $this->jsonWithTrace($adapted, $status, $traceId);
+        return response()->json($body, $status);
     }
 
     /**
-     * @param  array<string, mixed>  $headers
+     * @param  array<string, string>  $headers
      * @param  array<string, mixed>  $providerPayload
      */
     protected function streamToClient(
-        User $user,
-        PersonalAccessToken $token,
-        LlmProvider $provider,
-        LlmModel $model,
         string $protocol,
-        string $endpoint,
         string $url,
         array $headers,
         array $providerPayload,
-        string $traceId,
-        string $providerProtocol,
     ): Response {
         try {
             $response = $this->sendWithRetry(
@@ -592,84 +323,26 @@ class GatewayRequestProcessor
                 $providerPayload,
                 true,
             );
-        } catch (ConnectionException $exception) {
-            $this->registerProviderFailure($provider);
-
-            Log::warning('gateway.provider.timeout', [
-                'provider_id' => $provider->id,
-                'provider_slug' => $provider->slug,
-                'url' => $url,
-                'trace_id' => $traceId,
-                'streaming' => true,
-                'error' => $exception->getMessage(),
-            ]);
-
-            return $this->jsonWithTrace(
-                $this->protocolTransformer->errorPayload(
+        } catch (ConnectionException) {
+            return response()->json(
+                $this->errorPayload(
                     $protocol,
                     'Provider timeout.',
                     'provider_timeout',
                     'api_error',
                 ),
                 504,
-                $traceId,
             );
-        }
-
-        if ($response->status() >= 500) {
-            $this->registerProviderFailure($provider);
-        } else {
-            $this->registerProviderSuccess($provider);
         }
 
         $status = $response->status();
         $psrBody = $response->toPsrResponse()->getBody();
 
         return response()->stream(
-            function () use (
-                $psrBody,
-                $protocol,
-                $providerProtocol,
-                $model,
-            ): void {
-                $buffer = '';
-
+            function () use ($psrBody): void {
                 while (! $psrBody->eof()) {
-                    $buffer .= $psrBody->read(8192);
-
-                    while (
-                        ($separatorPosition = strpos($buffer, "\n\n")) !==
-                        false
-                    ) {
-                        $frame = substr($buffer, 0, $separatorPosition);
-                        $buffer = substr($buffer, $separatorPosition + 2);
-
-                        $adaptedFrame = $this->protocolTransformer->adaptStreamingFrame(
-                            $frame,
-                            $protocol,
-                            $providerProtocol,
-                            $model->external_model_id,
-                        );
-
-                        if ($adaptedFrame !== '') {
-                            echo $adaptedFrame;
-                            flush();
-                        }
-                    }
-                }
-
-                if ($buffer !== '') {
-                    $adaptedFrame = $this->protocolTransformer->adaptStreamingFrame(
-                        $buffer,
-                        $protocol,
-                        $providerProtocol,
-                        $model->external_model_id,
-                    );
-
-                    if ($adaptedFrame !== '') {
-                        echo $adaptedFrame;
-                        flush();
-                    }
+                    echo $psrBody->read(8192);
+                    flush();
                 }
             },
             $status,
@@ -678,27 +351,7 @@ class GatewayRequestProcessor
                 'Cache-Control' => 'no-cache',
                 'Connection' => 'keep-alive',
                 'X-Accel-Buffering' => 'no',
-                'X-Trace-Id' => $traceId,
             ],
-        );
-    }
-
-    /**
-     * @param  array<string, mixed>  $payload
-     * @param  array<string, string>  $headers
-     */
-    protected function jsonWithTrace(
-        array $payload,
-        int $status,
-        string $traceId,
-        array $headers = [],
-    ): Response {
-        return response()->json(
-            $payload,
-            $status,
-            array_merge($headers, [
-                'X-Trace-Id' => $traceId,
-            ]),
         );
     }
 
@@ -832,89 +485,48 @@ class GatewayRequestProcessor
         throw new ConnectionException('Gateway request failed after retries.');
     }
 
-    protected function idempotencyCacheKey(
-        User $user,
-        PersonalAccessToken $token,
-        string $endpoint,
-        string $idempotencyKey,
-    ): string {
-        return sprintf(
-            'gateway:idempotency:%d:%d:%s:%s',
-            $user->id,
-            $token->id,
-            md5($endpoint),
-            sha1($idempotencyKey),
-        );
+    /**
+     * Map a provider adapter type to the wire protocol it expects.
+     */
+    protected function providerProtocol(string $adapterType): string
+    {
+        return match ($adapterType) {
+            'anthropic_compatible' => 'anthropic',
+            default => 'openai',
+        };
     }
 
-    protected function isProviderCircuitOpen(LlmProvider $provider): bool
-    {
-        $openUntil = Cache::get(
-            $this->providerCircuitOpenUntilCacheKey($provider),
-        );
-
-        return is_numeric($openUntil) && (int) $openUntil > now()->timestamp;
-    }
-
-    protected function registerProviderFailure(LlmProvider $provider): void
-    {
-        $failuresKey = $this->providerFailureCountCacheKey($provider);
-        $cooldownSeconds = max(
-            1,
-            (int) config('services.llm_gateway.circuit_cooldown_seconds', 60),
-        );
-        $threshold = max(
-            1,
-            (int) config('services.llm_gateway.circuit_failure_threshold', 5),
-        );
-
-        $currentFailures = Cache::increment($failuresKey);
-
-        if ($currentFailures === 1) {
-            Cache::put($failuresKey, 1, now()->addSeconds($cooldownSeconds));
+    /**
+     * Produce a protocol-aware error payload. The gateway is a transparent
+     * 1:1 passthrough and does no request/response translation, so the only
+     * protocol-specific behaviour is the shape of the error envelope
+     * (Anthropic nests errors under a `type: error` wrapper).
+     *
+     * @return array<string, mixed>
+     */
+    protected function errorPayload(
+        string $incomingProtocol,
+        string $message,
+        string $code,
+        string $type = 'invalid_request_error',
+    ): array {
+        if ($incomingProtocol === 'anthropic') {
+            return [
+                'type' => 'error',
+                'error' => [
+                    'type' => $type,
+                    'message' => $message,
+                    'code' => $code,
+                ],
+            ];
         }
 
-        if ($currentFailures >= $threshold) {
-            Cache::put(
-                $this->providerCircuitOpenUntilCacheKey($provider),
-                now()->addSeconds($cooldownSeconds)->timestamp,
-                now()->addSeconds($cooldownSeconds),
-            );
-
-            Log::warning('gateway.circuit.opened', [
-                'provider_id' => $provider->id,
-                'provider_slug' => $provider->slug,
-                'failures' => $currentFailures,
-                'threshold' => $threshold,
-                'cooldown_seconds' => $cooldownSeconds,
-            ]);
-        }
-    }
-
-    protected function registerProviderSuccess(LlmProvider $provider): void
-    {
-        $wasOpen = $this->isProviderCircuitOpen($provider);
-
-        Cache::forget($this->providerFailureCountCacheKey($provider));
-        Cache::forget($this->providerCircuitOpenUntilCacheKey($provider));
-
-        if ($wasOpen) {
-            Log::info('gateway.circuit.closed', [
-                'provider_id' => $provider->id,
-                'provider_slug' => $provider->slug,
-            ]);
-        }
-    }
-
-    protected function providerFailureCountCacheKey(
-        LlmProvider $provider,
-    ): string {
-        return sprintf('gateway:circuit:provider:%d:failures', $provider->id);
-    }
-
-    protected function providerCircuitOpenUntilCacheKey(
-        LlmProvider $provider,
-    ): string {
-        return sprintf('gateway:circuit:provider:%d:open_until', $provider->id);
+        return [
+            'error' => [
+                'type' => $type,
+                'message' => $message,
+                'code' => $code,
+            ],
+        ];
     }
 }
