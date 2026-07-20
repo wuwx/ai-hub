@@ -2,7 +2,6 @@
 
 use App\Actions\Billing\SyncQuotaFromSubscription;
 use App\Models\User;
-use App\Services\PlanService;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
 use Livewire\Attributes\Computed;
@@ -45,7 +44,7 @@ new #[Title("Billing")] class extends Component {
             return $user->subscription()->plan->slug;
         }
 
-        return app(PlanService::class)->freePlanCode();
+        return (string) config('services.billing.free_plan_code', 'free');
     }
 
     /**
@@ -82,8 +81,10 @@ new #[Title("Billing")] class extends Component {
     {
         $currentPlanCode = $this->currentPlanCode;
 
-        return app(PlanService::class)
-            ->allPlans()
+        return Plan::query()
+            ->active()
+            ->orderBy('sort_order')
+            ->get()
             ->map(function (Plan $plan) use ($currentPlanCode) {
                 return [
                     "code" => $plan->slug,
@@ -122,7 +123,7 @@ new #[Title("Billing")] class extends Component {
         $user = Auth::user();
         abort_unless($user, 404);
 
-        $plan = app(PlanService::class)->findByCode($planCode);
+        $plan = Plan::query()->where('slug', $planCode)->first();
         abort_unless($plan, 404);
 
         app(SyncQuotaFromSubscription::class)->handle(

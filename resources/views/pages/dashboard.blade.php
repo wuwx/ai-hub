@@ -1,6 +1,5 @@
 <?php
 
-use App\Services\PlanService;
 use Illuminate\Support\Facades\Auth;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\Title;
@@ -19,7 +18,7 @@ new #[Title("Dashboard")] class extends Component {
             return $user->subscription()->plan->slug;
         }
 
-        return app(PlanService::class)->freePlanCode();
+        return (string) config('services.billing.free_plan_code', 'free');
     }
 
     /**

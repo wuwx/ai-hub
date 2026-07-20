@@ -389,7 +389,7 @@
             </div>
 
             @php
-                $plans = app(\App\Services\PlanService::class)->allPlans();
+                $plans = \Revoltify\Subscriptionify\Models\Plan::query()->active()->orderBy('sort_order')->get();
             @endphp
 
             <div class="grid md:grid-cols-3 gap-6 lg:gap-8 max-w-5xl mx-auto">
