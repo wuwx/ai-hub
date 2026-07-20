@@ -3,7 +3,7 @@
 use App\Models\LlmProvider;
 
 it('returns prometheus-format metrics', function () {
-    $response = $this->get('/api/metrics');
+    $response = $this->get('/metrics');
 
     $response->assertOk();
     $response->assertHeader(
@@ -22,7 +22,7 @@ it('returns prometheus-format metrics', function () {
 });
 
 it('includes TYPE declarations for gauges', function () {
-    $response = $this->get('/api/metrics');
+    $response = $this->get('/metrics');
 
     $content = $response->getContent();
 
@@ -31,7 +31,7 @@ it('includes TYPE declarations for gauges', function () {
 });
 
 it('does not require authentication', function () {
-    $this->get('/api/metrics')->assertOk();
+    $this->get('/metrics')->assertOk();
 });
 
 it('includes provider availability metrics', function () {
@@ -45,7 +45,7 @@ it('includes provider availability metrics', function () {
         'is_active' => true,
     ]);
 
-    $response = $this->get('/api/metrics');
+    $response = $this->get('/metrics');
 
     $content = $response->getContent();
 
@@ -54,7 +54,7 @@ it('includes provider availability metrics', function () {
 });
 
 it('includes subscription status metrics', function () {
-    $response = $this->get('/api/metrics');
+    $response = $this->get('/metrics');
 
     $content = $response->getContent();
 

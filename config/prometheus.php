@@ -10,7 +10,7 @@ return [
      * The urls that will return metrics.
      */
     'urls' => [
-        'default' => 'api/metrics',
+        'default' => 'metrics',
     ],
 
     /*
