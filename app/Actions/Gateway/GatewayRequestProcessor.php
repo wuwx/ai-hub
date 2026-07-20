@@ -31,9 +31,9 @@ class GatewayRequestProcessor
     public function handleEmbeddings(Request $request): Response
     {
         /** @var User|null $user */
-        $user = $request->attributes->get('gateway.user');
+        $user = $request->user();
         /** @var PersonalAccessToken|null $token */
-        $token = $request->attributes->get('gateway.api_key');
+        $token = $user?->currentAccessToken();
 
         if (! $user || ! $token) {
             return response()->json(
@@ -143,9 +143,9 @@ class GatewayRequestProcessor
         string $incomingEndpoint,
     ): Response {
         /** @var User|null $user */
-        $user = $request->attributes->get('gateway.user');
+        $user = $request->user();
         /** @var PersonalAccessToken|null $token */
-        $token = $request->attributes->get('gateway.api_key');
+        $token = $user?->currentAccessToken();
 
         if (! $user || ! $token) {
             return response()->json(

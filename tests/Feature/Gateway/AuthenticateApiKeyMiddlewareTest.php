@@ -39,20 +39,3 @@ it('accepts authenticated requests and reaches gateway model validation', functi
     $response->assertStatus(422);
     $response->assertJsonPath('error.code', 'model_unavailable');
 });
-
-it('accepts x-api-key header for authentication', function () {
-    $user = User::factory()->create();
-
-    $generated = app(GenerateApiKey::class)->handle(
-        user: $user,
-        name: 'Gateway Key Header',
-    );
-
-    $response = $this->withHeader('x-api-key', $generated->plainTextToken)->postJson('/api/v1/chat/completions', [
-        'model' => 'unknown-model',
-        'messages' => [['role' => 'user', 'content' => 'hello']],
-    ]);
-
-    $response->assertStatus(422);
-    $response->assertJsonPath('error.code', 'model_unavailable');
-});

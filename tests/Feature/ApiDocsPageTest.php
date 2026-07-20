@@ -31,7 +31,6 @@ it('documents authentication methods', function () {
 
     $response->assertOk();
     $response->assertSee('Authorization: Bearer');
-    $response->assertSee('x-api-key');
 });
 
 it('does not require authentication', function () {

@@ -25,12 +25,10 @@
         <section class="mb-12">
             <h2 class="text-2xl font-semibold mb-4">Authentication</h2>
             <div class="rounded-lg border border-zinc-800 bg-zinc-900 p-6 space-y-3">
-                <p class="text-zinc-300">All API requests must include an API key. You can use either the <code class="text-emerald-400">Authorization: Bearer</code> header or the <code class="text-emerald-400">x-api-key</code> header.</p>
+                <p class="text-zinc-300">All API requests must include your API key in the <code class="text-emerald-400">Authorization: Bearer</code> header.</p>
                 <div class="rounded-md bg-zinc-950 p-4 font-mono text-sm text-zinc-300 overflow-x-auto">
                     <span class="text-zinc-500"># Bearer token</span><br>
-                    Authorization: Bearer ahk_your_api_key<br><br>
-                    <span class="text-zinc-500"># x-api-key header</span><br>
-                    x-api-key: ahk_your_api_key
+                    Authorization: Bearer ahk_your_api_key
                 </div>
             </div>
         </section>
