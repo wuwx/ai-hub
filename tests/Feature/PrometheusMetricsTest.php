@@ -1,5 +1,7 @@
 <?php
 
+use App\Models\LlmProvider;
+
 it('returns prometheus-format metrics', function () {
     $response = $this->get('/api/metrics');
 
@@ -33,6 +35,16 @@ it('does not require authentication', function () {
 });
 
 it('includes provider availability metrics', function () {
+    LlmProvider::create([
+        'name' => 'Test Provider',
+        'slug' => 'test-provider',
+        'adapter_type' => 'openai_compatible',
+        'base_url' => 'https://api.test.com',
+        'auth_mode' => 'bearer',
+        'secret_ref' => 'test-secret',
+        'is_active' => true,
+    ]);
+
     $response = $this->get('/api/metrics');
 
     $content = $response->getContent();
