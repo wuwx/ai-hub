@@ -6,9 +6,6 @@ use App\Http\Controllers\Api\V1\MessagesController;
 use App\Http\Controllers\Api\V1\ModelsController;
 use App\Http\Controllers\Api\V1\ResponsesController;
 use Illuminate\Support\Facades\Route;
-use Spatie\Health\Http\Controllers\HealthCheckJsonResultsController;
-
-Route::get('health', HealthCheckJsonResultsController::class);
 
 Route::prefix('v1')
     ->middleware(['auth:sanctum'])
