@@ -2,6 +2,7 @@
 
 use App\Actions\ApiKeys\GenerateApiKey;
 use App\Models\User;
+use Laravel\Sanctum\PersonalAccessToken;
 use Livewire\Livewire;
 
 test('api keys page requires authentication', function () {
@@ -30,10 +31,10 @@ test('users can create api keys', function () {
         ->call('createKey')
         ->assertHasNoErrors();
 
-    $this->assertDatabaseHas('api_keys', [
-        'user_id' => $user->id,
+    $this->assertDatabaseHas('personal_access_tokens', [
+        'tokenable_id' => $user->id,
+        'tokenable_type' => User::class,
         'name' => 'Production Key',
-        'created_by' => $user->id,
     ]);
 });
 
@@ -51,26 +52,25 @@ test('api key name is required', function () {
 test('users can revoke their api keys', function () {
     $user = User::factory()->create();
 
-    $apiKey = app(GenerateApiKey::class)->handle(
+    $generated = app(GenerateApiKey::class)->handle(
         user: $user,
         name: 'Test Key',
-        createdBy: $user->id,
     );
 
     $this->actingAs($user);
 
     Livewire::test('pages::api-keys')
-        ->call('revokeKey', $apiKey->apiKey->id)
+        ->call('revokeKey', $generated->token->id)
         ->assertHasNoErrors();
 
-    expect($apiKey->apiKey->fresh()->revoked_at)->not->toBeNull();
+    expect(PersonalAccessToken::find($generated->token->id))->toBeNull();
 });
 
 test('cannot revoke another users api key', function () {
     $user = User::factory()->create();
     $otherUser = User::factory()->create();
 
-    $apiKey = app(GenerateApiKey::class)->handle(
+    $generated = app(GenerateApiKey::class)->handle(
         user: $otherUser,
         name: 'Other User Key',
     );
@@ -78,15 +78,15 @@ test('cannot revoke another users api key', function () {
     $this->actingAs($user);
 
     Livewire::test('pages::api-keys')
-        ->call('revokeKey', $apiKey->apiKey->id)
+        ->call('revokeKey', $generated->token->id)
         ->assertNotFound();
 });
 
 test('api keys list shows user keys', function () {
     $user = User::factory()->create();
 
-    app(GenerateApiKey::class)->handle(user: $user, name: 'Key One', createdBy: $user->id);
-    app(GenerateApiKey::class)->handle(user: $user, name: 'Key Two', createdBy: $user->id);
+    app(GenerateApiKey::class)->handle(user: $user, name: 'Key One');
+    app(GenerateApiKey::class)->handle(user: $user, name: 'Key Two');
 
     $this->actingAs($user);
 
@@ -99,8 +99,8 @@ test('api keys list does not show other users keys', function () {
     $user = User::factory()->create();
     $otherUser = User::factory()->create();
 
-    app(GenerateApiKey::class)->handle(user: $user, name: 'My Key', createdBy: $user->id);
-    app(GenerateApiKey::class)->handle(user: $otherUser, name: 'Other Key', createdBy: $otherUser->id);
+    app(GenerateApiKey::class)->handle(user: $user, name: 'My Key');
+    app(GenerateApiKey::class)->handle(user: $otherUser, name: 'Other Key');
 
     $this->actingAs($user);
 
@@ -119,5 +119,5 @@ test('created api key shows plain text key in component state', function () {
         ->call('createKey')
         ->assertHasNoErrors();
 
-    expect($component->get('generatedPlainTextKey'))->toStartWith('ahk_');
+    expect($component->get('generatedPlainTextKey'))->toMatch('/^\d+\|/');
 });

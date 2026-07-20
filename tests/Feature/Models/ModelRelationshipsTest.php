@@ -85,16 +85,11 @@ it('relates usage ledger to user api key provider and model with casts', functio
         'external_model_id' => 'model-l',
         'is_active' => true,
     ]);
-    $apiKey = $owner->apiKeys()->create([
-        'name' => 'k',
-        'key_hash' => 'h',
-        'last_four' => 'aaaa',
-        'created_by' => $owner->id,
-    ]);
+    $apiKey = $owner->createToken('k')->accessToken;
 
     $ledger = UsageLedger::create([
         'user_id' => $owner->id,
-        'api_key_id' => $apiKey->id,
+        'token_id' => $apiKey->id,
         'llm_provider_id' => $provider->id,
         'llm_model_id' => $model->id,
         'bucket_date' => now()->toDateString(),
@@ -109,7 +104,7 @@ it('relates usage ledger to user api key provider and model with casts', functio
     $fresh = $ledger->fresh();
 
     expect($fresh->user->is($owner))->toBeTrue()
-        ->and($fresh->apiKey->is($apiKey))->toBeTrue()
+        ->and($fresh->token->is($apiKey))->toBeTrue()
         ->and($fresh->provider->is($provider))->toBeTrue()
         ->and($fresh->llmModel->is($model))->toBeTrue()
         ->and($fresh->bucket_date)->toBeInstanceOf(CarbonInterface::class)
@@ -135,17 +130,12 @@ it('relates request log to user api key provider and model with casts', function
         'external_model_id' => 'model-p',
         'is_active' => true,
     ]);
-    $apiKey = $owner->apiKeys()->create([
-        'name' => 'k',
-        'key_hash' => 'h',
-        'last_four' => 'aaaa',
-        'created_by' => $owner->id,
-    ]);
+    $apiKey = $owner->createToken('k')->accessToken;
 
     $log = RequestLog::create([
         'trace_id' => 'trace-1',
         'user_id' => $owner->id,
-        'api_key_id' => $apiKey->id,
+        'token_id' => $apiKey->id,
         'llm_provider_id' => $provider->id,
         'llm_model_id' => $model->id,
         'protocol' => 'openai',
@@ -166,7 +156,7 @@ it('relates request log to user api key provider and model with casts', function
     $fresh = $log->fresh();
 
     expect($fresh->user->is($owner))->toBeTrue()
-        ->and($fresh->apiKey->is($apiKey))->toBeTrue()
+        ->and($fresh->token->is($apiKey))->toBeTrue()
         ->and($fresh->provider->is($provider))->toBeTrue()
         ->and($fresh->llmModel->is($model))->toBeTrue()
         ->and($fresh->is_streaming)->toBeTrue()
@@ -221,13 +211,8 @@ it('relates llm provider to models entitlements request logs and usage ledgers',
 it('returns user api keys', function () {
     $owner = User::factory()->create();
 
-    $apiKey = $owner->apiKeys()->create([
-        'name' => 'k',
-        'key_hash' => 'h',
-        'last_four' => 'aaaa',
-        'created_by' => $owner->id,
-    ]);
+    $owner->createToken('k');
 
-    expect($owner->apiKeys)->toHaveCount(1)
-        ->and($owner->apiKeys->first()->id)->toBe($apiKey->id);
+    expect($owner->tokens)->toHaveCount(1)
+        ->and($owner->tokens->first()->name)->toBe('k');
 });

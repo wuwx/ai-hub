@@ -5,7 +5,6 @@ namespace App\Actions\Gateway;
 use App\Actions\Usage\EnforceTokenQuota;
 use App\Actions\Usage\RecordApiRequestUsage;
 use App\Exceptions\QuotaExceededException;
-use App\Models\ApiKey;
 use App\Models\LlmModel;
 use App\Models\LlmProvider;
 use App\Models\User;
@@ -16,6 +15,7 @@ use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
+use Laravel\Sanctum\PersonalAccessToken;
 use Symfony\Component\HttpFoundation\Response;
 
 class GatewayRequestProcessor
@@ -42,15 +42,15 @@ class GatewayRequestProcessor
     {
         /** @var User|null $user */
         $user = $request->attributes->get('gateway.user');
-        /** @var ApiKey|null $apiKey */
-        $apiKey = $request->attributes->get('gateway.api_key');
+        /** @var PersonalAccessToken|null $token */
+        $token = $request->attributes->get('gateway.api_key');
 
         $traceId =
             (string) ($request->attributes->get('gateway.trace_id') ?:
             Str::uuid()->toString());
         $request->attributes->set('gateway.trace_id', $traceId);
 
-        if (! $user || ! $apiKey) {
+        if (! $user || ! $token) {
             return $this->jsonWithTrace(
                 $this->protocolTransformer->errorPayload(
                     'openai',
@@ -104,19 +104,6 @@ class GatewayRequestProcessor
                     'model_unavailable',
                 ),
                 422,
-                $traceId,
-            );
-        }
-
-        if (! $apiKey->canAccessModel($requestedModel)) {
-            return $this->jsonWithTrace(
-                $this->protocolTransformer->errorPayload(
-                    'openai',
-                    'This API key is not permitted to use the requested model.',
-                    'model_not_allowed',
-                    'permission_error',
-                ),
-                403,
                 $traceId,
             );
         }
@@ -212,7 +199,7 @@ class GatewayRequestProcessor
                 errorCode: 'provider_timeout',
                 errorMessage: $exception->getMessage(),
                 traceId: $traceId,
-                apiKey: $apiKey,
+                token: $token,
                 provider: $provider,
                 llmModel: $model,
                 enforceQuota: false,
@@ -262,7 +249,7 @@ class GatewayRequestProcessor
                 ? (string) data_get($body, 'error.message', '')
                 : null,
             traceId: $traceId,
-            apiKey: $apiKey,
+            token: $token,
             provider: $provider,
             llmModel: $model,
             enforceQuota: false,
@@ -278,15 +265,15 @@ class GatewayRequestProcessor
     ): Response {
         /** @var User|null $user */
         $user = $request->attributes->get('gateway.user');
-        /** @var ApiKey|null $apiKey */
-        $apiKey = $request->attributes->get('gateway.api_key');
+        /** @var PersonalAccessToken|null $token */
+        $token = $request->attributes->get('gateway.api_key');
 
         $traceId =
             (string) ($request->attributes->get('gateway.trace_id') ?:
             Str::uuid()->toString());
         $request->attributes->set('gateway.trace_id', $traceId);
 
-        if (! $user || ! $apiKey) {
+        if (! $user || ! $token) {
             return $this->jsonWithTrace(
                 $this->protocolTransformer->errorPayload(
                     $incomingProtocol,
@@ -326,21 +313,6 @@ class GatewayRequestProcessor
                     'model_unavailable',
                 ),
                 422,
-                $traceId,
-            );
-        }
-
-        // Per-key model allow-list: if the key restricts access to specific
-        // models, reject requests outside that scope.
-        if (! $apiKey->canAccessModel($requestedModel)) {
-            return $this->jsonWithTrace(
-                $this->protocolTransformer->errorPayload(
-                    $incomingProtocol,
-                    'This API key is not permitted to use the requested model.',
-                    'model_not_allowed',
-                    'permission_error',
-                ),
-                403,
                 $traceId,
             );
         }
@@ -396,7 +368,7 @@ class GatewayRequestProcessor
         if (! $isStreaming && $idempotencyKey !== '') {
             $idempotencyCacheKey = $this->idempotencyCacheKey(
                 $user,
-                $apiKey,
+                $token,
                 $incomingEndpoint,
                 $idempotencyKey,
             );
@@ -466,7 +438,7 @@ class GatewayRequestProcessor
         if ($isStreaming) {
             return $this->streamToClient(
                 user: $user,
-                apiKey: $apiKey,
+                token: $token,
                 provider: $provider,
                 model: $model,
                 protocol: $incomingProtocol,
@@ -482,7 +454,7 @@ class GatewayRequestProcessor
 
         return $this->forwardAsJson(
             user: $user,
-            apiKey: $apiKey,
+            token: $token,
             provider: $provider,
             model: $model,
             incomingProtocol: $incomingProtocol,
@@ -557,7 +529,7 @@ class GatewayRequestProcessor
      */
     protected function forwardAsJson(
         User $user,
-        ApiKey $apiKey,
+        PersonalAccessToken $token,
         LlmProvider $provider,
         LlmModel $model,
         string $incomingProtocol,
@@ -602,7 +574,7 @@ class GatewayRequestProcessor
                 errorCode: 'provider_timeout',
                 errorMessage: $exception->getMessage(),
                 traceId: $traceId,
-                apiKey: $apiKey,
+                token: $token,
                 provider: $provider,
                 llmModel: $model,
                 enforceQuota: false,
@@ -669,7 +641,7 @@ class GatewayRequestProcessor
                 ? (string) data_get($adapted, 'error.message', '')
                 : null,
             traceId: $traceId,
-            apiKey: $apiKey,
+            token: $token,
             provider: $provider,
             llmModel: $model,
             enforceQuota: false,
@@ -701,7 +673,7 @@ class GatewayRequestProcessor
      */
     protected function streamToClient(
         User $user,
-        ApiKey $apiKey,
+        PersonalAccessToken $token,
         LlmProvider $provider,
         LlmModel $model,
         string $protocol,
@@ -746,7 +718,7 @@ class GatewayRequestProcessor
                 errorCode: 'provider_timeout',
                 errorMessage: $exception->getMessage(),
                 traceId: $traceId,
-                apiKey: $apiKey,
+                token: $token,
                 provider: $provider,
                 llmModel: $model,
                 enforceQuota: false,
@@ -786,7 +758,7 @@ class GatewayRequestProcessor
                 $providerProtocol,
                 $model,
                 $user,
-                $apiKey,
+                $token,
                 $provider,
                 $endpoint,
                 $traceId,
@@ -881,7 +853,7 @@ class GatewayRequestProcessor
                         ),
                         errorCode: $errorStream,
                         traceId: $traceId,
-                        apiKey: $apiKey,
+                        token: $token,
                         provider: $provider,
                         llmModel: $model,
                         enforceQuota: false,
@@ -1050,14 +1022,14 @@ class GatewayRequestProcessor
 
     protected function idempotencyCacheKey(
         User $user,
-        ApiKey $apiKey,
+        PersonalAccessToken $token,
         string $endpoint,
         string $idempotencyKey,
     ): string {
         return sprintf(
             'gateway:idempotency:%d:%d:%s:%s',
             $user->id,
-            $apiKey->id,
+            $token->id,
             md5($endpoint),
             sha1($idempotencyKey),
         );

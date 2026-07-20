@@ -2,10 +2,10 @@
 
 namespace App\Http\Middleware;
 
-use App\Models\ApiKey;
 use Closure;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Str;
 use Symfony\Component\HttpFoundation\Response;
 
@@ -21,33 +21,35 @@ class AuthenticateApiKey
         $traceId = (string) $request->header('X-Trace-Id', Str::uuid()->toString());
         $request->attributes->set('gateway.trace_id', $traceId);
 
-        $plainTextKey = $request->bearerToken() ?: $request->header('x-api-key');
+        // Accept the key via either the standard Authorization: Bearer header
+        // or the alternate x-api-key header documented in the API reference.
+        $key = $request->bearerToken() ?: $request->header('x-api-key');
 
-        if (! is_string($plainTextKey) || $plainTextKey === '') {
+        if (! is_string($key) || $key === '') {
             return $this->unauthorized('Missing API key.', $traceId);
         }
 
-        $apiKey = ApiKey::query()
-            ->with('user')
-            ->where('key_hash', ApiKey::hashPlainTextKey($plainTextKey))
-            ->whereNull('revoked_at')
-            ->where(function ($query) {
-                $query->whereNull('expires_at')->orWhere('expires_at', '>', now());
-            })
-            ->first();
+        if ($request->header('x-api-key') && ! $request->bearerToken()) {
+            $request->headers->set('Authorization', 'Bearer '.$key);
+        }
 
-        if (! $apiKey || ! $apiKey->user) {
+        Auth::shouldUse('sanctum');
+        $user = auth()->user();
+
+        if (! $user) {
             return $this->unauthorized('Invalid API key.', $traceId);
         }
 
-        if (! $apiKey->isIpAllowed($request->ip())) {
-            return $this->forbidden('This API key is not allowed from this IP address.', $traceId);
+        $token = $user->currentAccessToken();
+
+        if ($token->expires_at !== null && $token->expires_at->isPast()) {
+            return $this->unauthorized('Expired API key.', $traceId);
         }
 
-        $apiKey->forceFill(['last_used_at' => now()])->save();
+        $token->forceFill(['last_used_at' => now()])->save();
 
-        $request->attributes->set('gateway.api_key', $apiKey);
-        $request->attributes->set('gateway.user', $apiKey->user);
+        $request->attributes->set('gateway.api_key', $token);
+        $request->attributes->set('gateway.user', $user);
 
         return $next($request);
     }
@@ -60,18 +62,6 @@ class AuthenticateApiKey
                 'message' => $message,
             ],
         ], 401, [
-            'X-Trace-Id' => $traceId,
-        ]);
-    }
-
-    protected function forbidden(string $message, string $traceId): JsonResponse
-    {
-        return response()->json([
-            'error' => [
-                'type' => 'permission_error',
-                'message' => $message,
-            ],
-        ], 403, [
             'X-Trace-Id' => $traceId,
         ]);
     }

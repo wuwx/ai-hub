@@ -2,13 +2,13 @@
 
 namespace App\Data;
 
-use App\Models\ApiKey;
+use Laravel\Sanctum\PersonalAccessToken;
 
 readonly class GeneratedApiKey
 {
     public function __construct(
-        public ApiKey $apiKey,
-        public string $plainTextKey,
+        public PersonalAccessToken $token,
+        public string $plainTextToken,
     ) {
         //
     }

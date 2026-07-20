@@ -3,7 +3,6 @@
 namespace App\Actions\Usage;
 
 use App\Exceptions\QuotaExceededException;
-use App\Models\ApiKey;
 use App\Models\LlmModel;
 use App\Models\LlmProvider;
 use App\Models\RequestLog;
@@ -11,6 +10,7 @@ use App\Models\UsageLedger;
 use App\Models\User;
 use Carbon\CarbonInterface;
 use Illuminate\Support\Facades\DB;
+use Laravel\Sanctum\PersonalAccessToken;
 
 class RecordApiRequestUsage
 {
@@ -45,7 +45,7 @@ class RecordApiRequestUsage
         ?string $errorCode = null,
         ?string $errorMessage = null,
         ?string $traceId = null,
-        ?ApiKey $apiKey = null,
+        ?PersonalAccessToken $token = null,
         ?LlmProvider $provider = null,
         ?LlmModel $llmModel = null,
         ?CarbonInterface $requestedAt = null,
@@ -72,7 +72,7 @@ class RecordApiRequestUsage
             $errorCode,
             $errorMessage,
             $traceId,
-            $apiKey,
+            $token,
             $provider,
             $llmModel,
             $requestedAt,
@@ -85,7 +85,7 @@ class RecordApiRequestUsage
             $requestLog = RequestLog::create([
                 'trace_id' => $traceId,
                 'user_id' => $user->id,
-                'api_key_id' => $apiKey?->id,
+                'token_id' => $token?->id,
                 'llm_provider_id' => $provider?->id,
                 'llm_model_id' => $llmModel?->id,
                 'protocol' => $protocol,
@@ -109,7 +109,7 @@ class RecordApiRequestUsage
 
             $this->incrementLedger(
                 user: $user,
-                apiKey: $apiKey,
+                token: $token,
                 provider: $provider,
                 llmModel: $llmModel,
                 bucketType: 'day',
@@ -122,7 +122,7 @@ class RecordApiRequestUsage
 
             $this->incrementLedger(
                 user: $user,
-                apiKey: $apiKey,
+                token: $token,
                 provider: $provider,
                 llmModel: $llmModel,
                 bucketType: 'week',
@@ -135,7 +135,7 @@ class RecordApiRequestUsage
 
             $this->incrementLedger(
                 user: $user,
-                apiKey: $apiKey,
+                token: $token,
                 provider: $provider,
                 llmModel: $llmModel,
                 bucketType: 'month',
@@ -192,7 +192,7 @@ class RecordApiRequestUsage
 
     protected function incrementLedger(
         User $user,
-        ?ApiKey $apiKey,
+        ?PersonalAccessToken $token,
         ?LlmProvider $provider,
         ?LlmModel $llmModel,
         string $bucketType,
@@ -204,7 +204,7 @@ class RecordApiRequestUsage
     ): void {
         $query = UsageLedger::query()
             ->where('user_id', $user->id)
-            ->where('api_key_id', $apiKey?->id)
+            ->where('token_id', $token?->id)
             ->where('llm_provider_id', $provider?->id)
             ->where('llm_model_id', $llmModel?->id)
             ->where('bucket_type', $bucketType)
@@ -216,7 +216,7 @@ class RecordApiRequestUsage
         if (! $ledger) {
             UsageLedger::create([
                 'user_id' => $user->id,
-                'api_key_id' => $apiKey?->id,
+                'token_id' => $token?->id,
                 'llm_provider_id' => $provider?->id,
                 'llm_model_id' => $llmModel?->id,
                 'bucket_date' => $bucketDate,

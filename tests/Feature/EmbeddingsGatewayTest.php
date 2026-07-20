@@ -216,8 +216,7 @@ function provisionEmbeddingsTarget(): array
     $apiKey = app(GenerateApiKey::class)->handle(
         user: $user,
         name: 'Embeddings Access Key',
-        createdBy: $user->id,
     );
 
-    return [$apiKey->plainTextKey, $model->external_model_id, $user];
+    return [$apiKey->plainTextToken, $model->external_model_id, $user];
 }

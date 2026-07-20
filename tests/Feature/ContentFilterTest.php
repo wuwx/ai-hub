@@ -35,14 +35,13 @@ beforeEach(function () {
     $this->apiKey = app(GenerateApiKey::class)->handle(
         user: $this->user,
         name: 'Content Test Key',
-        createdBy: $this->user->id,
     );
 });
 
 it('blocks requests containing prohibited content', function () {
     Http::fake();
 
-    $response = $this->withToken($this->apiKey->plainTextKey)->postJson(
+    $response = $this->withToken($this->apiKey->plainTextToken)->postJson(
         '/api/v1/chat/completions',
         [
             'model' => 'gpt-4.1',
@@ -80,7 +79,7 @@ it('allows normal requests', function () {
         ),
     ]);
 
-    $response = $this->withToken($this->apiKey->plainTextKey)->postJson(
+    $response = $this->withToken($this->apiKey->plainTextToken)->postJson(
         '/api/v1/chat/completions',
         [
             'model' => 'gpt-4.1',
@@ -96,7 +95,7 @@ it('allows normal requests', function () {
 it('is case-insensitive', function () {
     Http::fake();
 
-    $response = $this->withToken($this->apiKey->plainTextKey)->postJson(
+    $response = $this->withToken($this->apiKey->plainTextToken)->postJson(
         '/api/v1/chat/completions',
         [
             'model' => 'gpt-4.1',
@@ -113,7 +112,7 @@ it('is case-insensitive', function () {
 it('checks system prompts too', function () {
     Http::fake();
 
-    $response = $this->withToken($this->apiKey->plainTextKey)->postJson(
+    $response = $this->withToken($this->apiKey->plainTextToken)->postJson(
         '/api/v1/chat/completions',
         [
             'model' => 'gpt-4.1',
@@ -134,7 +133,7 @@ it('checks system prompts too', function () {
 it('does not forward blocked requests to upstream', function () {
     Http::fake();
 
-    $this->withToken($this->apiKey->plainTextKey)->postJson(
+    $this->withToken($this->apiKey->plainTextToken)->postJson(
         '/api/v1/chat/completions',
         [
             'model' => 'gpt-4.1',

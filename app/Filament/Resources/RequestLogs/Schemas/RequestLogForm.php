@@ -19,8 +19,8 @@ class RequestLogForm
                 Select::make('user_id')
                     ->relationship('user', 'name')
                     ->required(),
-                Select::make('api_key_id')
-                    ->relationship('apiKey', 'name'),
+                Select::make('token_id')
+                    ->relationship('token', 'name'),
                 Select::make('llm_provider_id')
                     ->relationship('provider', 'name'),
                 Select::make('llm_model_id')

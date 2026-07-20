@@ -2,11 +2,11 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\ApiKey;
 use App\Models\LlmProvider;
 use App\Models\RequestLog;
 use App\Models\User;
 use Illuminate\Http\Response;
+use Laravel\Sanctum\PersonalAccessToken;
 use Revoltify\Subscriptionify\Enums\SubscriptionStatus;
 use Revoltify\Subscriptionify\Models\Subscription;
 
@@ -45,16 +45,14 @@ class PrometheusMetricsController extends Controller
         $metrics[] = '# TYPE ai_hub_tokens_output_total counter';
         $metrics[] = "ai_hub_tokens_output_total {$totalTokensOutput}";
 
-        // User and API key counts
+        // User and API token counts
         $totalUsers = User::count();
-        $totalApiKeys = ApiKey::count();
-        $activeApiKeys = ApiKey::whereNull('revoked_at')
-            ->where(function ($query) {
-                $query
-                    ->whereNull('expires_at')
-                    ->orWhere('expires_at', '>', now());
-            })
-            ->count();
+        $totalApiKeys = PersonalAccessToken::count();
+        $activeApiKeys = PersonalAccessToken::where(function ($query) {
+            $query
+                ->whereNull('expires_at')
+                ->orWhere('expires_at', '>', now());
+        })->count();
 
         $metrics[] = '# TYPE ai_hub_users gauge';
         $metrics[] = "ai_hub_users {$totalUsers}";

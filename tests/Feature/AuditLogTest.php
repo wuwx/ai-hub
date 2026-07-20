@@ -3,6 +3,7 @@
 use App\Actions\ApiKeys\GenerateApiKey;
 use App\Actions\Audit\RecordAuditEvent;
 use App\Models\User;
+use Laravel\Sanctum\PersonalAccessToken;
 use Spatie\Activitylog\Models\Activity;
 
 it('records an audit event via the action', function () {
@@ -28,7 +29,6 @@ it('records an audit event when an API key is created', function () {
     app(GenerateApiKey::class)->handle(
         user: $user,
         name: 'Production Key',
-        createdBy: $user->id,
     );
 
     // The Livewire page would call RecordAuditEvent after key creation.
@@ -48,22 +48,22 @@ it('records an audit event when an API key is revoked', function () {
     $generated = app(GenerateApiKey::class)->handle(
         user: $user,
         name: 'To Revoke',
-        createdBy: $user->id,
     );
 
-    $generated->apiKey->update(['revoked_at' => now()]);
+    $token = $generated->token;
+    $token->delete();
 
     app(RecordAuditEvent::class)->handle(
         action: 'api_key.revoked',
-        subject: $generated->apiKey,
+        subject: $token,
         actor: $user,
     );
 
     $activity = Activity::query()->where('description', 'api_key.revoked')->first();
 
     expect($activity)->not->toBeNull()
-        ->and($activity->subject_type)->toBe('App\Models\ApiKey')
-        ->and($activity->subject_id)->toBe($generated->apiKey->id);
+        ->and($activity->subject_type)->toBe(PersonalAccessToken::class)
+        ->and($activity->subject_id)->toBe($token->id);
 });
 
 it('allows null actor for system-generated events', function () {

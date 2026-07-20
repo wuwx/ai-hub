@@ -4,49 +4,46 @@ use App\Actions\ApiKeys\GenerateApiKey;
 use App\Actions\ApiKeys\RotateApiKey;
 use App\Models\User;
 use Illuminate\Support\Carbon;
+use Laravel\Sanctum\PersonalAccessToken;
 
-it('generates a plaintext key and stores only its hash', function () {
+it('generates a plaintext key backed by a sanctum token', function () {
     $user = User::factory()->create();
 
     $result = app(GenerateApiKey::class)->handle(
         user: $user,
         name: 'Primary Key',
         expiresAt: Carbon::now()->addMonth(),
-        createdBy: $user->id,
     );
 
-    expect($result->plainTextKey)->toStartWith('ahk_');
-    expect($result->apiKey->user_id)->toBe($user->id);
-    expect($result->apiKey->created_by)->toBe($user->id);
-    expect($result->apiKey->key_hash)->toBe(hash('sha256', $result->plainTextKey));
-    expect($result->apiKey->last_four)->toBe(substr($result->plainTextKey, -4));
+    expect($result->plainTextToken)->toMatch('/^\d+\|[A-Za-z0-9]{40,}$/');
+    expect($result->token->tokenable_id)->toBe($user->id);
+    expect($result->token->name)->toBe('Primary Key');
 
-    $this->assertDatabaseHas('api_keys', [
-        'id' => $result->apiKey->id,
+    $this->assertDatabaseHas('personal_access_tokens', [
+        'id' => $result->token->id,
         'name' => 'Primary Key',
-        'last_four' => substr($result->plainTextKey, -4),
-        'key_hash' => hash('sha256', $result->plainTextKey),
+        'tokenable_id' => $user->id,
+        'tokenable_type' => User::class,
     ]);
 });
 
-it('rotates an api key and clears revoked status', function () {
+it('rotates an api key into a new token', function () {
     $user = User::factory()->create();
 
     $generated = app(GenerateApiKey::class)->handle(
         user: $user,
         name: 'Rotate Me',
-        createdBy: $user->id,
     );
 
-    $apiKey = $generated->apiKey;
-    $apiKey->update(['revoked_at' => now()]);
+    $token = $generated->token;
 
-    $rotated = app(RotateApiKey::class)->handle($apiKey);
+    $rotated = app(RotateApiKey::class)->handle($token);
 
-    expect($rotated->plainTextKey)->toStartWith('ahk_');
-    expect($rotated->apiKey->id)->toBe($apiKey->id);
-    expect($rotated->apiKey->key_hash)->toBe(hash('sha256', $rotated->plainTextKey));
-    expect($rotated->apiKey->last_four)->toBe(substr($rotated->plainTextKey, -4));
-    expect($rotated->apiKey->revoked_at)->toBeNull();
-    expect($rotated->plainTextKey)->not->toBe($generated->plainTextKey);
+    expect($rotated->plainTextToken)->toMatch('/^\d+\|/');
+    expect($rotated->token->id)->not->toBe($token->id);
+    expect($rotated->token->name)->toBe('Rotate Me');
+    expect($rotated->plainTextToken)->not->toBe($generated->plainTextToken);
+
+    // The old token is deleted during rotation.
+    expect(PersonalAccessToken::find($token->id))->toBeNull();
 });

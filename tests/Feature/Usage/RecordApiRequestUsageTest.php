@@ -29,11 +29,10 @@ it('records request log and updates day/week/month ledgers', function () {
         'is_active' => true,
     ]);
 
-    $apiKey = app(GenerateApiKey::class)->handle(
+    $token = app(GenerateApiKey::class)->handle(
         user: $user,
         name: 'Gateway Key',
-        createdBy: $user->id,
-    )->apiKey;
+    )->token;
 
     app(RecordApiRequestUsage::class)->handle(
         user: $user,
@@ -44,7 +43,7 @@ it('records request log and updates day/week/month ledgers', function () {
         tokenOutput: 30,
         statusCode: 200,
         latencyMs: 840,
-        apiKey: $apiKey,
+        token: $token,
         provider: $provider,
         llmModel: $model,
         traceId: 'trace_123',
@@ -52,7 +51,7 @@ it('records request log and updates day/week/month ledgers', function () {
 
     $this->assertDatabaseHas('request_logs', [
         'user_id' => $user->id,
-        'api_key_id' => $apiKey->id,
+        'token_id' => $token->id,
         'llm_provider_id' => $provider->id,
         'llm_model_id' => $model->id,
         'token_total' => 150,

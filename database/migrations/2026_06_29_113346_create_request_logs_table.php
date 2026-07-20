@@ -15,7 +15,7 @@ return new class extends Migration
             $table->id();
             $table->string('trace_id', 64)->nullable();
             $table->foreignId('user_id')->constrained()->cascadeOnDelete();
-            $table->foreignId('api_key_id')->nullable()->constrained()->nullOnDelete();
+            $table->foreignId('token_id')->nullable()->constrained('personal_access_tokens')->nullOnDelete();
             $table->foreignId('llm_provider_id')->nullable()->constrained()->nullOnDelete();
             $table->foreignId('llm_model_id')->nullable()->constrained()->nullOnDelete();
             $table->string('protocol', 32);

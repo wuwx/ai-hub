@@ -7,7 +7,6 @@ use Database\Factories\UserFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\Hidden;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
-use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Illuminate\Support\Carbon;
@@ -15,6 +14,7 @@ use Illuminate\Support\Str;
 use Laravel\Fortify\Contracts\PasskeyUser;
 use Laravel\Fortify\PasskeyAuthenticatable;
 use Laravel\Fortify\TwoFactorAuthenticatable;
+use Laravel\Sanctum\HasApiTokens;
 use Revoltify\Subscriptionify\Concerns\InteractsWithSubscriptions;
 use Revoltify\Subscriptionify\Contracts\Subscribable;
 
@@ -36,7 +36,7 @@ use Revoltify\Subscriptionify\Contracts\Subscribable;
 class User extends Authenticatable implements PasskeyUser, Subscribable
 {
     /** @use HasFactory<UserFactory> */
-    use HasFactory, InteractsWithSubscriptions, Notifiable, PasskeyAuthenticatable, TwoFactorAuthenticatable;
+    use HasApiTokens, HasFactory, InteractsWithSubscriptions, Notifiable, PasskeyAuthenticatable, TwoFactorAuthenticatable;
 
     /**
      * Get the attributes that should be cast.
@@ -50,16 +50,6 @@ class User extends Authenticatable implements PasskeyUser, Subscribable
             'password' => 'hashed',
             'two_factor_confirmed_at' => 'datetime',
         ];
-    }
-
-    /**
-     * Get the user's API keys.
-     *
-     * @return HasMany<ApiKey, $this>
-     */
-    public function apiKeys(): HasMany
-    {
-        return $this->hasMany(ApiKey::class);
     }
 
     /**

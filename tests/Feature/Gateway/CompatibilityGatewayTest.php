@@ -324,8 +324,7 @@ function provisionGatewayTarget(string $adapterType, string $externalModelId): a
     $apiKey = app(GenerateApiKey::class)->handle(
         user: $user,
         name: 'Gateway Access Key',
-        createdBy: $user->id,
     );
 
-    return [$apiKey->plainTextKey, $model->external_model_id];
+    return [$apiKey->plainTextToken, $model->external_model_id];
 }

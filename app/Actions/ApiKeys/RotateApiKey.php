@@ -3,8 +3,8 @@
 namespace App\Actions\ApiKeys;
 
 use App\Data\GeneratedApiKey;
-use App\Models\ApiKey;
-use Illuminate\Support\Str;
+use App\Models\User;
+use Laravel\Sanctum\PersonalAccessToken;
 
 class RotateApiKey
 {
@@ -13,16 +13,19 @@ class RotateApiKey
         //
     }
 
-    public function handle(ApiKey $apiKey): GeneratedApiKey
+    /**
+     * Rotate a token: delete the old one and issue a fresh token with the
+     * same name and expiry.
+     */
+    public function handle(PersonalAccessToken $token): GeneratedApiKey
     {
-        $plainTextKey = 'ahk_'.Str::random(48);
+        /** @var User $user */
+        $user = $token->tokenable;
+        $name = $token->name;
+        $expiresAt = $token->expires_at;
 
-        $apiKey->update([
-            'key_hash' => $this->generator->hashKey($plainTextKey),
-            'last_four' => Str::substr($plainTextKey, -4),
-            'revoked_at' => null,
-        ]);
+        $token->delete();
 
-        return new GeneratedApiKey($apiKey->refresh(), $plainTextKey);
+        return $this->generator->handle($user, $name, $expiresAt);
     }
 }

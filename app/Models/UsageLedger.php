@@ -5,10 +5,11 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Laravel\Sanctum\PersonalAccessToken;
 
 #[Fillable([
     'user_id',
-    'api_key_id',
+    'token_id',
     'llm_provider_id',
     'llm_model_id',
     'bucket_date',
@@ -30,11 +31,11 @@ class UsageLedger extends Model
     }
 
     /**
-     * @return BelongsTo<ApiKey, $this>
+     * @return BelongsTo<PersonalAccessToken, $this>
      */
-    public function apiKey(): BelongsTo
+    public function token(): BelongsTo
     {
-        return $this->belongsTo(ApiKey::class);
+        return $this->belongsTo(PersonalAccessToken::class);
     }
 
     /**

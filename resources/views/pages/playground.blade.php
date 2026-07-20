@@ -15,6 +15,8 @@ new #[Title('Playground')] class extends Component
 
     public string $userMessage = '';
 
+    public string $apiKeyInput = '';
+
     public float $temperature = 0.7;
 
     public int $maxTokens = 1024;
@@ -60,6 +62,7 @@ new #[Title('Playground')] class extends Component
     {
         $this->validate([
             'selectedModel' => ['required', 'string'],
+            'apiKeyInput' => ['required', 'string'],
             'userMessage' => ['required', 'string'],
             'systemPrompt' => ['nullable', 'string'],
             'temperature' => ['numeric', 'min:0', 'max:2'],
@@ -71,19 +74,6 @@ new #[Title('Playground')] class extends Component
         $this->statusCode = null;
         $this->latencyMs = null;
         $this->usage = null;
-
-        $apiKey = Auth::user()?->apiKeys()
-            ->whereNull('revoked_at')
-            ->where(function ($query) {
-                $query->whereNull('expires_at')->orWhere('expires_at', '>', now());
-            })
-            ->first();
-
-        if (! $apiKey) {
-            $this->error = 'No active API key found. Please create an API key first.';
-
-            return;
-        }
 
         $messages = [];
 
@@ -104,7 +94,7 @@ new #[Title('Playground')] class extends Component
         $startedAt = microtime(true);
 
         try {
-            $response = Http::withToken($apiKey->key_hash)
+            $response = Http::withToken($this->apiKeyInput)
                 ->timeout(120)
                 ->post(url('/api/v1/chat/completions'), $payload);
 
@@ -158,6 +148,12 @@ new #[Title('Playground')] class extends Component
                 <flux:field>
                     <flux:label>{{ __('Message') }}</flux:label>
                     <flux:textarea wire:model="userMessage" rows="6" placeholder="Type your message here..." required data-test="playground-message" />
+                </flux:field>
+
+                <flux:field>
+                    <flux:label>{{ __('API Key') }}</flux:label>
+                    <flux:input wire:model="apiKeyInput" type="password" placeholder="Paste one of your API keys" data-test="playground-api-key" />
+                    <flux:description>{{ __('Used only for this request and never stored.') }}</flux:description>
                 </flux:field>
 
                 <div class="grid grid-cols-2 gap-4">

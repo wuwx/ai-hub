@@ -2,6 +2,7 @@
 
 use App\Actions\ApiKeys\GenerateApiKey;
 use App\Models\User;
+use Laravel\Sanctum\PersonalAccessToken;
 use Livewire\Livewire;
 
 test('users can rotate their api keys', function () {
@@ -11,20 +12,20 @@ test('users can rotate their api keys', function () {
         user: $user,
         name: 'Test Key',
         expiresAt: null,
-        createdBy: $user->id,
     );
 
-    $oldLastFour = $generated->apiKey->last_four;
+    $oldId = $generated->token->id;
 
     $this->actingAs($user);
 
-    $result = Livewire::test('pages::api-keys')
-        ->call('rotateKey', $generated->apiKey->id);
+    $component = Livewire::test('pages::api-keys')
+        ->call('rotateKey', $oldId);
 
-    // After rotation, the last four should change
-    $generated->apiKey->refresh();
-    expect($generated->apiKey->last_four)->not->toBe($oldLastFour);
-    expect($generated->apiKey->revoked_at)->toBeNull();
+    // After rotation the old token is gone and a fresh one exists.
+    expect(PersonalAccessToken::find($oldId))->toBeNull();
+    expect($component->get('rotatedKeyId'))->not->toBe($oldId);
+    expect($component->get('rotatedPlainTextKey'))->not->toBeNull();
+    expect(PersonalAccessToken::find($component->get('rotatedKeyId'))->name)->toBe('Test Key');
 });
 
 test('rotating key shows new key to user', function () {
@@ -34,18 +35,16 @@ test('rotating key shows new key to user', function () {
         user: $user,
         name: 'Test Key',
         expiresAt: null,
-        createdBy: $user->id,
     );
 
     $this->actingAs($user);
 
     $component = Livewire::test('pages::api-keys')
-        ->call('rotateKey', $generated->apiKey->id);
+        ->call('rotateKey', $generated->token->id);
 
-    // Check the component state has the rotated key
     expect($component->get('rotatedPlainTextKey'))->not->toBeNull();
-    expect($component->get('rotatedKeyId'))->toBe($generated->apiKey->id);
-    expect($component->get('rotatedPlainTextKey'))->toStartWith('ahk_');
+    expect($component->get('rotatedPlainTextKey'))->toMatch('/^\d+\|/');
+    expect($component->get('rotatedKeyId'))->not->toBe($generated->token->id);
 });
 
 test('dismiss rotated key clears state', function () {
@@ -55,13 +54,12 @@ test('dismiss rotated key clears state', function () {
         user: $user,
         name: 'Test Key',
         expiresAt: null,
-        createdBy: $user->id,
     );
 
     $this->actingAs($user);
 
     $component = Livewire::test('pages::api-keys')
-        ->call('rotateKey', $generated->apiKey->id)
+        ->call('rotateKey', $generated->token->id)
         ->call('dismissRotatedKey');
 
     expect($component->get('rotatedPlainTextKey'))->toBeNull();

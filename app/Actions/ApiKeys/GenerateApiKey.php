@@ -3,36 +3,18 @@
 namespace App\Actions\ApiKeys;
 
 use App\Data\GeneratedApiKey;
-use App\Models\ApiKey;
 use App\Models\User;
-use Illuminate\Support\Carbon;
-use Illuminate\Support\Str;
+use Carbon\CarbonInterface;
 
 class GenerateApiKey
 {
-    public function handle(User $user, string $name, ?Carbon $expiresAt = null, ?int $createdBy = null): GeneratedApiKey
+    /**
+     * Create a new Sanctum token for the user.
+     */
+    public function handle(User $user, string $name, ?CarbonInterface $expiresAt = null): GeneratedApiKey
     {
-        $plainTextKey = $this->makePlainTextKey();
+        $newToken = $user->createToken($name, ['*'], $expiresAt);
 
-        $apiKey = ApiKey::create([
-            'user_id' => $user->id,
-            'name' => $name,
-            'key_hash' => $this->hashKey($plainTextKey),
-            'last_four' => Str::substr($plainTextKey, -4),
-            'expires_at' => $expiresAt,
-            'created_by' => $createdBy,
-        ]);
-
-        return new GeneratedApiKey($apiKey, $plainTextKey);
-    }
-
-    public function hashKey(string $plainTextKey): string
-    {
-        return hash('sha256', $plainTextKey);
-    }
-
-    protected function makePlainTextKey(): string
-    {
-        return 'ahk_'.Str::random(48);
+        return new GeneratedApiKey($newToken->accessToken, $newToken->plainTextToken);
     }
 }

@@ -16,7 +16,7 @@ class RequestLogsTable
                     ->searchable(),
                 TextColumn::make('team.name')
                     ->searchable(),
-                TextColumn::make('apiKey.name')
+                TextColumn::make('token.name')
                     ->searchable(),
                 TextColumn::make('provider.name')
                     ->searchable(),

@@ -14,7 +14,7 @@ return new class extends Migration
         Schema::create('usage_ledgers', function (Blueprint $table) {
             $table->id();
             $table->foreignId('user_id')->constrained()->cascadeOnDelete();
-            $table->foreignId('api_key_id')->nullable()->constrained()->nullOnDelete();
+            $table->foreignId('token_id')->nullable()->constrained('personal_access_tokens')->nullOnDelete();
             $table->foreignId('llm_provider_id')->nullable()->constrained()->nullOnDelete();
             $table->foreignId('llm_model_id')->nullable()->constrained()->nullOnDelete();
             $table->date('bucket_date');
@@ -27,7 +27,7 @@ return new class extends Migration
             $table->timestamps();
 
             $table->index(['user_id', 'bucket_type', 'bucket_date'], 'usage_ledger_user_bucket_idx');
-            $table->index(['api_key_id', 'bucket_date'], 'usage_ledger_api_key_bucket_idx');
+            $table->index(['token_id', 'bucket_date'], 'usage_ledger_token_bucket_idx');
             $table->index(['llm_provider_id', 'llm_model_id', 'bucket_date'], 'usage_ledger_provider_model_bucket_idx');
         });
     }
