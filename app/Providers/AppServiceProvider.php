@@ -7,6 +7,10 @@ use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Validation\Rules\Password;
+use Spatie\Health\Checks\Checks\CacheCheck;
+use Spatie\Health\Checks\Checks\DatabaseCheck;
+use Spatie\Health\Checks\Checks\UsedDiskSpaceCheck;
+use Spatie\Health\Facades\Health;
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -24,6 +28,22 @@ class AppServiceProvider extends ServiceProvider
     public function boot(): void
     {
         $this->configureDefaults();
+
+        $this->registerHealthChecks();
+    }
+
+    /**
+     * Register the application's health checks.
+     */
+    protected function registerHealthChecks(): void
+    {
+        Health::checks([
+            DatabaseCheck::new(),
+            CacheCheck::new(),
+            UsedDiskSpaceCheck::new()
+                ->warnWhenUsedSpaceIsAbovePercentage(70)
+                ->failWhenUsedSpaceIsAbovePercentage(90),
+        ]);
     }
 
     /**

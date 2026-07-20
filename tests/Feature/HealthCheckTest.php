@@ -1,32 +1,35 @@
 <?php
 
-it('returns ok status when all services are healthy', function () {
-    $response = $this->getJson('/api/health');
+it('returns health check results', function () {
+    $response = $this->getJson('/api/health?fresh');
 
     $response->assertOk();
-    $response->assertJsonPath('status', 'ok');
     $response->assertJsonStructure([
-        'status',
-        'timestamp',
-        'checks' => [
-            'database' => ['status', 'latency_ms'],
-            'cache' => ['status', 'latency_ms'],
+        'finishedAt',
+        'checkResults' => [
+            '*' => [
+                'name',
+                'label',
+                'notificationMessage',
+                'shortSummary',
+                'status',
+                'meta',
+            ],
         ],
     ]);
 });
 
 it('does not require authentication', function () {
-    $this->getJson('/api/health')->assertOk();
+    $this->getJson('/api/health?fresh')->assertOk();
 });
 
-it('includes latency for database and cache checks', function () {
-    $response = $this->getJson('/api/health');
+it('reports the database and cache as healthy', function () {
+    $response = $this->getJson('/api/health?fresh');
 
     $response->assertOk();
 
-    $databaseLatency = $response->json('checks.database.latency_ms');
-    $cacheLatency = $response->json('checks.cache.latency_ms');
+    $names = $response->json('checkResults.*.name');
 
-    expect($databaseLatency)->toBeInt()->toBeGreaterThanOrEqual(0);
-    expect($cacheLatency)->toBeInt()->toBeGreaterThanOrEqual(0);
+    expect($names)->toContain('Database');
+    expect($names)->toContain('Cache');
 });

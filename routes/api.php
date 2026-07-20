@@ -5,11 +5,11 @@ use App\Http\Controllers\Api\V1\EmbeddingsController;
 use App\Http\Controllers\Api\V1\MessagesController;
 use App\Http\Controllers\Api\V1\ModelsController;
 use App\Http\Controllers\Api\V1\ResponsesController;
-use App\Http\Controllers\HealthCheckController;
 use App\Http\Controllers\PrometheusMetricsController;
 use Illuminate\Support\Facades\Route;
+use Spatie\Health\Http\Controllers\HealthCheckJsonResultsController;
 
-Route::get('health', HealthCheckController::class);
+Route::get('health', HealthCheckJsonResultsController::class);
 
 Route::get('metrics', PrometheusMetricsController::class);
 
