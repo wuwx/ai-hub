@@ -448,41 +448,21 @@ class GatewayRequestProcessor
             0,
             (int) config('services.llm_gateway.retry_backoff_ms', 150),
         );
-        $lastConnectionException = null;
 
-        for ($attempt = 1; $attempt <= $attempts; $attempt++) {
-            try {
-                $request = Http::withHeaders($headers)->timeout(
-                    config('services.llm_gateway.timeout_seconds', 120),
-                );
+        $request = Http::withHeaders($headers)
+            ->timeout((int) config('services.llm_gateway.timeout_seconds', 120))
+            ->retry(
+                $attempts,
+                $backoffMs,
+                fn ($exception, $response) => $exception instanceof ConnectionException
+                    || ($response instanceof HttpResponse && $response->status() >= 500),
+            );
 
-                if ($stream) {
-                    $request = $request->withOptions(['stream' => true]);
-                }
-
-                $response = $request->send('POST', $url, ['json' => $payload]);
-
-                if ($response->status() < 500 || $attempt === $attempts) {
-                    return $response;
-                }
-            } catch (ConnectionException $exception) {
-                $lastConnectionException = $exception;
-
-                if ($attempt === $attempts) {
-                    throw $exception;
-                }
-            }
-
-            if ($backoffMs > 0) {
-                usleep($backoffMs * 1000);
-            }
+        if ($stream) {
+            $request = $request->withOptions(['stream' => true]);
         }
 
-        if ($lastConnectionException instanceof ConnectionException) {
-            throw $lastConnectionException;
-        }
-
-        throw new ConnectionException('Gateway request failed after retries.');
+        return $request->send('POST', $url, ['json' => $payload]);
     }
 
     /**
