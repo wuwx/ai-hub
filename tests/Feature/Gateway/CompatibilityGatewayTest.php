@@ -1,6 +1,5 @@
 <?php
 
-use App\Actions\ApiKeys\GenerateApiKey;
 use App\Actions\Billing\SyncQuotaFromSubscription;
 use App\Models\LlmModel;
 use App\Models\LlmProvider;
@@ -176,10 +175,7 @@ function provisionGatewayTarget(string $adapterType, string $externalModelId): a
     TestCase::entitleProvider($provider);
     TestCase::entitleModel($model);
 
-    $apiKey = app(GenerateApiKey::class)->handle(
-        user: $user,
-        name: 'Gateway Access Key',
-    );
+    $apiKey = $user->createToken('Gateway Access Key', ['*'], null);
 
     return [$apiKey->plainTextToken, $model->external_model_id];
 }

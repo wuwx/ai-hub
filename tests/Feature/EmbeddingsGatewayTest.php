@@ -1,6 +1,5 @@
 <?php
 
-use App\Actions\ApiKeys\GenerateApiKey;
 use App\Actions\Billing\SyncQuotaFromSubscription;
 use App\Models\LlmModel;
 use App\Models\LlmProvider;
@@ -169,10 +168,7 @@ function provisionEmbeddingsTarget(): array
     TestCase::entitleProvider($provider);
     TestCase::entitleModel($model);
 
-    $apiKey = app(GenerateApiKey::class)->handle(
-        user: $user,
-        name: 'Embeddings Access Key',
-    );
+    $apiKey = $user->createToken('Embeddings Access Key', ['*'], null);
 
     return [$apiKey->plainTextToken, $model->external_model_id, $user];
 }

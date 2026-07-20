@@ -1,6 +1,5 @@
 <?php
 
-use App\Actions\ApiKeys\GenerateApiKey;
 use App\Models\User;
 use Laravel\Sanctum\PersonalAccessToken;
 use Livewire\Livewire;
@@ -52,10 +51,7 @@ test('api key name is required', function () {
 test('users can revoke their api keys', function () {
     $user = User::factory()->create();
 
-    $generated = app(GenerateApiKey::class)->handle(
-        user: $user,
-        name: 'Test Key',
-    );
+    $generated = $user->createToken('Test Key', ['*'], null);
 
     $this->actingAs($user);
 
@@ -70,10 +66,7 @@ test('cannot revoke another users api key', function () {
     $user = User::factory()->create();
     $otherUser = User::factory()->create();
 
-    $generated = app(GenerateApiKey::class)->handle(
-        user: $otherUser,
-        name: 'Other User Key',
-    );
+    $generated = $otherUser->createToken('Other User Key', ['*'], null);
 
     $this->actingAs($user);
 
@@ -85,8 +78,8 @@ test('cannot revoke another users api key', function () {
 test('api keys list shows user keys', function () {
     $user = User::factory()->create();
 
-    app(GenerateApiKey::class)->handle(user: $user, name: 'Key One');
-    app(GenerateApiKey::class)->handle(user: $user, name: 'Key Two');
+    $user->createToken('Key One', ['*'], null);
+    $user->createToken('Key Two', ['*'], null);
 
     $this->actingAs($user);
 
@@ -99,8 +92,8 @@ test('api keys list does not show other users keys', function () {
     $user = User::factory()->create();
     $otherUser = User::factory()->create();
 
-    app(GenerateApiKey::class)->handle(user: $user, name: 'My Key');
-    app(GenerateApiKey::class)->handle(user: $otherUser, name: 'Other Key');
+    $user->createToken('My Key', ['*'], null);
+    $otherUser->createToken('Other Key', ['*'], null);
 
     $this->actingAs($user);
 

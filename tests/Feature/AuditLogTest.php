@@ -1,6 +1,5 @@
 <?php
 
-use App\Actions\ApiKeys\GenerateApiKey;
 use App\Models\User;
 use Laravel\Sanctum\PersonalAccessToken;
 use Spatie\Activitylog\Models\Activity;
@@ -24,10 +23,7 @@ it('records an audit event via the activity helper', function () {
 it('records an audit event when an API key is created', function () {
     $user = User::factory()->create();
 
-    app(GenerateApiKey::class)->handle(
-        user: $user,
-        name: 'Production Key',
-    );
+    $user->createToken('Production Key', ['*'], null);
 
     // The Livewire page would call activity() after key creation.
     // Here we simulate that call directly.
@@ -42,10 +38,7 @@ it('records an audit event when an API key is created', function () {
 it('records an audit event when an API key is revoked', function () {
     $user = User::factory()->create();
 
-    $generated = app(GenerateApiKey::class)->handle(
-        user: $user,
-        name: 'To Revoke',
-    );
+    $generated = $user->createToken('To Revoke', ['*'], null);
 
     $token = $generated->accessToken;
     $token->delete();

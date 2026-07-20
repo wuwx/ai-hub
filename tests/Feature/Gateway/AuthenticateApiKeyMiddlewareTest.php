@@ -1,6 +1,5 @@
 <?php
 
-use App\Actions\ApiKeys\GenerateApiKey;
 use App\Models\User;
 
 it('rejects gateway requests without api key', function () {
@@ -26,10 +25,7 @@ it('rejects gateway requests with invalid api key', function () {
 it('accepts authenticated requests and reaches gateway model validation', function () {
     $user = User::factory()->create();
 
-    $generated = app(GenerateApiKey::class)->handle(
-        user: $user,
-        name: 'Gateway Key',
-    );
+    $generated = $user->createToken('Gateway Key', ['*'], null);
 
     $response = $this->withToken($generated->plainTextToken)->postJson('/api/v1/chat/completions', [
         'model' => 'unknown-model',

@@ -1,7 +1,5 @@
 <?php
 
-use App\Actions\ApiKeys\GenerateApiKey;
-use App\Actions\ApiKeys\RotateApiKey;
 use Illuminate\Support\Facades\Auth;
 use Laravel\Sanctum\PersonalAccessToken;
 use Livewire\Attributes\Computed;
@@ -59,11 +57,7 @@ new #[Title('API Keys')] class extends Component
             ? \Illuminate\Support\Carbon::parse($this->newKeyExpiresAt)
             : null;
 
-        $generated = app(GenerateApiKey::class)->handle(
-            user: Auth::user(),
-            name: $this->newKeyName,
-            expiresAt: $expiresAt,
-        );
+        $generated = Auth::user()->createToken($this->newKeyName, ['*'], $expiresAt);
 
         activity()
             ->performedOn($generated->accessToken)
@@ -119,7 +113,12 @@ new #[Title('API Keys')] class extends Component
 
         abort_unless($token, 404);
 
-        $generated = app(RotateApiKey::class)->handle($token);
+        $tokenName = $token->name;
+        $tokenExpiresAt = $token->expires_at;
+
+        $token->delete();
+
+        $generated = Auth::user()->createToken($tokenName, ['*'], $tokenExpiresAt);
 
         activity()
             ->performedOn($generated->accessToken)

@@ -1,6 +1,5 @@
 <?php
 
-use App\Actions\ApiKeys\GenerateApiKey;
 use App\Models\User;
 use Laravel\Sanctum\PersonalAccessToken;
 use Livewire\Livewire;
@@ -8,11 +7,7 @@ use Livewire\Livewire;
 test('users can rotate their api keys', function () {
     $user = User::factory()->create();
 
-    $generated = app(GenerateApiKey::class)->handle(
-        user: $user,
-        name: 'Test Key',
-        expiresAt: null,
-    );
+    $generated = $user->createToken('Test Key', ['*'], null);
 
     $oldId = $generated->accessToken->id;
 
@@ -31,11 +26,7 @@ test('users can rotate their api keys', function () {
 test('rotating key shows new key to user', function () {
     $user = User::factory()->create();
 
-    $generated = app(GenerateApiKey::class)->handle(
-        user: $user,
-        name: 'Test Key',
-        expiresAt: null,
-    );
+    $generated = $user->createToken('Test Key', ['*'], null);
 
     $this->actingAs($user);
 
@@ -50,11 +41,7 @@ test('rotating key shows new key to user', function () {
 test('dismiss rotated key clears state', function () {
     $user = User::factory()->create();
 
-    $generated = app(GenerateApiKey::class)->handle(
-        user: $user,
-        name: 'Test Key',
-        expiresAt: null,
-    );
+    $generated = $user->createToken('Test Key', ['*'], null);
 
     $this->actingAs($user);
 

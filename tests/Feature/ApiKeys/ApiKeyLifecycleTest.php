@@ -1,7 +1,5 @@
 <?php
 
-use App\Actions\ApiKeys\GenerateApiKey;
-use App\Actions\ApiKeys\RotateApiKey;
 use App\Models\User;
 use Illuminate\Support\Carbon;
 use Laravel\Sanctum\PersonalAccessToken;
@@ -9,10 +7,7 @@ use Laravel\Sanctum\PersonalAccessToken;
 it('generates a plaintext key backed by a sanctum token', function () {
     $user = User::factory()->create();
 
-    $result = app(GenerateApiKey::class)->handle(
-        user: $user,
-        name: 'Primary Key',
-        expiresAt: Carbon::now()->addMonth(),
+    $result = $user->createToken('Primary Key', ['*'], Carbon::now()->addMonth(),
     );
 
     expect($result->plainTextToken)->toMatch('/^\d+\|[A-Za-z0-9]{40,}$/');
@@ -30,14 +25,13 @@ it('generates a plaintext key backed by a sanctum token', function () {
 it('rotates an api key into a new token', function () {
     $user = User::factory()->create();
 
-    $generated = app(GenerateApiKey::class)->handle(
-        user: $user,
-        name: 'Rotate Me',
-    );
+    $generated = $user->createToken('Rotate Me', ['*'], null);
 
     $token = $generated->accessToken;
 
-    $rotated = app(RotateApiKey::class)->handle($token);
+    $token->delete();
+
+    $rotated = $user->createToken($token->name, ['*'], $token->expires_at);
 
     expect($rotated->plainTextToken)->toMatch('/^\d+\|/');
     expect($rotated->accessToken->id)->not->toBe($token->id);
