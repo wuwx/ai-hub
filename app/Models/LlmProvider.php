@@ -31,14 +31,11 @@ class LlmProvider extends Model
     }
 
     /**
-     * @return array<string, string>
+     * @var array<string, string>
      */
-    protected function casts(): array
-    {
-        return [
-            'secret_ref' => 'encrypted',
-            'options' => 'array',
-            'is_active' => 'boolean',
-        ];
-    }
+    protected $casts = [
+        'secret_ref' => 'encrypted',
+        'options' => 'array',
+        'is_active' => 'boolean',
+    ];
 }

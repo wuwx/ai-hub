@@ -85,9 +85,9 @@ class ProtocolTransformer
             'temperature' => $canonical['temperature'] ?? null,
         ]);
 
-        // Ask OpenAI-compatible providers to emit a final usage chunk so we can
-        // bill streaming output tokens accurately. Providers that don't support
-        // this option typically ignore unknown fields.
+        // Request a final usage chunk in the SSE stream so streaming clients
+        // receive token usage. Providers that don't support this option ignore
+        // the unknown field.
         if ((bool) ($canonical['stream'] ?? false)) {
             $payload['stream_options'] = ['include_usage' => true];
         }
@@ -151,23 +151,6 @@ class ProtocolTransformer
     /**
      * @param  array<string, mixed>  $response
      */
-    public function extractToolCallsCount(array $response, string $incomingProtocol): int
-    {
-        if ($incomingProtocol === 'anthropic') {
-            /** @var array<int, array<string, mixed>> $content */
-            $content = data_get($response, 'content', []);
-
-            return collect($content)
-                ->filter(fn ($block) => ($block['type'] ?? null) === 'tool_use')
-                ->count();
-        }
-
-        /** @var array<int, array<string, mixed>> $toolCalls */
-        $toolCalls = data_get($response, 'choices.0.message.tool_calls', []);
-
-        return collect($toolCalls)->count();
-    }
-
     /**
      * @param  array<string, mixed>  $canonical
      */
@@ -208,91 +191,6 @@ class ProtocolTransformer
         $tokens = ($cjkCount / 1.5) + ($nonCjkChars / 4);
 
         return max(1, (int) ceil($tokens));
-    }
-
-    /**
-     * Extract usage tokens and text content from a single SSE frame.
-     *
-     * Used while streaming so we can bill output tokens accurately. Returns
-     * integers for input/output tokens (0 when the frame carries no usage)
-     * and any text delta accumulated from the frame.
-     *
-     * @return array{input: int, output: int, text: string}
-     */
-    public function extractStreamTelemetry(string $frame, string $providerProtocol): array
-    {
-        $data = $this->extractSseData($frame);
-
-        if ($data === null || $data === '' || trim($data) === '[DONE]') {
-            return ['input' => 0, 'output' => 0, 'text' => ''];
-        }
-
-        $json = json_decode($data, true);
-
-        if (! is_array($json)) {
-            return ['input' => 0, 'output' => 0, 'text' => ''];
-        }
-
-        if ($providerProtocol === 'anthropic') {
-            return $this->extractAnthropicStreamTelemetry($json);
-        }
-
-        return $this->extractOpenAiStreamTelemetry($json);
-    }
-
-    /**
-     * @param  array<string, mixed>  $payload
-     * @return array{input: int, output: int, text: string}
-     */
-    protected function extractAnthropicStreamTelemetry(array $payload): array
-    {
-        $type = (string) ($payload['type'] ?? '');
-
-        if ($type === 'message_start') {
-            return [
-                'input' => (int) data_get($payload, 'message.usage.input_tokens', 0),
-                'output' => (int) data_get($payload, 'message.usage.output_tokens', 0),
-                'text' => '',
-            ];
-        }
-
-        if ($type === 'message_delta') {
-            return [
-                'input' => 0,
-                'output' => (int) data_get($payload, 'usage.output_tokens', 0),
-                'text' => '',
-            ];
-        }
-
-        if ($type === 'content_block_delta' && data_get($payload, 'delta.type') === 'text_delta') {
-            return [
-                'input' => 0,
-                'output' => 0,
-                'text' => (string) data_get($payload, 'delta.text', ''),
-            ];
-        }
-
-        return ['input' => 0, 'output' => 0, 'text' => ''];
-    }
-
-    /**
-     * @param  array<string, mixed>  $payload
-     * @return array{input: int, output: int, text: string}
-     */
-    protected function extractOpenAiStreamTelemetry(array $payload): array
-    {
-        $text = (string) data_get($payload, 'choices.0.delta.content', '');
-        $usage = data_get($payload, 'usage');
-
-        if (is_array($usage)) {
-            return [
-                'input' => (int) data_get($usage, 'prompt_tokens', 0),
-                'output' => (int) data_get($usage, 'completion_tokens', 0),
-                'text' => $text,
-            ];
-        }
-
-        return ['input' => 0, 'output' => 0, 'text' => $text];
     }
 
     /**

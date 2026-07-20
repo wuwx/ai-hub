@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Actions\Usage;
+namespace App\Actions\Quota;
 
 use App\Exceptions\QuotaExceededException;
 use App\Models\User;

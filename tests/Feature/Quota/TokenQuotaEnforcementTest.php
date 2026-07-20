@@ -1,6 +1,6 @@
 <?php
 
-use App\Actions\Usage\EnforceTokenQuota;
+use App\Actions\Quota\EnforceTokenQuota;
 use App\Exceptions\QuotaExceededException;
 use App\Models\User;
 

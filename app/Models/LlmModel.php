@@ -25,15 +25,6 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 class LlmModel extends Model
 {
     /**
-     * @var array<string, string>
-     */
-    protected $casts = [
-        'capabilities' => 'array',
-        'pricing' => 'array',
-        'is_active' => 'boolean',
-    ];
-
-    /**
      * @return BelongsTo<LlmProvider, $this>
      */
     public function provider(): BelongsTo
@@ -42,14 +33,11 @@ class LlmModel extends Model
     }
 
     /**
-     * @return array<string, string>
+     * @var array<string, string>
      */
-    protected function casts(): array
-    {
-        return [
-            'capabilities' => 'array',
-            'pricing' => 'array',
-            'is_active' => 'boolean',
-        ];
-    }
+    protected $casts = [
+        'capabilities' => 'array',
+        'pricing' => 'array',
+        'is_active' => 'boolean',
+    ];
 }

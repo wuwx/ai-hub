@@ -22,7 +22,7 @@
 
             <section>
                 <h2 class="text-xl font-semibold text-zinc-100">2. Description of Service</h2>
-                <p class="mt-2">The Service provides a unified API gateway that routes requests to large language model providers. We handle authentication, billing, usage tracking, and rate limiting on your behalf.</p>
+                <p class="mt-2">The Service provides a unified API gateway that routes requests to large language model providers. We handle authentication, billing, token quotas, and rate limiting on your behalf.</p>
             </section>
 
             <section>
@@ -58,7 +58,7 @@
 
             <section>
                 <h2 class="text-xl font-semibold text-zinc-100">7. Data Retention</h2>
-                <p class="mt-2">Request logs are retained for 30 days and then automatically deleted. Usage ledgers and billing records are retained indefinitely for accounting purposes. You may export your data at any time via the dashboard.</p>
+                <p class="mt-2">We do not persist API request logs or per-request usage records. Billing records are retained for accounting purposes. You may export your billing data at any time via the dashboard.</p>
             </section>
 
             <section>

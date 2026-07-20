@@ -20,7 +20,7 @@
                 <p class="mt-2">We collect the following data to operate the Service:</p>
                 <ul class="mt-2 list-disc pl-6 space-y-1">
                     <li><strong>Account data:</strong> name, email</li>
-                    <li><strong>Usage data:</strong> API request logs (model, tokens, latency, status), aggregated in usage ledgers</li>
+                    <li><strong>Usage data:</strong> we enforce token quotas in real time but do not persist API request logs or usage ledgers</li>
                     <li><strong>Billing data:</strong> payment provider customer IDs, subscription status, invoice records</li>
                     <li><strong>Technical data:</strong> IP addresses (for security and IP allow-lists), user agent, trace IDs</li>
                 </ul>
@@ -32,7 +32,7 @@
                     <li>To authenticate and authorize API requests</li>
                     <li>To calculate usage charges and generate invoices</li>
                     <li>To monitor for abuse, anomalous usage, and security threats</li>
-                    <li>To provide operational dashboards and usage analytics</li>
+                    <li>To enforce token quotas and monitor for abuse</li>
                     <li>To send billing, quota, and security notifications</li>
                 </ul>
             </section>
@@ -49,7 +49,7 @@
 
             <section>
                 <h2 class="text-xl font-semibold text-zinc-100">4. Data Retention</h2>
-                <p class="mt-2">Request logs are automatically deleted after 30 days. Usage ledgers and billing records are retained for the lifetime of your account for accounting and audit purposes. Audit logs (administrative actions) are retained indefinitely.</p>
+                <p class="mt-2">We do not retain API request logs or usage ledgers. Billing records are retained for the lifetime of your account for accounting and audit purposes. Audit logs (administrative actions) are retained indefinitely.</p>
             </section>
 
             <section>
@@ -61,8 +61,8 @@
                 <h2 class="text-xl font-semibold text-zinc-100">6. Your Rights</h2>
                 <p class="mt-2">You may:</p>
                 <ul class="mt-2 list-disc pl-6 space-y-1">
-                    <li>Export your usage and billing data at any time via the dashboard</li>
-                    <li>Delete your account and associated data (request logs are deleted; billing records are retained for legal compliance)</li>
+                    <li>Export your billing data at any time via the dashboard</li>
+                    <li>Delete your account and associated data (billing records are retained for legal compliance)</li>
                     <li>Revoke API keys at any time</li>
                     <li>Configure IP allow-lists to restrict API key usage</li>
                 </ul>
