@@ -31,22 +31,6 @@ class LlmProvider extends Model
     }
 
     /**
-     * @return HasMany<RequestLog, $this>
-     */
-    public function requestLogs(): HasMany
-    {
-        return $this->hasMany(RequestLog::class);
-    }
-
-    /**
-     * @return HasMany<UsageLedger, $this>
-     */
-    public function usageLedgers(): HasMany
-    {
-        return $this->hasMany(UsageLedger::class);
-    }
-
-    /**
      * @return array<string, string>
      */
     protected function casts(): array

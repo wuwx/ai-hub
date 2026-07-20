@@ -20,16 +20,8 @@
                         {{ __('API Keys') }}
                     </flux:sidebar.item>
 
-                    <flux:sidebar.item icon="chart-bar" :href="route('usage.index')" :current="request()->routeIs('usage.*')" wire:navigate>
-                        {{ __('Usage') }}
-                    </flux:sidebar.item>
-
                     <flux:sidebar.item icon="credit-card" :href="route('billing.index')" :current="request()->routeIs('billing.*')" wire:navigate>
                         {{ __('Billing') }}
-                    </flux:sidebar.item>
-
-                    <flux:sidebar.item icon="document-text" :href="route('request-logs.index')" :current="request()->routeIs('request-logs.*')" wire:navigate>
-                        {{ __('Request Logs') }}
                     </flux:sidebar.item>
                 </flux:sidebar.group>
             </flux:sidebar.nav>

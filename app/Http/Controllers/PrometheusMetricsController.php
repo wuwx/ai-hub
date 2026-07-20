@@ -3,7 +3,6 @@
 namespace App\Http\Controllers;
 
 use App\Models\LlmProvider;
-use App\Models\RequestLog;
 use App\Models\User;
 use Illuminate\Http\Response;
 use Laravel\Sanctum\PersonalAccessToken;
@@ -15,35 +14,6 @@ class PrometheusMetricsController extends Controller
     public function __invoke(): Response
     {
         $metrics = [];
-
-        // Gateway request metrics
-        $totalRequests = RequestLog::count();
-        $totalErrors = RequestLog::where('status_code', '>=', 400)->count();
-        $todayRequests = RequestLog::whereDate(
-            'requested_at',
-            today(),
-        )->count();
-        $todayErrors = RequestLog::whereDate('requested_at', today())
-            ->where('status_code', '>=', 400)
-            ->count();
-
-        $metrics[] = '# TYPE ai_hub_requests_total counter';
-        $metrics[] = "ai_hub_requests_total {$totalRequests}";
-        $metrics[] = '# TYPE ai_hub_requests_errors_total counter';
-        $metrics[] = "ai_hub_requests_errors_total {$totalErrors}";
-        $metrics[] = '# TYPE ai_hub_requests_today gauge';
-        $metrics[] = "ai_hub_requests_today {$todayRequests}";
-        $metrics[] = '# TYPE ai_hub_requests_errors_today gauge';
-        $metrics[] = "ai_hub_requests_errors_today {$todayErrors}";
-
-        // Token metrics
-        $totalTokensInput = (int) RequestLog::sum('token_input');
-        $totalTokensOutput = (int) RequestLog::sum('token_output');
-
-        $metrics[] = '# TYPE ai_hub_tokens_input_total counter';
-        $metrics[] = "ai_hub_tokens_input_total {$totalTokensInput}";
-        $metrics[] = '# TYPE ai_hub_tokens_output_total counter';
-        $metrics[] = "ai_hub_tokens_output_total {$totalTokensOutput}";
 
         // User and API token counts
         $totalUsers = User::count();
@@ -87,12 +57,6 @@ class PrometheusMetricsController extends Controller
         $metrics[] = "ai_hub_subscriptions{status=\"active\"} {$activeSubscriptions}";
         $metrics[] = "ai_hub_subscriptions{status=\"trialing\"} {$trialingSubscriptions}";
         $metrics[] = "ai_hub_subscriptions{status=\"past_due\"} {$pastDueSubscriptions}";
-
-        // Latency metrics (average over last 24h)
-        $avgLatency = (int) RequestLog::where('requested_at', '>=', now()->subDay())->avg('latency_ms');
-
-        $metrics[] = '# TYPE ai_hub_request_latency_ms_avg gauge';
-        $metrics[] = "ai_hub_request_latency_ms_avg {$avgLatency}";
 
         $output = implode("\n", $metrics)."\n";
 

@@ -12,10 +12,6 @@ it('returns prometheus-format metrics', function () {
     $content = $response->getContent();
 
     expect($content)
-        ->toContain('ai_hub_requests_total')
-        ->and($content)
-        ->toContain('ai_hub_tokens_input_total')
-        ->and($content)
         ->toContain('ai_hub_users')
         ->and($content)
         ->toContain('ai_hub_api_keys')
@@ -23,14 +19,12 @@ it('returns prometheus-format metrics', function () {
         ->toContain('ai_hub_subscriptions');
 });
 
-it('includes TYPE declarations for counters and gauges', function () {
+it('includes TYPE declarations for gauges', function () {
     $response = $this->get('/api/metrics');
 
     $content = $response->getContent();
 
     expect($content)
-        ->toContain('# TYPE ai_hub_requests_total counter')
-        ->and($content)
         ->toContain('# TYPE ai_hub_users gauge');
 });
 

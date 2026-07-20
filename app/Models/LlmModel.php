@@ -5,7 +5,6 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use Illuminate\Database\Eloquent\Relations\HasMany;
 
 #[
     Fillable([
@@ -40,22 +39,6 @@ class LlmModel extends Model
     public function provider(): BelongsTo
     {
         return $this->belongsTo(LlmProvider::class, 'llm_provider_id');
-    }
-
-    /**
-     * @return HasMany<RequestLog, $this>
-     */
-    public function requestLogs(): HasMany
-    {
-        return $this->hasMany(RequestLog::class);
-    }
-
-    /**
-     * @return HasMany<UsageLedger, $this>
-     */
-    public function usageLedgers(): HasMany
-    {
-        return $this->hasMany(UsageLedger::class);
     }
 
     /**

@@ -138,49 +138,6 @@ it('rejects embeddings without a valid API key', function () {
     ])->assertUnauthorized();
 });
 
-it(
-    'records usage for successful embeddings',
-    function () {
-        [
-            $plainTextKey,
-            $modelExternalId,
-            $user,
-        ] = provisionEmbeddingsTarget();
-
-        Http::fake([
-            'https://openai.mock/v1/embeddings' => Http::response(
-                [
-                    'object' => 'list',
-                    'data' => [
-                        [
-                            'object' => 'embedding',
-                            'index' => 0,
-                            'embedding' => [0.1],
-                        ],
-                    ],
-                    'model' => 'text-embedding-3-small',
-                    'usage' => ['prompt_tokens' => 10, 'total_tokens' => 10],
-                ],
-                200,
-            ),
-        ]);
-
-        $this->withToken($plainTextKey)
-            ->postJson('/api/v1/embeddings', [
-                'model' => $modelExternalId,
-                'input' => 'chargeable input',
-            ])
-            ->assertOk();
-
-        $this->assertDatabaseHas('request_logs', [
-            'user_id' => $user->id,
-            'protocol' => 'openai',
-            'endpoint' => '/v1/embeddings',
-            'status_code' => 200,
-        ]);
-    },
-);
-
 function provisionEmbeddingsTarget(): array
 {
     $user = User::factory()->create();

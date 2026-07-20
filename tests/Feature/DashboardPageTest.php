@@ -1,7 +1,6 @@
 <?php
 
 use App\Actions\Billing\SyncQuotaFromSubscription;
-use App\Models\UsageLedger;
 use App\Models\User;
 use Livewire\Livewire;
 
@@ -49,39 +48,6 @@ test('dashboard shows active subscription plan in badge', function () {
         ->assertSee('Pro');
 });
 
-test('dashboard displays stat cards with zero data when no usage', function () {
-    $user = User::factory()->create();
-
-    $this->actingAs($user);
-
-    Livewire::test('pages::dashboard')
-        ->assertSee("Today's Tokens")
-        ->assertSee("Today's Requests")
-        ->assertSee('Monthly Tokens')
-        ->assertSee('Error Rate');
-});
-
-test('dashboard displays real usage data from usage ledger', function () {
-    $user = User::factory()->create();
-
-    // Create usage ledger entries
-    UsageLedger::create([
-        'user_id' => $user->id,
-        'bucket_type' => 'day',
-        'bucket_date' => now()->toDateString(),
-        'token_input' => 500,
-        'token_output' => 300,
-        'token_total' => 800,
-        'request_count' => 5,
-        'error_count' => 0,
-    ]);
-
-    $this->actingAs($user);
-
-    Livewire::test('pages::dashboard')
-        ->assertSee('800'); // Today's tokens
-});
-
 test('dashboard shows quick actions section', function () {
     $user = User::factory()->create();
 
@@ -90,15 +56,5 @@ test('dashboard shows quick actions section', function () {
     Livewire::test('pages::dashboard')
         ->assertSee('Quick Actions')
         ->assertSee('Manage API Keys')
-        ->assertSee('View Usage')
         ->assertSee('Billing & Subscription');
-});
-
-test('dashboard shows request trend chart section', function () {
-    $user = User::factory()->create();
-
-    $this->actingAs($user);
-
-    Livewire::test('pages::dashboard')
-        ->assertSee('Request Trend (14 days)');
 });

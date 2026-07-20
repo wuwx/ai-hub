@@ -3,7 +3,6 @@
 namespace App\Actions\Gateway;
 
 use App\Actions\Usage\EnforceTokenQuota;
-use App\Actions\Usage\RecordApiRequestUsage;
 use App\Exceptions\QuotaExceededException;
 use App\Models\LlmModel;
 use App\Models\LlmProvider;
@@ -24,7 +23,6 @@ class GatewayRequestProcessor
         private readonly ProtocolTransformer $protocolTransformer,
         private readonly ResolveProviderSecret $resolveProviderSecret,
         private readonly EnforceTokenQuota $enforceTokenQuota,
-        private readonly RecordApiRequestUsage $recordApiRequestUsage,
         private readonly ContentFilter $contentFilter,
     ) {
         //
@@ -167,8 +165,6 @@ class GatewayRequestProcessor
             ->reject(fn ($value) => $value === null)
             ->all();
 
-        $startedAt = microtime(true);
-
         try {
             $response = $this->sendWithRetry(
                 $headers,
@@ -187,23 +183,6 @@ class GatewayRequestProcessor
                 'endpoint' => 'embeddings',
                 'error' => $exception->getMessage(),
             ]);
-
-            $this->recordApiRequestUsage->handle(
-                user: $user,
-                protocol: 'openai',
-                endpoint: '/v1/embeddings',
-                tokenInput: $tokenInputEstimate,
-                tokenOutput: 0,
-                statusCode: 504,
-                latencyMs: (int) round((microtime(true) - $startedAt) * 1000),
-                errorCode: 'provider_timeout',
-                errorMessage: $exception->getMessage(),
-                traceId: $traceId,
-                token: $token,
-                provider: $provider,
-                llmModel: $model,
-                enforceQuota: false,
-            );
 
             return $this->jsonWithTrace(
                 $this->protocolTransformer->errorPayload(
@@ -229,31 +208,6 @@ class GatewayRequestProcessor
         if (! is_array($body)) {
             $body = ['error' => ['message' => (string) $response->body()]];
         }
-
-        $usageInput = (int) data_get($body, 'usage.prompt_tokens', 0);
-        $finalInput = $usageInput > 0 ? $usageInput : $tokenInputEstimate;
-
-        $this->recordApiRequestUsage->handle(
-            user: $user,
-            protocol: 'openai',
-            endpoint: '/v1/embeddings',
-            tokenInput: $finalInput,
-            tokenOutput: 0,
-            isStreaming: false,
-            statusCode: $status,
-            latencyMs: (int) round((microtime(true) - $startedAt) * 1000),
-            errorCode: $status >= 400
-                ? (string) data_get($body, 'error.code', 'provider_error')
-                : null,
-            errorMessage: $status >= 400
-                ? (string) data_get($body, 'error.message', '')
-                : null,
-            traceId: $traceId,
-            token: $token,
-            provider: $provider,
-            llmModel: $model,
-            enforceQuota: false,
-        );
 
         return $this->jsonWithTrace($body, $status, $traceId);
     }
@@ -447,7 +401,6 @@ class GatewayRequestProcessor
                 headers: $headers,
                 providerPayload: $providerPayload,
                 traceId: $traceId,
-                inputEstimate: $tokenInputEstimate,
                 providerProtocol: $providerProtocol,
             );
         }
@@ -464,7 +417,6 @@ class GatewayRequestProcessor
             headers: $headers,
             providerPayload: $providerPayload,
             traceId: $traceId,
-            inputEstimate: $tokenInputEstimate,
             idempotencyCacheKey: $idempotencyCacheKey,
             payloadHash: $payloadHash,
         );
@@ -539,12 +491,9 @@ class GatewayRequestProcessor
         array $headers,
         array $providerPayload,
         string $traceId,
-        int $inputEstimate,
         ?string $idempotencyCacheKey = null,
         ?string $payloadHash = null,
     ): Response {
-        $startedAt = microtime(true);
-
         try {
             $response = $this->sendWithRetry(
                 $headers,
@@ -562,23 +511,6 @@ class GatewayRequestProcessor
                 'trace_id' => $traceId,
                 'error' => $exception->getMessage(),
             ]);
-
-            $this->recordApiRequestUsage->handle(
-                user: $user,
-                protocol: $incomingProtocol,
-                endpoint: $endpoint,
-                tokenInput: $inputEstimate,
-                tokenOutput: 0,
-                statusCode: 504,
-                latencyMs: (int) round((microtime(true) - $startedAt) * 1000),
-                errorCode: 'provider_timeout',
-                errorMessage: $exception->getMessage(),
-                traceId: $traceId,
-                token: $token,
-                provider: $provider,
-                llmModel: $model,
-                enforceQuota: false,
-            );
 
             return $this->jsonWithTrace(
                 $this->protocolTransformer->errorPayload(
@@ -614,37 +546,6 @@ class GatewayRequestProcessor
             $incomingProtocol,
             $providerProtocol,
             $model->external_model_id,
-        );
-        $usage = $this->protocolTransformer->extractUsage(
-            $adapted,
-            $incomingProtocol,
-        );
-        $toolCallsCount = $this->protocolTransformer->extractToolCallsCount(
-            $adapted,
-            $incomingProtocol,
-        );
-
-        $this->recordApiRequestUsage->handle(
-            user: $user,
-            protocol: $incomingProtocol,
-            endpoint: $endpoint,
-            tokenInput: $usage['input'] > 0 ? $usage['input'] : $inputEstimate,
-            tokenOutput: $usage['output'],
-            isStreaming: false,
-            toolCallsCount: $toolCallsCount,
-            statusCode: $status,
-            latencyMs: (int) round((microtime(true) - $startedAt) * 1000),
-            errorCode: $status >= 400
-                ? (string) data_get($adapted, 'error.code', 'provider_error')
-                : null,
-            errorMessage: $status >= 400
-                ? (string) data_get($adapted, 'error.message', '')
-                : null,
-            traceId: $traceId,
-            token: $token,
-            provider: $provider,
-            llmModel: $model,
-            enforceQuota: false,
         );
 
         if ($idempotencyCacheKey && $payloadHash) {
@@ -682,11 +583,8 @@ class GatewayRequestProcessor
         array $headers,
         array $providerPayload,
         string $traceId,
-        int $inputEstimate,
         string $providerProtocol,
     ): Response {
-        $startedAt = microtime(true);
-
         try {
             $response = $this->sendWithRetry(
                 $headers,
@@ -705,24 +603,6 @@ class GatewayRequestProcessor
                 'streaming' => true,
                 'error' => $exception->getMessage(),
             ]);
-
-            $this->recordApiRequestUsage->handle(
-                user: $user,
-                protocol: $protocol,
-                endpoint: $endpoint,
-                tokenInput: $inputEstimate,
-                tokenOutput: 0,
-                isStreaming: true,
-                statusCode: 504,
-                latencyMs: (int) round((microtime(true) - $startedAt) * 1000),
-                errorCode: 'provider_timeout',
-                errorMessage: $exception->getMessage(),
-                traceId: $traceId,
-                token: $token,
-                provider: $provider,
-                llmModel: $model,
-                enforceQuota: false,
-            );
 
             return $this->jsonWithTrace(
                 $this->protocolTransformer->errorPayload(
@@ -744,78 +624,28 @@ class GatewayRequestProcessor
 
         $status = $response->status();
         $psrBody = $response->toPsrResponse()->getBody();
-        $startedAtStream = $startedAt;
-        $errorStream = $status >= 400 ? 'provider_error' : null;
-        $streamStatus = $status;
 
-        // Usage is recorded INSIDE the stream closure so we can bill the actual
-        // output tokens emitted by upstream SSE frames. If we recorded before
-        // streaming, every stream would show 0 output tokens and be billed as free.
         return response()->stream(
             function () use (
                 $psrBody,
                 $protocol,
                 $providerProtocol,
                 $model,
-                $user,
-                $token,
-                $provider,
-                $endpoint,
-                $traceId,
-                $inputEstimate,
-                $startedAtStream,
-                $errorStream,
-                $streamStatus,
             ): void {
                 $buffer = '';
-                $streamInputTokens = 0;
-                $streamOutputTokens = 0;
-                $accumulatedText = '';
 
-                try {
-                    while (! $psrBody->eof()) {
-                        $buffer .= $psrBody->read(8192);
+                while (! $psrBody->eof()) {
+                    $buffer .= $psrBody->read(8192);
 
-                        while (
-                            ($separatorPosition = strpos($buffer, "\n\n")) !==
-                            false
-                        ) {
-                            $frame = substr($buffer, 0, $separatorPosition);
-                            $buffer = substr($buffer, $separatorPosition + 2);
-
-                            $telemetry = $this->protocolTransformer->extractStreamTelemetry(
-                                $frame,
-                                $providerProtocol,
-                            );
-                            $streamInputTokens += $telemetry['input'];
-                            $streamOutputTokens += $telemetry['output'];
-                            $accumulatedText .= $telemetry['text'];
-
-                            $adaptedFrame = $this->protocolTransformer->adaptStreamingFrame(
-                                $frame,
-                                $protocol,
-                                $providerProtocol,
-                                $model->external_model_id,
-                            );
-
-                            if ($adaptedFrame !== '') {
-                                echo $adaptedFrame;
-                                flush();
-                            }
-                        }
-                    }
-
-                    if ($buffer !== '') {
-                        $telemetry = $this->protocolTransformer->extractStreamTelemetry(
-                            $buffer,
-                            $providerProtocol,
-                        );
-                        $streamInputTokens += $telemetry['input'];
-                        $streamOutputTokens += $telemetry['output'];
-                        $accumulatedText .= $telemetry['text'];
+                    while (
+                        ($separatorPosition = strpos($buffer, "\n\n")) !==
+                        false
+                    ) {
+                        $frame = substr($buffer, 0, $separatorPosition);
+                        $buffer = substr($buffer, $separatorPosition + 2);
 
                         $adaptedFrame = $this->protocolTransformer->adaptStreamingFrame(
-                            $buffer,
+                            $frame,
                             $protocol,
                             $providerProtocol,
                             $model->external_model_id,
@@ -826,38 +656,20 @@ class GatewayRequestProcessor
                             flush();
                         }
                     }
-                } finally {
-                    // Prefer real upstream usage; fall back to estimate when provider
-                    // didn't emit usage frames (e.g. older OpenAI-compatible backends).
-                    $finalInput =
-                        $streamInputTokens > 0
-                            ? $streamInputTokens
-                            : $inputEstimate;
-                    $finalOutput =
-                        $streamOutputTokens > 0
-                            ? $streamOutputTokens
-                            : $this->protocolTransformer->estimateTextTokens(
-                                $accumulatedText,
-                            );
+                }
 
-                    $this->recordApiRequestUsage->handle(
-                        user: $user,
-                        protocol: $protocol,
-                        endpoint: $endpoint,
-                        tokenInput: $finalInput,
-                        tokenOutput: $finalOutput,
-                        isStreaming: true,
-                        statusCode: $streamStatus,
-                        latencyMs: (int) round(
-                            (microtime(true) - $startedAtStream) * 1000,
-                        ),
-                        errorCode: $errorStream,
-                        traceId: $traceId,
-                        token: $token,
-                        provider: $provider,
-                        llmModel: $model,
-                        enforceQuota: false,
+                if ($buffer !== '') {
+                    $adaptedFrame = $this->protocolTransformer->adaptStreamingFrame(
+                        $buffer,
+                        $protocol,
+                        $providerProtocol,
+                        $model->external_model_id,
                     );
+
+                    if ($adaptedFrame !== '') {
+                        echo $adaptedFrame;
+                        flush();
+                    }
                 }
             },
             $status,
