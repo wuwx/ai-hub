@@ -50,7 +50,7 @@ it('records an audit event when an API key is revoked', function () {
         name: 'To Revoke',
     );
 
-    $token = $generated->token;
+    $token = $generated->accessToken;
     $token->delete();
 
     app(RecordAuditEvent::class)->handle(

@@ -60,10 +60,10 @@ test('users can revoke their api keys', function () {
     $this->actingAs($user);
 
     Livewire::test('pages::api-keys')
-        ->call('revokeKey', $generated->token->id)
+        ->call('revokeKey', $generated->accessToken->id)
         ->assertHasNoErrors();
 
-    expect(PersonalAccessToken::find($generated->token->id))->toBeNull();
+    expect(PersonalAccessToken::find($generated->accessToken->id))->toBeNull();
 });
 
 test('cannot revoke another users api key', function () {
@@ -78,7 +78,7 @@ test('cannot revoke another users api key', function () {
     $this->actingAs($user);
 
     Livewire::test('pages::api-keys')
-        ->call('revokeKey', $generated->token->id)
+        ->call('revokeKey', $generated->accessToken->id)
         ->assertNotFound();
 });
 

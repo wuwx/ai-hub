@@ -68,16 +68,16 @@ new #[Title('API Keys')] class extends Component
 
         app(RecordAuditEvent::class)->handle(
             action: 'api_key.created',
-            subject: $generated->token,
+            subject: $generated->accessToken,
             properties: [
-                'name' => $generated->token->name,
-                'expires_at' => $generated->token->expires_at?->toDateTimeString(),
+                'name' => $generated->accessToken->name,
+                'expires_at' => $generated->accessToken->expires_at?->toDateTimeString(),
             ],
             actor: Auth::user(),
         );
 
         $this->generatedPlainTextKey = $generated->plainTextToken;
-        $this->generatedKeyId = $generated->token->id;
+        $this->generatedKeyId = $generated->accessToken->id;
         $this->newKeyName = '';
         $this->newKeyExpiresAt = null;
 
@@ -128,15 +128,15 @@ new #[Title('API Keys')] class extends Component
 
         app(RecordAuditEvent::class)->handle(
             action: 'api_key.rotated',
-            subject: $generated->token,
+            subject: $generated->accessToken,
             properties: [
-                'name' => $generated->token->name,
+                'name' => $generated->accessToken->name,
             ],
             actor: Auth::user(),
         );
 
         $this->rotatedPlainTextKey = $generated->plainTextToken;
-        $this->rotatedKeyId = $generated->token->id;
+        $this->rotatedKeyId = $generated->accessToken->id;
 
         $this->dispatch('api-key-rotated');
     }

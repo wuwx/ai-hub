@@ -14,7 +14,7 @@ test('users can rotate their api keys', function () {
         expiresAt: null,
     );
 
-    $oldId = $generated->token->id;
+    $oldId = $generated->accessToken->id;
 
     $this->actingAs($user);
 
@@ -40,11 +40,11 @@ test('rotating key shows new key to user', function () {
     $this->actingAs($user);
 
     $component = Livewire::test('pages::api-keys')
-        ->call('rotateKey', $generated->token->id);
+        ->call('rotateKey', $generated->accessToken->id);
 
     expect($component->get('rotatedPlainTextKey'))->not->toBeNull();
     expect($component->get('rotatedPlainTextKey'))->toMatch('/^\d+\|/');
-    expect($component->get('rotatedKeyId'))->not->toBe($generated->token->id);
+    expect($component->get('rotatedKeyId'))->not->toBe($generated->accessToken->id);
 });
 
 test('dismiss rotated key clears state', function () {
@@ -59,7 +59,7 @@ test('dismiss rotated key clears state', function () {
     $this->actingAs($user);
 
     $component = Livewire::test('pages::api-keys')
-        ->call('rotateKey', $generated->token->id)
+        ->call('rotateKey', $generated->accessToken->id)
         ->call('dismissRotatedKey');
 
     expect($component->get('rotatedPlainTextKey'))->toBeNull();

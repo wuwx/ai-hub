@@ -2,8 +2,8 @@
 
 namespace App\Actions\ApiKeys;
 
-use App\Data\GeneratedApiKey;
 use App\Models\User;
+use Laravel\Sanctum\NewAccessToken;
 use Laravel\Sanctum\PersonalAccessToken;
 
 class RotateApiKey
@@ -17,7 +17,7 @@ class RotateApiKey
      * Rotate a token: delete the old one and issue a fresh token with the
      * same name and expiry.
      */
-    public function handle(PersonalAccessToken $token): GeneratedApiKey
+    public function handle(PersonalAccessToken $token): NewAccessToken
     {
         /** @var User $user */
         $user = $token->tokenable;
