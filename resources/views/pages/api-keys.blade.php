@@ -1,5 +1,6 @@
 <?php
 
+use App\Models\User;
 use Illuminate\Support\Facades\Auth;
 use Laravel\Sanctum\PersonalAccessToken;
 use Livewire\Attributes\Computed;
@@ -29,8 +30,14 @@ new #[Title('API Keys')] class extends Component
     #[Computed]
     public function apiKeys(): array
     {
-        return Auth::user()
-            ?->tokens()
+        /** @var User|null $user */
+        $user = Auth::user();
+
+        if ($user === null) {
+            return [];
+        }
+
+        return $user->tokens()
             ->orderByDesc('created_at')
             ->get()
             ->map(fn (PersonalAccessToken $token) => [
@@ -41,12 +48,15 @@ new #[Title('API Keys')] class extends Component
                 'is_active' => $token->expires_at === null || ! $token->expires_at->isPast(),
                 'created_at' => $token->created_at->toDateTimeString(),
             ])
-            ->toArray() ?? [];
+            ->toArray();
     }
 
     public function createKey(): void
     {
         abort_unless($this->canManage, 403);
+
+        /** @var User $user */
+        $user = Auth::user();
 
         $this->validate([
             'newKeyName' => ['required', 'string', 'max:255'],
@@ -57,11 +67,11 @@ new #[Title('API Keys')] class extends Component
             ? \Illuminate\Support\Carbon::parse($this->newKeyExpiresAt)
             : null;
 
-        $generated = Auth::user()->createToken($this->newKeyName, ['*'], $expiresAt);
+        $generated = $user->createToken($this->newKeyName, ['*'], $expiresAt);
 
         activity()
             ->performedOn($generated->accessToken)
-            ->causedBy(Auth::user())
+            ->causedBy($user)
             ->withProperties([
                 'name' => $generated->accessToken->name,
                 'expires_at' => $generated->accessToken->expires_at?->toDateTimeString(),
@@ -80,8 +90,10 @@ new #[Title('API Keys')] class extends Component
     {
         abort_unless($this->canManage, 403);
 
-        $token = Auth::user()
-            ?->tokens()
+        /** @var User $user */
+        $user = Auth::user();
+
+        $token = $user->tokens()
             ->where('id', $keyId)
             ->first();
 
@@ -93,7 +105,7 @@ new #[Title('API Keys')] class extends Component
 
         activity()
             ->performedOn($token)
-            ->causedBy(Auth::user())
+            ->causedBy($user)
             ->withProperties(['name' => $name])
             ->log('api_key.revoked');
 
@@ -106,8 +118,10 @@ new #[Title('API Keys')] class extends Component
     {
         abort_unless($this->canManage, 403);
 
-        $token = Auth::user()
-            ?->tokens()
+        /** @var User $user */
+        $user = Auth::user();
+
+        $token = $user->tokens()
             ->where('id', $keyId)
             ->first();
 
@@ -118,11 +132,11 @@ new #[Title('API Keys')] class extends Component
 
         $token->delete();
 
-        $generated = Auth::user()->createToken($tokenName, ['*'], $tokenExpiresAt);
+        $generated = $user->createToken($tokenName, ['*'], $tokenExpiresAt);
 
         activity()
             ->performedOn($generated->accessToken)
-            ->causedBy(Auth::user())
+            ->causedBy($user)
             ->withProperties(['name' => $generated->accessToken->name])
             ->log('api_key.rotated');
 
