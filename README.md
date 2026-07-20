@@ -1,74 +1,82 @@
 # AI Hub
 
-AI Hub 是一个基于 Laravel 13 + Filament 5 + Livewire 4 构建的 LLM API 网关。
+AI Hub 是一个基于 Laravel 13 + Filament 5 + Livewire 4 构建的 LLM API 网关与管理平台。
 
-它提供统一的 OpenAI / Anthropic 兼容网关、API Key 鉴权与配额、基于订阅计划的模型准入控制与定价能力，目标是让团队快速接入并统一调度多家大模型供应商，而无需关心各家协议差异。
-
-> 注意：当前版本**不持久化任何请求日志或按请求的用量明细**（无 request logs、无 usage ledger）。配额通过订阅计划的开关特性（toggle features）实时校验，指标仅通过 Prometheus 暴露聚合计数。
+它提供统一的 OpenAI / Anthropic 兼容网关、API Key 鉴权（Sanctum）、基于订阅计划的模型管理与定价能力，目标是让团队快速接入并统一调度多家大模型供应商，而无需关心各家协议差异。
 
 ## 核心能力
 
-- 统一兼容网关
-  - OpenAI: `/api/v1/chat/completions`, `/api/v1/responses`, `/api/v1/embeddings`
+- **统一兼容网关**
+  - OpenAI: `/api/v1/chat/completions`, `/api/v1/responses`, `/api/v1/embeddings`, `/api/v1/models`
   - Anthropic: `/api/v1/messages`
-  - 流式（SSE）与非流式双通道，流式响应携带最终 usage 信息
-- 鉴权与账户
+  - 流式（SSE）与非流式双通道透明代理
+- **鉴权与账户**
   - API Key 鉴权（`Authorization: Bearer`，基于 Sanctum Personal Access Token）
   - Fortify：登录 / 注册 / 2FA / 密码重置 / 邮箱验证
   - Laravel Passkeys（WebAuthn 无密码登录）
   - 审计日志（spatie/laravel-activitylog）：记录 API Key 创建/吊销/轮换等关键操作
-- 订阅与配额
-  - 基于 Subscriptionify 的订阅计划（Plan）控制模型 / 供应商准入（开关特性：`model:<id>` / `provider:<slug>`）
-  - Token 配额（日 / 周 / 月），由订阅计划定义，并通过计费页（`pages::billing` 的 `subscribeToPlan` 动作）直接在用户上开通 / 切换计划
-- 模型定价
-  - `App\Actions\Billing\ResolveModelPricing` 解析售价，每个 `LlmModel` 支持三种模式（优先级递减）：
-    1. `sell_input_per_1m_usd` / `sell_output_per_1m_usd`：直接设定售价
-    2. `markup_percent` + `cost_input_per_1m_usd` / `cost_output_per_1m_usd`：成本加成
-    3. `pricing` JSON（legacy）：兼容旧格式
-- 可靠性与风控
-  - 上游重试（指数退避，同模型 5xx / 超时自动重试，由 `retry_attempts` / `retry_backoff_ms` 配置）
-  - 幂等键缓存与冲突保护
-  - 标准 Rate Limit 响应头（`X-RateLimit-Limit` / `X-RateLimit-Remaining` / `X-RateLimit-Reset`）
-  - 团队级并发限流（默认 50 个在飞请求，超出返回 `429 too_many_concurrent_requests`，由 `LLM_GATEWAY_MAX_CONCURRENT_PER_TEAM` 配置）
-- API Key 治理
-  - Team 维度 API Key，支持模型白名单、IP 白名单（CIDR）、日 token 限额、每分钟限流
-- 运维观测
-  - Prometheus Metrics 端点（`GET /api/metrics`）：用户数、API Key 数、Provider 健康状态、订阅数等聚合计数
-  - Health Check 端点（`GET /api/health`，检查 database + cache）
+- **订阅与计划**
+  - 基于 Subscriptionify 的订阅计划（Plan）管理
+  - 通过 Filament 后台管理 Plans、Features
+- **可靠性**
+  - 上游重试（指数退避，5xx / 超时自动重试，由 `retry_attempts` / `retry_backoff_ms` 配置）
+  - API 限流（`throttle:api`，默认 60 次/分钟）
+- **运维观测**
+  - Prometheus Metrics 端点（`GET /metrics`）：用户数、API Key 数、Provider 健康状态、订阅数等聚合计数
+  - Health Check 端点（`GET /health`，检查 database + cache + disk）
 
 ## 技术栈
 
-- PHP 8.5
-- Laravel 13
-- Filament 5
-- Livewire 4
-- Flux UI 2（前台组件库）
-- Fortify（认证后端：登录 / 注册 / 2FA / 密码重置 / 邮箱验证）
-- Laravel Passkeys（WebAuthn 无密码登录）
-- Subscriptionify（订阅计划与开关特性）
-- Pest 4
-- Tailwind CSS v4
-- spatie/laravel-activitylog（审计日志 / 操作记录）
+| 层级 | 技术 |
+|------|------|
+| 语言 | PHP 8.5 |
+| 后端框架 | Laravel 13 |
+| 管理后台 | Filament 5 |
+| 前台交互 | Livewire 4 + Flux UI 2 |
+| 认证 | Fortify + Laravel Passkeys（WebAuthn） |
+| API 鉴权 | Laravel Sanctum |
+| 订阅计费 | Subscriptionify |
+| 审计日志 | spatie/laravel-activitylog |
+| 健康检查 | spatie/laravel-health |
+| 监控指标 | spatie/laravel-prometheus |
+| 测试 | Pest 4 |
+| 静态分析 | Larastan (level 7) |
+| 前端构建 | Vite 8 + Tailwind CSS v4 |
 
 ## 项目结构（简要）
 
-- `app/Actions/Gateway`: 网关处理（鉴权透传、协议识别与错误体适配）、幂等、Provider 密钥解析
-- `app/Actions/Billing`: 定价解析、订阅配额同步
-- `app/Actions/ApiKeys`: API Key 生成、轮换
-- `app/Actions/Audit`: 审计日志记录
-- `app/Actions/Fortify`: 认证相关
-- `app/Http/Middleware`: API Key 鉴权、限流（含 Rate Limit 响应头）、IP 白名单校验、团队并发请求限制
-- `app/Http/Controllers/Gateway`: 兼容网关控制器
-- `app/Http/Controllers`: Health Check、Prometheus Metrics
-- `app/Http/Responses`: Fortify 登录/注册/2FA/邮箱验证/Passkey 响应（自动跳转当前团队）
-- `app/Models`: `User`（同时作为 Subscriptionify 的 subscribable）、`LlmProvider`、`LlmModel`（订阅 / 计划 / 特性由 Subscriptionify 提供 `Plan` / `Subscription` / `Feature` 模型）
-- `app/Services`: `PlanService` 等
-- `database/migrations`: 网关（llm_providers / llm_models）、订阅（subscriptionify 的 plans / features / subscriptions / feature_*）、活动日志（spatie activity_log）、Passkeys、Fortify 等表结构
-- `resources/views/pages/`: Livewire 匿名页面组件（dashboard、api-keys、playground、billing、settings、teams）
-- `resources/views/pages/auth`: Fortify 认证页面（登录、注册、2FA、密码重置、邮箱验证）
-- `resources/views/docs.blade.php`: API 文档页面
-- `resources/views/welcome.blade.php`: 产品 Landing Page
-- `tests/Feature`: 网关 / 配额 / 计费 / 后台 / 前台页面 / 审计日志 / 认证 / Passkey 等功能测试
+```
+app/
+├── Actions/Fortify/          # 认证相关（CreateNewUser、ResetUserPassword）
+├── Concerns/                 # 共享 trait（PasswordValidationRules、ProfileValidationRules）
+├── Filament/
+│   └── Resources/            # 管理后台资源
+│       ├── AuditLogs/        #   审计日志
+│       ├── LlmModels/        #   LLM 模型管理
+│       ├── LlmProviders/     #   LLM 供应商管理
+│       └── Plans/            #   订阅计划管理
+├── Http/
+│   ├── Controllers/Api/V1/   # 网关控制器（Completions、Embeddings、Messages、Models、Responses）
+│   └── Responses/            # Fortify 登录/注册/2FA 等响应
+├── Livewire/Actions/         # Livewire 动作（Logout）
+├── Models/                   # User、LlmProvider、LlmModel
+└── Providers/                # AppService、Fortify、Filament AdminPanel、Prometheus
+
+database/
+├── factories/                # UserFactory
+├── migrations/               # 用户、网关、订阅、活动日志、Passkeys、Health 等表
+└── seeders/                  # DatabaseSeeder、SubscriptionifySeeder
+
+resources/views/
+├── pages/                    # Livewire 页面（dashboard、api-keys、playground、billing、settings）
+├── pages/auth/               # Fortify 认证页面（登录、注册、2FA、密码重置、邮箱验证）
+├── components/               # 共享 Blade 组件
+├── layouts/                  # 布局模板
+├── docs.blade.php            # API 文档页面
+└── welcome.blade.php         # Landing Page
+
+tests/Feature/                # 网关、API Key、计费、审计、认证、Health、Prometheus 等功能测试
+```
 
 ## 快速开始
 
@@ -109,44 +117,58 @@ npm run dev
 
 ### 网关
 
-- `LLM_GATEWAY_TIMEOUT_SECONDS`
-- `LLM_GATEWAY_ANTHROPIC_VERSION`
-- `LLM_GATEWAY_RETRY_ATTEMPTS`
-- `LLM_GATEWAY_RETRY_BACKOFF_MS`
-- `LLM_GATEWAY_IDEMPOTENCY_TTL_SECONDS`
-- `LLM_GATEWAY_API_KEY_RATE_LIMIT_PER_MINUTE`
-- `LLM_GATEWAY_API_KEY_RATE_LIMIT_DECAY_SECONDS`
-- `LLM_GATEWAY_MAX_CONCURRENT_PER_TEAM`（团队级在飞请求上限，默认 50）
+| 变量 | 默认值 | 说明 |
+|------|--------|------|
+| `LLM_GATEWAY_TIMEOUT_SECONDS` | 120 | 上游请求超时（秒） |
+| `LLM_GATEWAY_ANTHROPIC_VERSION` | 2023-06-01 | Anthropic API 版本 |
+| `LLM_GATEWAY_RETRY_ATTEMPTS` | 2 | 重试次数 |
+| `LLM_GATEWAY_RETRY_BACKOFF_MS` | 150 | 重试退避（毫秒） |
+| `LLM_GATEWAY_IDEMPOTENCY_TTL_SECONDS` | 300 | 幂等键 TTL |
+| `LLM_GATEWAY_API_KEY_RATE_LIMIT_PER_MINUTE` | 120 | API Key 每分钟限流 |
+| `LLM_GATEWAY_API_KEY_RATE_LIMIT_DECAY_SECONDS` | 60 | 限流衰减窗口 |
+
+### 计费
+
+| 变量 | 默认值 | 说明 |
+|------|--------|------|
+| `BILLING_CURRENCY` | USD | 计费货币 |
+| `BILLING_FREE_PLAN_CODE` | free | 免费计划代码 |
 
 ### 上游 Provider 密钥
 
-在 `llm_providers.secret_ref` 中以 `secret://KEY` 引用（推荐，兼容 `config:cache`）：
-
-- `OPENAI_API_KEY`
-- `ANTHROPIC_API_KEY`
-- `GROQ_API_KEY`
-- `DEEPSEEK_API_KEY`
-- `MISTRAL_API_KEY`
+在 Filament 后台创建 Provider 时填写 `secret_ref`（加密存储），支持 `bearer` 和 `header` 两种认证模式。
 
 ## API 网关示例
 
-### OpenAI 兼容
+### OpenAI Chat Completions
 
 ```bash
-curl -X POST http://127.0.0.1:8000/api/v1/chat/completions \
+curl -X POST http://localhost:8000/api/v1/chat/completions \
   -H "Authorization: Bearer <API_KEY>" \
   -H "Content-Type: application/json" \
   -d '{
-    "model": "qwen3:0.6b",
+    "model": "gpt-4.1",
     "messages": [{"role": "user", "content": "你好"}],
     "stream": false
+  }'
+```
+
+### OpenAI Responses
+
+```bash
+curl -X POST http://localhost:8000/api/v1/responses \
+  -H "Authorization: Bearer <API_KEY>" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "gpt-4.1",
+    "input": "你好"
   }'
 ```
 
 ### Embeddings
 
 ```bash
-curl -X POST http://127.0.0.1:8000/api/v1/embeddings \
+curl -X POST http://localhost:8000/api/v1/embeddings \
   -H "Authorization: Bearer <API_KEY>" \
   -H "Content-Type: application/json" \
   -d '{
@@ -155,14 +177,14 @@ curl -X POST http://127.0.0.1:8000/api/v1/embeddings \
   }'
 ```
 
-### Anthropic 兼容
+### Anthropic Messages
 
 ```bash
-curl -X POST http://127.0.0.1:8000/api/v1/messages \
+curl -X POST http://localhost:8000/api/v1/messages \
   -H "Authorization: Bearer <API_KEY>" \
   -H "Content-Type: application/json" \
   -d '{
-    "model": "gpt-4.1",
+    "model": "claude-3-7-sonnet",
     "messages": [{"role": "user", "content": "hello"}],
     "max_tokens": 128
   }'
@@ -171,7 +193,7 @@ curl -X POST http://127.0.0.1:8000/api/v1/messages \
 ### 列出可用模型
 
 ```bash
-curl http://127.0.0.1:8000/api/v1/models \
+curl http://localhost:8000/api/v1/models \
   -H "Authorization: Bearer <API_KEY>"
 ```
 
@@ -180,38 +202,48 @@ curl http://127.0.0.1:8000/api/v1/models \
 ### Health Check
 
 ```bash
-curl http://127.0.0.1:8000/api/health
+curl http://localhost:8000/health
 ```
 
-返回 `database` 和 `cache` 子系统状态及延迟，HTTP 200 表示健康，503 表示降级。
+返回 `database`、`cache`、`disk` 子系统状态及延迟，HTTP 200 表示健康，503 表示降级。
 
 ### Prometheus Metrics
 
 ```bash
-curl http://127.0.0.1:8000/api/metrics
+curl http://localhost:8000/metrics
 ```
 
-输出 Prometheus 兼容格式的指标，包括用户数、API Key 数（含活跃数）、各 Provider 健康状态、订阅数（active / trialing / past_due）等聚合计数。
+输出 Prometheus 兼容格式的指标（命名空间 `ai_hub`），包括：
+- `ai_hub_users`：注册用户总数
+- `ai_hub_api_keys` / `ai_hub_api_keys_active`：API Key 总数与活跃数
+- `ai_hub_provider_active{provider="slug"}`：各 Provider 可用状态
+- `ai_hub_subscriptions{status="active|trialing|past_due"}`：订阅数按状态分组
 
 ## 管理后台
 
-使用 Filament 进行运营管理，包含以下资源与页面：
+使用 Filament 5 进行运营管理，访问路径：`/admin`
 
-- **Gateway Configuration**：Llm Providers、Llm Models、Plans（含 Model / Provider Entitlements）
-- **Governance**：API Keys、Audit Logs
-
-在本地启动后访问：
-
-- `/admin`
+| 导航组 | 资源 | 说明 |
+|--------|------|------|
+| — | LLM Providers | 供应商管理（名称、适配器类型、Base URL、认证模式、密钥） |
+| — | LLM Models | 模型管理（关联 Provider、外部模型 ID、能力、定价、上下文窗口） |
+| Billing | Plans | 订阅计划管理（Subscriptionify） |
+| — | Audit Logs | 操作审计日志（只读） |
 
 ## 前台页面
 
-- **Dashboard**：账户与配额概览（当前 Plan、Token 配额使用等）
-- **API Keys**：创建、查看、轮换（Rotate）、删除 API Key，支持模型白名单、IP 白名单与日限额配置
-- **Playground**：内置 API 调试页面，支持模型选择、System Prompt、参数配置与响应展示
-- **Billing**：查看当前订阅计划（基于 Subscriptionify）
-- **Settings**：资料编辑（Profile）、外观偏好（Appearance）、安全设置（Security：2FA / Passkey / 密码 / 注销账号）、团队管理（Teams）
-- **静态信息页**：`/terms` 服务条款、`/privacy` 隐私政策
+| 路径 | 页面 | 说明 |
+|------|------|------|
+| `/dashboard` | Dashboard | 账户与订阅概览 |
+| `/api-keys` | API Keys | 创建、查看、轮换、删除 API Key |
+| `/playground` | Playground | 内置 API 调试，支持模型选择与参数配置 |
+| `/billing` | Billing | 查看与管理订阅计划 |
+| `/settings/profile` | Profile | 资料编辑 |
+| `/settings/appearance` | Appearance | 外观偏好 |
+| `/settings/security` | Security | 2FA / Passkey / 密码 / 注销账号 |
+| `/docs` | API Docs | API 文档 |
+| `/terms` | Terms | 服务条款 |
+| `/privacy` | Privacy | 隐私政策 |
 
 ## 测试
 
@@ -221,23 +253,24 @@ curl http://127.0.0.1:8000/api/metrics
 php artisan test --compact
 ```
 
-运行核心平台回归：
+运行网关相关测试：
 
 ```bash
-php artisan test --compact tests/Feature/Gateway tests/Feature/ApiKeys tests/Feature/Billing tests/Feature/LlmPlatformAdminSetupTest.php
+php artisan test --compact tests/Feature/Gateway
 ```
 
-运行前台页面测试：
+运行完整质量检查（lint + 静态分析 + 测试）：
 
 ```bash
-php artisan test --compact tests/Feature/DashboardPageTest.php tests/Feature/BillingPageTest.php tests/Feature/ApiKeyRotationTest.php
+composer test
 ```
 
 ## 生产建议
 
 - 配置 Redis 作为缓存与限流存储
-- 通过 `GET /api/metrics` 接入 Prometheus / Grafana 监控告警
-- 通过 `GET /api/health` 配置负载均衡器 / K8s 健康探针
+- 通过 `GET /metrics` 接入 Prometheus / Grafana 监控告警
+- 通过 `GET /health` 配置负载均衡器 / K8s 健康探针
+- 生产环境设置 `APP_ENV=production`，自动启用强密码策略与破坏性命令保护
 
 ## License
 
