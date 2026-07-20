@@ -17,7 +17,7 @@ class ModelsController extends Controller
      * available models during initialization. Entitlement gating was removed,
      * so every active model on an active provider is listed.
      */
-    public function index(): Response
+    public function __invoke(): Response
     {
         $models = $this->resolveModels();
 

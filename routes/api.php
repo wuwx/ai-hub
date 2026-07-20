@@ -10,7 +10,7 @@ use Illuminate\Support\Facades\Route;
 Route::prefix('v1')
     ->middleware(['auth:sanctum', 'throttle:api'])
     ->group(function () {
-        Route::get('models', [ModelsController::class, 'index']);
+        Route::get('models', ModelsController::class);
         Route::post('chat/completions', CompletionsController::class);
         Route::post('embeddings', EmbeddingsController::class);
         Route::post('responses', ResponsesController::class);
