@@ -8,7 +8,7 @@ use App\Http\Controllers\Api\V1\ResponsesController;
 use Illuminate\Support\Facades\Route;
 
 Route::prefix('v1')
-    ->middleware(['auth:sanctum'])
+    ->middleware(['auth:sanctum', 'throttle:api'])
     ->group(function () {
         Route::get('models', [ModelsController::class, 'index']);
         Route::post('chat/completions', CompletionsController::class);

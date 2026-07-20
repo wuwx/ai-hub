@@ -2,7 +2,6 @@
 
 use App\Actions\ApiKeys\GenerateApiKey;
 use App\Actions\ApiKeys\RotateApiKey;
-use App\Actions\Audit\RecordAuditEvent;
 use Illuminate\Support\Facades\Auth;
 use Laravel\Sanctum\PersonalAccessToken;
 use Livewire\Attributes\Computed;
@@ -66,15 +65,14 @@ new #[Title('API Keys')] class extends Component
             expiresAt: $expiresAt,
         );
 
-        app(RecordAuditEvent::class)->handle(
-            action: 'api_key.created',
-            subject: $generated->accessToken,
-            properties: [
+        activity()
+            ->performedOn($generated->accessToken)
+            ->causedBy(Auth::user())
+            ->withProperties([
                 'name' => $generated->accessToken->name,
                 'expires_at' => $generated->accessToken->expires_at?->toDateTimeString(),
-            ],
-            actor: Auth::user(),
-        );
+            ])
+            ->log('api_key.created');
 
         $this->generatedPlainTextKey = $generated->plainTextToken;
         $this->generatedKeyId = $generated->accessToken->id;
@@ -99,14 +97,11 @@ new #[Title('API Keys')] class extends Component
 
         $token->delete();
 
-        app(RecordAuditEvent::class)->handle(
-            action: 'api_key.revoked',
-            subject: $token,
-            properties: [
-                'name' => $name,
-            ],
-            actor: Auth::user(),
-        );
+        activity()
+            ->performedOn($token)
+            ->causedBy(Auth::user())
+            ->withProperties(['name' => $name])
+            ->log('api_key.revoked');
 
         $this->dispatch('api-key-revoked');
 
@@ -126,14 +121,11 @@ new #[Title('API Keys')] class extends Component
 
         $generated = app(RotateApiKey::class)->handle($token);
 
-        app(RecordAuditEvent::class)->handle(
-            action: 'api_key.rotated',
-            subject: $generated->accessToken,
-            properties: [
-                'name' => $generated->accessToken->name,
-            ],
-            actor: Auth::user(),
-        );
+        activity()
+            ->performedOn($generated->accessToken)
+            ->causedBy(Auth::user())
+            ->withProperties(['name' => $generated->accessToken->name])
+            ->log('api_key.rotated');
 
         $this->rotatedPlainTextKey = $generated->plainTextToken;
         $this->rotatedKeyId = $generated->accessToken->id;
