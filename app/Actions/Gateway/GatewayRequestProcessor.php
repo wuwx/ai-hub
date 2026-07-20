@@ -15,12 +15,6 @@ use Symfony\Component\HttpFoundation\Response;
 
 class GatewayRequestProcessor
 {
-    public function __construct(
-        private readonly ResolveProviderSecret $resolveProviderSecret,
-    ) {
-        //
-    }
-
     /**
      * Handle an OpenAI-compatible embeddings request.
      *
@@ -363,26 +357,22 @@ class GatewayRequestProcessor
         LlmProvider $provider,
         string $providerProtocol,
     ): array {
-        $resolvedSecret = $this->resolveProviderSecret->handle(
-            $provider->secret_ref,
-        );
-
         $headers = [
             'Accept' => 'application/json',
             'Content-Type' => 'application/json',
         ];
 
-        if ($provider->auth_mode === 'bearer' && $resolvedSecret) {
-            $headers['Authorization'] = 'Bearer '.$resolvedSecret;
+        if ($provider->auth_mode === 'bearer' && $provider->secret_ref) {
+            $headers['Authorization'] = 'Bearer '.$provider->secret_ref;
         }
 
-        if ($provider->auth_mode === 'header' && $resolvedSecret) {
+        if ($provider->auth_mode === 'header' && $provider->secret_ref) {
             $headerName = (string) data_get(
                 $provider->options,
                 'auth_header',
                 'x-api-key',
             );
-            $headers[$headerName] = $resolvedSecret;
+            $headers[$headerName] = $provider->secret_ref;
         }
 
         if ($providerProtocol === 'anthropic') {

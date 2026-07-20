@@ -46,16 +46,6 @@ return [
             'LLM_GATEWAY_IDEMPOTENCY_TTL_SECONDS',
             300,
         ),
-        // Provider upstream secrets. Each entry is loaded from env() here (so it
-        // survives `config:cache`) and referenced from llm_providers.secret_ref
-        // as `secret://KEY` (recommended) or legacy `env://KEY`.
-        'secrets' => array_filter([
-            'OPENAI_API_KEY' => env('OPENAI_API_KEY'),
-            'ANTHROPIC_API_KEY' => env('ANTHROPIC_API_KEY'),
-            'GROQ_API_KEY' => env('GROQ_API_KEY'),
-            'DEEPSEEK_API_KEY' => env('DEEPSEEK_API_KEY'),
-            'MISTRAL_API_KEY' => env('MISTRAL_API_KEY'),
-        ]),
     ],
 
     'billing' => [
