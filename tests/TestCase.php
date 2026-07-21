@@ -2,8 +2,8 @@
 
 namespace Tests;
 
-use App\Models\LlmModel;
-use App\Models\LlmProvider;
+use App\Models\AiModel;
+use App\Models\AiProvider;
 use App\Models\User;
 use Database\Seeders\SubscriptionifySeeder;
 use Illuminate\Foundation\Testing\TestCase as BaseTestCase;
@@ -130,7 +130,7 @@ abstract class TestCase extends BaseTestCase
     /**
      * Grant a plan access to an LLM model via a Subscriptionify toggle feature.
      */
-    public static function entitleModel(LlmModel $model, string $planCode = 'free'): void
+    public static function entitleModel(AiModel $model, string $planCode = 'free'): void
     {
         (new SubscriptionifySeeder)->run();
 
@@ -148,7 +148,7 @@ abstract class TestCase extends BaseTestCase
     /**
      * Grant a plan access to an LLM provider via a Subscriptionify toggle feature.
      */
-    public static function entitleProvider(LlmProvider $provider, string $planCode = 'free'): void
+    public static function entitleProvider(AiProvider $provider, string $planCode = 'free'): void
     {
         (new SubscriptionifySeeder)->run();
 

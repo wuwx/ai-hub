@@ -8,7 +8,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 /**
- * @property-read Collection<int, LlmModel> $models
+ * @property-read Collection<int, AiModel> $models
  */
 #[Fillable([
     'name',
@@ -20,14 +20,14 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
     'options',
     'is_active',
 ])]
-class LlmProvider extends Model
+class AiProvider extends Model
 {
     /**
-     * @return HasMany<LlmModel, $this>
+     * @return HasMany<AiModel, $this>
      */
     public function models(): HasMany
     {
-        return $this->hasMany(LlmModel::class);
+        return $this->hasMany(AiModel::class);
     }
 
     /**

@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Filament\Resources\LlmModels\Schemas;
+namespace App\Filament\Resources\AiModels\Schemas;
 
 use Filament\Forms\Components\KeyValue;
 use Filament\Forms\Components\Select;
@@ -8,13 +8,13 @@ use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Toggle;
 use Filament\Schemas\Schema;
 
-class LlmModelForm
+class AiModelForm
 {
     public static function configure(Schema $schema): Schema
     {
         return $schema
             ->components([
-                Select::make('llm_provider_id')
+                Select::make('ai_provider_id')
                     ->relationship('provider', 'name')
                     ->required(),
                 TextInput::make('name')

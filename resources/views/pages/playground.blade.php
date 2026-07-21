@@ -1,6 +1,6 @@
 <?php
 
-use App\Models\LlmModel;
+use App\Models\AiModel;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Http;
 use Livewire\Attributes\Computed;
@@ -41,16 +41,16 @@ new #[Title('Playground')] class extends Component
             return [];
         }
 
-        return LlmModel::query()
+        return AiModel::query()
             ->with('provider')
             ->where('is_active', true)
             ->whereHas('provider', fn ($query) => $query->where('is_active', true))
             ->orderBy('name')
             ->get()
-            ->filter(fn (LlmModel $model) => $model->provider
+            ->filter(fn (AiModel $model) => $model->provider
                 && $user->hasFeature('model:'.$model->external_model_id)
                 && $user->hasFeature('provider:'.$model->provider->slug))
-            ->map(fn (LlmModel $model) => [
+            ->map(fn (AiModel $model) => [
                 'value' => $model->external_model_id,
                 'label' => $model->name,
             ])

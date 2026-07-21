@@ -2,7 +2,7 @@
 
 namespace App\Providers;
 
-use App\Models\LlmProvider;
+use App\Models\AiProvider;
 use App\Models\User;
 use Illuminate\Support\ServiceProvider;
 use Laravel\Sanctum\PersonalAccessToken;
@@ -34,8 +34,8 @@ class PrometheusServiceProvider extends ServiceProvider
             ->helpText('Provider availability status')
             ->label('provider')
             ->value(function () {
-                return LlmProvider::all()
-                    ->map(fn (LlmProvider $provider) => [
+                return AiProvider::all()
+                    ->map(fn (AiProvider $provider) => [
                         $provider->is_active ? 1 : 0,
                         [$provider->slug],
                     ])

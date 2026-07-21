@@ -1,17 +1,24 @@
 <?php
 
-use App\Models\LlmModel;
-use App\Models\LlmProvider;
+use App\Models\AiModel;
+use App\Models\AiProvider;
 use App\Models\User;
 use Database\Seeders\SubscriptionifySeeder;
 use Illuminate\Http\Client\Request as HttpRequest;
 use Illuminate\Support\Facades\Http;
 use Tests\TestCase;
 
-it('rejects openai requests when the upstream provider is anthropic compatible', function () {
+it('forwards chat completion requests to the upstream regardless of provider adapter type', function () {
     [$plainTextKey, $modelExternalId] = provisionGatewayTarget('anthropic_compatible', 'claude-3-7-sonnet');
 
-    Http::fake();
+    Http::fake([
+        'https://anthropic.mock/v1/chat/completions' => Http::response([
+            'id' => 'cmpl_1',
+            'choices' => [
+                ['message' => ['role' => 'assistant', 'content' => 'hello from upstream']],
+            ],
+        ], 200),
+    ]);
 
     $response = $this->withToken($plainTextKey)->postJson('/api/v1/chat/completions', [
         'model' => $modelExternalId,
@@ -20,9 +27,8 @@ it('rejects openai requests when the upstream provider is anthropic compatible',
         ],
     ]);
 
-    $response->assertStatus(422);
-    $response->assertJsonPath('error.code', 'protocol_mismatch');
-    Http::assertNothingSent();
+    $response->assertOk();
+    $response->assertJsonPath('choices.0.message.content', 'hello from upstream');
 });
 
 it('rejects anthropic requests when the upstream provider is openai compatible', function () {
@@ -112,7 +118,7 @@ it('lists all active models regardless of entitlement', function () {
 
     // Create a second provider+model that previously would have been hidden
     // behind an entitlement check. With gating removed it is now listed.
-    $otherProvider = LlmProvider::create([
+    $otherProvider = AiProvider::create([
         'name' => 'Anthropic Direct',
         'slug' => 'anthropic-direct-'.uniqid(),
         'adapter_type' => 'anthropic_compatible',
@@ -122,8 +128,8 @@ it('lists all active models regardless of entitlement', function () {
         'is_active' => true,
     ]);
 
-    LlmModel::create([
-        'llm_provider_id' => $otherProvider->id,
+    AiModel::create([
+        'ai_provider_id' => $otherProvider->id,
         'name' => 'CLAUDE-3-7-SONNET',
         'external_model_id' => 'claude-3-7-sonnet',
         'is_active' => true,
@@ -147,7 +153,7 @@ function provisionGatewayTarget(string $adapterType, string $externalModelId): a
     (new SubscriptionifySeeder)->run();
     TestCase::subscribeUserToFreePlan($user);
 
-    $provider = LlmProvider::create([
+    $provider = AiProvider::create([
         'name' => 'Provider '.$adapterType,
         'slug' => 'provider-'.$adapterType.'-'.uniqid(),
         'adapter_type' => $adapterType,
@@ -164,8 +170,8 @@ function provisionGatewayTarget(string $adapterType, string $externalModelId): a
         'is_active' => true,
     ]);
 
-    $model = LlmModel::create([
-        'llm_provider_id' => $provider->id,
+    $model = AiModel::create([
+        'ai_provider_id' => $provider->id,
         'name' => strtoupper($externalModelId),
         'external_model_id' => $externalModelId,
         'is_active' => true,

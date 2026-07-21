@@ -8,7 +8,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 #[
     Fillable([
-        'llm_provider_id',
+        'ai_provider_id',
         'name',
         'external_model_id',
         'capabilities',
@@ -22,14 +22,14 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @property array<mixed> $pricing
  * @property array<mixed> $capabilities
  */
-class LlmModel extends Model
+class AiModel extends Model
 {
     /**
-     * @return BelongsTo<LlmProvider, $this>
+     * @return BelongsTo<AiProvider, $this>
      */
     public function provider(): BelongsTo
     {
-        return $this->belongsTo(LlmProvider::class, 'llm_provider_id');
+        return $this->belongsTo(AiProvider::class, 'ai_provider_id');
     }
 
     /**

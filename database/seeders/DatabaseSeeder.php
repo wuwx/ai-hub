@@ -2,8 +2,8 @@
 
 namespace Database\Seeders;
 
-use App\Models\LlmModel;
-use App\Models\LlmProvider;
+use App\Models\AiModel;
+use App\Models\AiProvider;
 use App\Models\User;
 use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
@@ -31,13 +31,13 @@ class DatabaseSeeder extends Seeder
             SubscriptionifySeeder::class,
         ]);
 
-        $this->seedLlmProviders();
+        $this->seedAiProviders();
         $this->seedModelProviderFeatures();
     }
 
-    private function seedLlmProviders(): void
+    private function seedAiProviders(): void
     {
-        $openai = LlmProvider::create([
+        $openai = AiProvider::create([
             'name' => 'OpenAI',
             'slug' => 'openai',
             'adapter_type' => 'openai_compatible',
@@ -46,7 +46,7 @@ class DatabaseSeeder extends Seeder
             'is_active' => true,
         ]);
 
-        $anthropic = LlmProvider::create([
+        $anthropic = AiProvider::create([
             'name' => 'Anthropic',
             'slug' => 'anthropic',
             'adapter_type' => 'anthropic_compatible',
@@ -55,7 +55,7 @@ class DatabaseSeeder extends Seeder
             'is_active' => true,
         ]);
 
-        $google = LlmProvider::create([
+        $google = AiProvider::create([
             'name' => 'Google',
             'slug' => 'google',
             'adapter_type' => 'openai_compatible',
@@ -64,7 +64,7 @@ class DatabaseSeeder extends Seeder
             'is_active' => true,
         ]);
 
-        $ollama = LlmProvider::create([
+        $ollama = AiProvider::create([
             'name' => 'Ollama',
             'slug' => 'ollama',
             'adapter_type' => 'openai_compatible',
@@ -73,14 +73,14 @@ class DatabaseSeeder extends Seeder
             'is_active' => true,
         ]);
 
-        $this->seedLlmModels($openai, $anthropic, $google, $ollama);
+        $this->seedAiModels($openai, $anthropic, $google, $ollama);
     }
 
-    private function seedLlmModels(LlmProvider $openai, LlmProvider $anthropic, LlmProvider $google, LlmProvider $ollama): void
+    private function seedAiModels(AiProvider $openai, AiProvider $anthropic, AiProvider $google, AiProvider $ollama): void
     {
         // OpenAI Models
-        $gpt4o = LlmModel::create([
-            'llm_provider_id' => $openai->id,
+        $gpt4o = AiModel::create([
+            'ai_provider_id' => $openai->id,
             'name' => 'GPT-4o',
             'external_model_id' => 'gpt-4o',
             'capabilities' => ['chat', 'vision', 'function_calling'],
@@ -93,8 +93,8 @@ class DatabaseSeeder extends Seeder
             'is_active' => true,
         ]);
 
-        LlmModel::create([
-            'llm_provider_id' => $openai->id,
+        AiModel::create([
+            'ai_provider_id' => $openai->id,
             'name' => 'GPT-4o Mini',
             'external_model_id' => 'gpt-4o-mini',
             'capabilities' => ['chat', 'vision', 'function_calling'],
@@ -107,8 +107,8 @@ class DatabaseSeeder extends Seeder
             'is_active' => true,
         ]);
 
-        LlmModel::create([
-            'llm_provider_id' => $openai->id,
+        AiModel::create([
+            'ai_provider_id' => $openai->id,
             'name' => 'o3-mini',
             'external_model_id' => 'o3-mini',
             'capabilities' => ['chat', 'reasoning'],
@@ -122,8 +122,8 @@ class DatabaseSeeder extends Seeder
         ]);
 
         // Anthropic Models
-        $claudeSonnet = LlmModel::create([
-            'llm_provider_id' => $anthropic->id,
+        $claudeSonnet = AiModel::create([
+            'ai_provider_id' => $anthropic->id,
             'name' => 'Claude Sonnet 4',
             'external_model_id' => 'claude-sonnet-4-20250514',
             'capabilities' => ['chat', 'vision', 'function_calling'],
@@ -136,8 +136,8 @@ class DatabaseSeeder extends Seeder
             'is_active' => true,
         ]);
 
-        LlmModel::create([
-            'llm_provider_id' => $anthropic->id,
+        AiModel::create([
+            'ai_provider_id' => $anthropic->id,
             'name' => 'Claude 3.5 Haiku',
             'external_model_id' => 'claude-3-5-haiku-20241022',
             'capabilities' => ['chat', 'vision', 'function_calling'],
@@ -151,8 +151,8 @@ class DatabaseSeeder extends Seeder
         ]);
 
         // Google Models
-        LlmModel::create([
-            'llm_provider_id' => $google->id,
+        AiModel::create([
+            'ai_provider_id' => $google->id,
             'name' => 'Gemini 2.0 Flash',
             'external_model_id' => 'gemini-2.0-flash',
             'capabilities' => ['chat', 'vision', 'function_calling'],
@@ -165,8 +165,8 @@ class DatabaseSeeder extends Seeder
             'is_active' => true,
         ]);
 
-        LlmModel::create([
-            'llm_provider_id' => $google->id,
+        AiModel::create([
+            'ai_provider_id' => $google->id,
             'name' => 'Gemini 2.5 Pro',
             'external_model_id' => 'gemini-2.5-pro',
             'capabilities' => ['chat', 'vision', 'reasoning', 'function_calling'],
@@ -180,8 +180,8 @@ class DatabaseSeeder extends Seeder
         ]);
 
         // Ollama Models (self-hosted, free)
-        LlmModel::create([
-            'llm_provider_id' => $ollama->id,
+        AiModel::create([
+            'ai_provider_id' => $ollama->id,
             'name' => 'Llama 3.1 8B',
             'external_model_id' => 'llama3.1',
             'capabilities' => ['chat', 'function_calling'],
@@ -194,8 +194,8 @@ class DatabaseSeeder extends Seeder
             'is_active' => true,
         ]);
 
-        LlmModel::create([
-            'llm_provider_id' => $ollama->id,
+        AiModel::create([
+            'ai_provider_id' => $ollama->id,
             'name' => 'Llama 3.1 70B',
             'external_model_id' => 'llama3.1:70b',
             'capabilities' => ['chat', 'function_calling'],
@@ -208,8 +208,8 @@ class DatabaseSeeder extends Seeder
             'is_active' => true,
         ]);
 
-        LlmModel::create([
-            'llm_provider_id' => $ollama->id,
+        AiModel::create([
+            'ai_provider_id' => $ollama->id,
             'name' => 'Mistral 7B',
             'external_model_id' => 'mistral',
             'capabilities' => ['chat', 'function_calling'],
@@ -222,8 +222,8 @@ class DatabaseSeeder extends Seeder
             'is_active' => true,
         ]);
 
-        LlmModel::create([
-            'llm_provider_id' => $ollama->id,
+        AiModel::create([
+            'ai_provider_id' => $ollama->id,
             'name' => 'Code Llama 13B',
             'external_model_id' => 'codellama:13b',
             'capabilities' => ['chat'],
@@ -236,8 +236,8 @@ class DatabaseSeeder extends Seeder
             'is_active' => true,
         ]);
 
-        LlmModel::create([
-            'llm_provider_id' => $ollama->id,
+        AiModel::create([
+            'ai_provider_id' => $ollama->id,
             'name' => 'Qwen 2.5 7B',
             'external_model_id' => 'qwen2.5',
             'capabilities' => ['chat', 'function_calling'],
@@ -250,8 +250,8 @@ class DatabaseSeeder extends Seeder
             'is_active' => true,
         ]);
 
-        LlmModel::create([
-            'llm_provider_id' => $ollama->id,
+        AiModel::create([
+            'ai_provider_id' => $ollama->id,
             'name' => 'DeepSeek R1 8B',
             'external_model_id' => 'deepseek-r1:8b',
             'capabilities' => ['chat', 'reasoning'],
@@ -278,7 +278,7 @@ class DatabaseSeeder extends Seeder
             return;
         }
 
-        foreach (LlmProvider::where('is_active', true)->get() as $provider) {
+        foreach (AiProvider::where('is_active', true)->get() as $provider) {
             $feature = Feature::query()->updateOrCreate(
                 ['slug' => 'provider:'.$provider->slug],
                 ['name' => $provider->name.' provider access', 'type' => FeatureType::Toggle, 'sort_order' => 100],
@@ -289,7 +289,7 @@ class DatabaseSeeder extends Seeder
             }
         }
 
-        foreach (LlmModel::where('is_active', true)->get() as $model) {
+        foreach (AiModel::where('is_active', true)->get() as $model) {
             $feature = Feature::query()->updateOrCreate(
                 ['slug' => 'model:'.$model->external_model_id],
                 ['name' => $model->name.' model access', 'type' => FeatureType::Toggle, 'sort_order' => 100],

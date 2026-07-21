@@ -1,6 +1,6 @@
 <?php
 
-use App\Models\LlmProvider;
+use App\Models\AiProvider;
 
 it('returns prometheus-format metrics', function () {
     $response = $this->get('/metrics');
@@ -35,7 +35,7 @@ it('does not require authentication', function () {
 });
 
 it('includes provider availability metrics', function () {
-    LlmProvider::create([
+    AiProvider::create([
         'name' => 'Test Provider',
         'slug' => 'test-provider',
         'adapter_type' => 'openai_compatible',

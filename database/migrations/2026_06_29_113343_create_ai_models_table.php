@@ -11,9 +11,9 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::create('llm_models', function (Blueprint $table) {
+        Schema::create('ai_models', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('llm_provider_id')->constrained()->cascadeOnDelete();
+            $table->foreignId('ai_provider_id')->constrained()->cascadeOnDelete();
             $table->string('name');
             $table->string('external_model_id');
             $table->json('capabilities')->nullable();
@@ -23,7 +23,7 @@ return new class extends Migration
             $table->boolean('is_active')->default(true);
             $table->timestamps();
 
-            $table->unique(['llm_provider_id', 'external_model_id']);
+            $table->unique(['ai_provider_id', 'external_model_id']);
             $table->index(['is_active', 'name']);
         });
     }
@@ -33,6 +33,6 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::dropIfExists('llm_models');
+        Schema::dropIfExists('ai_models');
     }
 };

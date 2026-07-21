@@ -1,13 +1,13 @@
 <?php
 
-namespace App\Filament\Resources\LlmModels;
+namespace App\Filament\Resources\AiProviders;
 
-use App\Filament\Resources\LlmModels\Pages\CreateLlmModel;
-use App\Filament\Resources\LlmModels\Pages\EditLlmModel;
-use App\Filament\Resources\LlmModels\Pages\ListLlmModels;
-use App\Filament\Resources\LlmModels\Schemas\LlmModelForm;
-use App\Filament\Resources\LlmModels\Tables\LlmModelsTable;
-use App\Models\LlmModel;
+use App\Filament\Resources\AiProviders\Pages\CreateAiProvider;
+use App\Filament\Resources\AiProviders\Pages\EditAiProvider;
+use App\Filament\Resources\AiProviders\Pages\ListAiProviders;
+use App\Filament\Resources\AiProviders\Schemas\AiProviderForm;
+use App\Filament\Resources\AiProviders\Tables\AiProvidersTable;
+use App\Models\AiProvider;
 use BackedEnum;
 use Filament\Resources\Resource;
 use Filament\Schemas\Schema;
@@ -17,9 +17,9 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Auth;
 use UnitEnum;
 
-class LlmModelResource extends Resource
+class AiProviderResource extends Resource
 {
-    protected static ?string $model = LlmModel::class;
+    protected static ?string $model = AiProvider::class;
 
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedRectangleStack;
 
@@ -47,12 +47,12 @@ class LlmModelResource extends Resource
 
     public static function form(Schema $schema): Schema
     {
-        return LlmModelForm::configure($schema);
+        return AiProviderForm::configure($schema);
     }
 
     public static function table(Table $table): Table
     {
-        return LlmModelsTable::configure($table);
+        return AiProvidersTable::configure($table);
     }
 
     public static function getRelations(): array
@@ -65,9 +65,9 @@ class LlmModelResource extends Resource
     public static function getPages(): array
     {
         return [
-            'index' => ListLlmModels::route('/'),
-            'create' => CreateLlmModel::route('/create'),
-            'edit' => EditLlmModel::route('/{record}/edit'),
+            'index' => ListAiProviders::route('/'),
+            'create' => CreateAiProvider::route('/create'),
+            'edit' => EditAiProvider::route('/{record}/edit'),
         ];
     }
 

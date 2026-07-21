@@ -1,7 +1,7 @@
 <?php
 
-use App\Models\LlmModel;
-use App\Models\LlmProvider;
+use App\Models\AiModel;
+use App\Models\AiProvider;
 use App\Models\User;
 use Revoltify\Subscriptionify\Enums\FeatureType;
 use Revoltify\Subscriptionify\Models\Feature;
@@ -9,7 +9,7 @@ use Revoltify\Subscriptionify\Models\Plan;
 use Tests\TestCase;
 
 it('grants model access to a plan via a subscriptionify toggle feature', function () {
-    $provider = LlmProvider::create([
+    $provider = AiProvider::create([
         'name' => 'Provider A',
         'slug' => 'provider-a',
         'adapter_type' => 'openai_compatible',
@@ -17,8 +17,8 @@ it('grants model access to a plan via a subscriptionify toggle feature', functio
         'auth_mode' => 'bearer',
         'is_active' => true,
     ]);
-    $model = LlmModel::create([
-        'llm_provider_id' => $provider->id,
+    $model = AiModel::create([
+        'ai_provider_id' => $provider->id,
         'name' => 'Model A',
         'external_model_id' => 'model-a',
         'is_active' => true,
@@ -40,7 +40,7 @@ it('grants model access to a plan via a subscriptionify toggle feature', functio
 });
 
 it('grants provider access to a plan via a subscriptionify toggle feature', function () {
-    $provider = LlmProvider::create([
+    $provider = AiProvider::create([
         'name' => 'Provider B',
         'slug' => 'provider-b',
         'adapter_type' => 'openai_compatible',

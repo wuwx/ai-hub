@@ -1,7 +1,7 @@
 <?php
 
-use App\Models\LlmModel;
-use App\Models\LlmProvider;
+use App\Models\AiModel;
+use App\Models\AiProvider;
 use App\Models\User;
 use Database\Seeders\SubscriptionifySeeder;
 use Illuminate\Http\Client\Request as HttpRequest;
@@ -142,7 +142,7 @@ function provisionEmbeddingsTarget(): array
     (new SubscriptionifySeeder)->run();
     TestCase::subscribeUserToFreePlan($user);
 
-    $provider = LlmProvider::create([
+    $provider = AiProvider::create([
         'name' => 'OpenAI Mock',
         'slug' => 'openai-embeddings-'.uniqid(),
         'adapter_type' => 'openai_compatible',
@@ -157,8 +157,8 @@ function provisionEmbeddingsTarget(): array
         'is_active' => true,
     ]);
 
-    $model = LlmModel::create([
-        'llm_provider_id' => $provider->id,
+    $model = AiModel::create([
+        'ai_provider_id' => $provider->id,
         'name' => 'TEXT-EMBEDDING-3-SMALL',
         'external_model_id' => 'text-embedding-3-small',
         'is_active' => true,

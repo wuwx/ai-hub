@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Filament\Resources\LlmProviders\Schemas;
+namespace App\Filament\Resources\AiProviders\Schemas;
 
 use Filament\Forms\Components\KeyValue;
 use Filament\Forms\Components\Select;
@@ -8,7 +8,7 @@ use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Toggle;
 use Filament\Schemas\Schema;
 
-class LlmProviderForm
+class AiProviderForm
 {
     public static function configure(Schema $schema): Schema
     {
