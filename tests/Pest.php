@@ -1,5 +1,9 @@
 <?php
 
+use App\Models\AiModel;
+use App\Models\AiProvider;
+use App\Models\User;
+use Database\Seeders\SubscriptionifySeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -44,7 +48,76 @@ expect()->extend('toBeOne', function () {
 |
 */
 
-function something()
+function provisionGatewayTarget(string $adapterType, string $externalModelId): array
 {
-    // ..
+    $user = User::factory()->create();
+
+    (new SubscriptionifySeeder)->run();
+    TestCase::subscribeUserToFreePlan($user);
+
+    $provider = AiProvider::create([
+        'name' => 'Provider '.$adapterType,
+        'slug' => 'provider-'.$adapterType.'-'.uniqid(),
+        'adapter_type' => $adapterType,
+        'base_url' => $adapterType === 'anthropic_compatible' ? 'https://anthropic.mock' : 'https://openai.mock',
+        'auth_mode' => 'bearer',
+        'secret_ref' => 'test-secret',
+        'options' => [
+            'endpoints' => [
+                'chat' => '/v1/chat/completions',
+                'responses' => '/v1/responses',
+                'messages' => '/v1/messages',
+            ],
+        ],
+        'is_active' => true,
+    ]);
+
+    $model = AiModel::create([
+        'ai_provider_id' => $provider->id,
+        'name' => strtoupper($externalModelId),
+        'external_model_id' => $externalModelId,
+        'is_active' => true,
+    ]);
+
+    TestCase::entitleProvider($provider);
+    TestCase::entitleModel($model);
+
+    $apiKey = $user->createToken('Gateway Access Key', ['*'], null);
+
+    return [$apiKey->plainTextToken, $model->external_model_id];
+}
+
+function provisionEmbeddingsTarget(string $externalModelId): array
+{
+    $user = User::factory()->create();
+
+    (new SubscriptionifySeeder)->run();
+    TestCase::subscribeUserToFreePlan($user);
+
+    $provider = AiProvider::create([
+        'name' => 'Mock Provider',
+        'slug' => 'mock-provider-'.uniqid(),
+        'adapter_type' => 'openai_compatible',
+        'base_url' => 'https://mockprovider.local',
+        'auth_mode' => 'bearer',
+        'secret_ref' => 'test-secret',
+        'options' => [
+            'endpoints' => ['embeddings' => '/v1/embeddings'],
+        ],
+        'is_active' => true,
+    ]);
+
+    $model = AiModel::create([
+        'ai_provider_id' => $provider->id,
+        'name' => strtoupper($externalModelId),
+        'external_model_id' => $externalModelId,
+        'is_active' => true,
+    ]);
+
+    TestCase::entitleProvider($provider);
+    TestCase::entitleModel($model);
+
+    $apiKey = $user->createToken('Gateway Access Key', ['*'], null);
+
+    return [$apiKey->plainTextToken, $model->external_model_id];
 }
