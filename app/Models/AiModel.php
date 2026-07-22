@@ -27,7 +27,7 @@ class AiModel extends Model
     /**
      * @return BelongsTo<AiProvider, $this>
      */
-    public function provider(): BelongsTo
+    public function aiProvider(): BelongsTo
     {
         return $this->belongsTo(AiProvider::class, 'ai_provider_id');
     }

@@ -15,7 +15,7 @@ class AiModelForm
         return $schema
             ->components([
                 Select::make('ai_provider_id')
-                    ->relationship('provider', 'name')
+                    ->relationship('aiProvider', 'name')
                     ->required(),
                 TextInput::make('name')
                     ->required(),
