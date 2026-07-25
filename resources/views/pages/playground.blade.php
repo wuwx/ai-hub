@@ -42,14 +42,14 @@ new #[Title('Playground')] class extends Component
         }
 
         return AiModel::query()
-            ->with('provider')
+            ->with('aiProvider')
             ->where('is_active', true)
-            ->whereHas('provider', fn ($query) => $query->where('is_active', true))
+            ->whereHas('aiProvider', fn ($query) => $query->where('is_active', true))
             ->orderBy('name')
             ->get()
-            ->filter(fn (AiModel $model) => $model->provider
+            ->filter(fn (AiModel $model) => $model->aiProvider
                 && $user->hasFeature('model:'.$model->external_model_id)
-                && $user->hasFeature('provider:'.$model->provider->slug))
+                && $user->hasFeature('provider:'.$model->aiProvider->slug))
             ->map(fn (AiModel $model) => [
                 'value' => $model->external_model_id,
                 'label' => $model->name,
