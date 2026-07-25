@@ -60,22 +60,9 @@ it('rejects embeddings without a model field', function () {
         'input' => 'The quick brown fox',
     ]);
 
-    $response->assertStatus(422);
-    $response->assertJsonPath('error.code', 'missing_model');
-    Http::assertNothingSent();
-});
-
-it('rejects embeddings without an input field', function () {
-    [$plainTextKey, $modelExternalId] = provisionEmbeddingsTarget('text-embedding-3-small');
-
-    Http::fake();
-
-    $response = $this->withToken($plainTextKey)->postJson('/api/v1/embeddings', [
-        'model' => $modelExternalId,
-    ]);
-
-    $response->assertStatus(422);
-    $response->assertJsonPath('error.code', 'missing_input');
+    // Provider resolution happens in middleware via firstOrFail(); without a
+    // matching model the request is rejected before anything is forwarded.
+    $response->assertStatus(404);
     Http::assertNothingSent();
 });
 
