@@ -10361,12 +10361,12 @@
             "source": {
                 "type": "git",
                 "url": "https://github.com/wuwx/laravel-gateway.git",
-                "reference": "5dbe5fa5d0784cb11c1fcffb426b14964b4a8c8e"
+                "reference": "5d09388ca6406c7bcf5c673eca5643baee593880"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/wuwx/laravel-gateway/zipball/5dbe5fa5d0784cb11c1fcffb426b14964b4a8c8e",
-                "reference": "5dbe5fa5d0784cb11c1fcffb426b14964b4a8c8e",
+                "url": "https://api.github.com/repos/wuwx/laravel-gateway/zipball/5d09388ca6406c7bcf5c673eca5643baee593880",
+                "reference": "5d09388ca6406c7bcf5c673eca5643baee593880",
                 "shasum": ""
             },
             "require": {
@@ -10436,7 +10436,7 @@
                     "type": "github"
                 }
             ],
-            "time": "2026-07-26T16:35:34+00:00"
+            "time": "2026-07-26T19:11:31+00:00"
         }
     ],
     "packages-dev": [
