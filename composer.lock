@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "88e6b34b26f75ccca2665d1b4971791b",
+    "content-hash": "319d87a9f11f9aba2fe4777d664e57f6",
     "packages": [
         {
             "name": "bacon/bacon-qr-code",
@@ -10352,6 +10352,89 @@
                 "source": "https://github.com/webmozarts/assert/tree/2.4.1"
             },
             "time": "2026-06-15T15:31:57+00:00"
+        },
+        {
+            "name": "wuwx/laravel-gateway",
+            "version": "dev-main",
+            "source": {
+                "type": "git",
+                "url": "https://github.com/wuwx/laravel-gateway.git",
+                "reference": "5dbe5fa5d0784cb11c1fcffb426b14964b4a8c8e"
+            },
+            "dist": {
+                "type": "zip",
+                "url": "https://api.github.com/repos/wuwx/laravel-gateway/zipball/5dbe5fa5d0784cb11c1fcffb426b14964b4a8c8e",
+                "reference": "5dbe5fa5d0784cb11c1fcffb426b14964b4a8c8e",
+                "shasum": ""
+            },
+            "require": {
+                "illuminate/contracts": "^11.0||^12.0||^13.0",
+                "illuminate/http": "^11.0||^12.0||^13.0",
+                "illuminate/routing": "^11.0||^12.0||^13.0",
+                "illuminate/support": "^11.0||^12.0||^13.0",
+                "php": "^8.3",
+                "spatie/laravel-package-tools": "^1.16"
+            },
+            "require-dev": {
+                "larastan/larastan": "^3.0",
+                "laravel/pint": "^1.14",
+                "nunomaduro/collision": "^8.8",
+                "orchestra/testbench": "^11.0.0||^10.0.0||^9.0.0",
+                "pestphp/pest": "^4.0",
+                "pestphp/pest-plugin-arch": "^4.0",
+                "pestphp/pest-plugin-laravel": "^4.0",
+                "phpstan/extension-installer": "^1.4",
+                "phpstan/phpstan-deprecation-rules": "^2.0",
+                "phpstan/phpstan-phpunit": "^2.0"
+            },
+            "default-branch": true,
+            "type": "library",
+            "extra": {
+                "laravel": {
+                    "aliases": {
+                        "Gateway": "Wuwx\\LaravelGateway\\Facades\\Gateway"
+                    },
+                    "providers": [
+                        "Wuwx\\LaravelGateway\\GatewayServiceProvider"
+                    ]
+                }
+            },
+            "autoload": {
+                "psr-4": {
+                    "Wuwx\\LaravelGateway\\": "src/",
+                    "Wuwx\\LaravelGateway\\Database\\Factories\\": "database/factories/"
+                }
+            },
+            "notification-url": "https://packagist.org/downloads/",
+            "license": [
+                "MIT"
+            ],
+            "authors": [
+                {
+                    "name": "wuwx",
+                    "role": "Developer"
+                }
+            ],
+            "description": "A lightweight HTTP gateway proxy for Laravel applications.",
+            "homepage": "https://github.com/wuwx/laravel-gateway",
+            "keywords": [
+                "gateway",
+                "http",
+                "laravel",
+                "proxy",
+                "wuwx"
+            ],
+            "support": {
+                "issues": "https://github.com/wuwx/laravel-gateway/issues",
+                "source": "https://github.com/wuwx/laravel-gateway/tree/main"
+            },
+            "funding": [
+                {
+                    "url": "https://github.com/wuwx",
+                    "type": "github"
+                }
+            ],
+            "time": "2026-07-26T16:35:34+00:00"
         }
     ],
     "packages-dev": [
@@ -14056,7 +14139,9 @@
     ],
     "aliases": [],
     "minimum-stability": "stable",
-    "stability-flags": {},
+    "stability-flags": {
+        "wuwx/laravel-gateway": 20
+    },
     "prefer-stable": true,
     "prefer-lowest": false,
     "platform": {

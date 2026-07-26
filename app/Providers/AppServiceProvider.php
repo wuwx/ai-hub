@@ -2,16 +2,12 @@
 
 namespace App\Providers;
 
-use App\Http\Controllers\GatewayController;
-use App\Http\Routing\GatewayDefinition;
 use Carbon\CarbonImmutable;
-use Closure;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\RateLimiter;
-use Illuminate\Support\Facades\Route;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Validation\Rules\Password;
 use Spatie\Health\Checks\Checks\CacheCheck;
@@ -39,8 +35,6 @@ class AppServiceProvider extends ServiceProvider
         $this->configureRateLimiting();
 
         $this->registerHealthChecks();
-
-        $this->registerGatewayMacro();
     }
 
     /**
@@ -65,26 +59,6 @@ class AppServiceProvider extends ServiceProvider
                 ->warnWhenUsedSpaceIsAbovePercentage(70)
                 ->failWhenUsedSpaceIsAbovePercentage(90),
         ]);
-    }
-
-    /**
-     * Register the Route::gateway() macro for proxying requests to an upstream URL.
-     *
-     * Example:
-     *   Route::gateway('/v1/{path}', function ($route) {
-     *       $route->to('https://api.openai.com');
-     *   });
-     */
-    protected function registerGatewayMacro(): void
-    {
-        Route::macro('gateway', function (string $uri, Closure $callback) {
-            $definition = new GatewayDefinition;
-            $callback($definition);
-
-            return Route::any($uri, function (Request $request) use ($definition) {
-                return app(GatewayController::class)($request, $definition);
-            })->where('path', '.*');
-        });
     }
 
     /**
